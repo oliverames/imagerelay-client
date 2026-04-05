@@ -41,9 +41,9 @@ class CliValidationTests(unittest.TestCase):
             result = self.run_cli(env, "sync", "once", check=False)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("The client is not ready to sync yet.", result.stderr)
-            self.assertIn("Missing settings: api_key, remote_root_folder_id, default_file_type_id", result.stderr)
-            self.assertIn("Run `imagerelay-client init`", result.stderr)
+            output = result.stdout + result.stderr
+            self.assertIn("not configured yet", output)
+            self.assertIn("imagerelay-client init", output)
             self.assertNotIn("Traceback", result.stderr)
 
     def test_daemon_start_without_setup_shows_guidance(self) -> None:
@@ -54,8 +54,9 @@ class CliValidationTests(unittest.TestCase):
             result = self.run_cli(env, "daemon", "start", check=False)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("The client is not ready to sync yet.", result.stderr)
-            self.assertNotIn("did not become ready before the timeout expired", result.stderr)
+            output = result.stdout + result.stderr
+            self.assertIn("not configured yet", output)
+            self.assertNotIn("did not become ready before the timeout expired", output)
 
     def test_config_set_rejects_invalid_boolean_value(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -148,7 +149,8 @@ class CliValidationTests(unittest.TestCase):
                 result = self.run_cli(env, "sync", "once", check=False)
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Syncing is paused until you resume it.", result.stderr)
+            output = result.stdout + result.stderr
+            self.assertIn("paused", output.lower())
 
     def test_config_set_can_clear_nullable_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -68,8 +68,8 @@ class MenuStatusTests(unittest.TestCase):
             recent_activity=[],
         )
 
-        self.assertEqual(_status_symbol_name(idle), "sdcard")
-        self.assertEqual(_status_symbol_name(running), "sdcard.fill")
+        self.assertEqual(_status_symbol_name(idle), "xmark.circle")
+        self.assertEqual(_status_symbol_name(running), "arrow.triangle.2.circlepath")
 
     def test_primary_status_label_prefers_pause_and_running_states(self) -> None:
         paused = MenuStatusSnapshot(

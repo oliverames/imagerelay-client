@@ -6,7 +6,6 @@ import requests
 
 from .api import ImageRelayApiError
 from .config import SyncConfigurationError
-from .daemon import DaemonLockError
 from .sync_pause import SyncPausedError
 
 
@@ -20,6 +19,9 @@ def user_message_for_error(error: Exception) -> str:
             "Sync is not configured yet. Run `imagerelay-client init` to set up "
             "your API key, root folder, and file type."
         )
+    # Lazy import to avoid circular dependency (daemon -> sync_engine -> user_messages)
+    from .daemon import DaemonLockError  # noqa: E402
+
     if isinstance(error, DaemonLockError):
         return (
             "Another sync instance is already running. "
