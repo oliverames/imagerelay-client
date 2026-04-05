@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import logging
 import os
 import plistlib
 import platform
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from .appdirs import APP_HOME_ENV, autostart_path, ensure_app_dirs, log_path
 
+log = logging.getLogger(__name__)
 
 BUNDLE_ID = "com.imagerelay.client"
 
@@ -79,12 +82,38 @@ class AutoStart:
     def path(self) -> Path:
         return self.spec.destination
 
+    def _run_launchctl(self, *args: str) -> bool:
+        """Run a launchctl command, returning True on success."""
+        result = subprocess.run(
+            ["launchctl", *args],
+            capture_output=True,
+        )
+        return result.returncode == 0
+
     def enable(self) -> Path:
         ensure_app_dirs()
         self.spec.destination.parent.mkdir(parents=True, exist_ok=True)
         with self.spec.destination.open("wb") as handle:
             plistlib.dump(self.spec.plist(), handle, sort_keys=False)
+
+        gui_target = f"gui/{os.getuid()}"
+        if not self._run_launchctl("bootstrap", gui_target, str(self.spec.destination)):
+            if not self._run_launchctl("load", str(self.spec.destination)):
+                log.warning(
+                    "Plist written to %s but could not be loaded immediately; "
+                    "it will activate on next login.",
+                    self.spec.destination,
+                )
+
         return self.spec.destination
 
     def disable(self) -> None:
+        gui_target = f"gui/{os.getuid()}/{self.spec.label}"
+        if not self._run_launchctl("bootout", gui_target):
+            if not self._run_launchctl("unload", str(self.spec.destination)):
+                log.warning(
+                    "Could not unload %s; removing plist anyway.",
+                    self.spec.destination,
+                )
+
         self.spec.destination.unlink(missing_ok=True)

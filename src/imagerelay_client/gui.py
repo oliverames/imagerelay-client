@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import platform
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -78,21 +79,155 @@ class MenuStatusSnapshot:
 
 
 def _status_symbol_name(snapshot: MenuStatusSnapshot) -> str:
-    return "sdcard.fill" if snapshot.running else "sdcard"
+    if snapshot.missing_fields:
+        return "gearshape.circle"
+    if snapshot.paused:
+        return "pause.circle"
+    if snapshot.sync_state == "error":
+        return "exclamationmark.triangle"
+    if snapshot.running and snapshot.sync_state == "syncing":
+        return "arrow.triangle.2.circlepath"
+    if snapshot.running:
+        return "checkmark.circle"
+    return "xmark.circle"
 
 
-def _load_status_symbol(symbol_name: str):
+def _set_status_icon(app, symbol_name: str) -> bool:
+    """Set the status bar icon to an SF Symbol via AppKit.
+
+    Uses NSStatusItem.button() which is the public NSStatusItem API.
+    Returns True if the icon was set, False on any failure (graceful fallback).
+    """
     try:
         from AppKit import NSImage
     except ImportError:
-        return None
+        return False
 
-    image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(symbol_name, APP_NAME)
+    image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(
+        symbol_name, APP_NAME
+    )
     if image is None:
-        return None
+        return False
 
     image.setTemplate_(True)
-    return image
+
+    ns_app = getattr(app, "_nsapp", None)
+    if ns_app is None:
+        return False
+
+    try:
+        status_item = ns_app.nsstatusitem
+        status_item.button().setImage_(image)
+        status_item.button().setTitle_("")
+        return True
+    except AttributeError:
+        return False
+
+
+def _clear_status_icon(app) -> bool:
+    """Remove the SF Symbol icon from the status bar, reverting to text title."""
+    ns_app = getattr(app, "_nsapp", None)
+    if ns_app is None:
+        return False
+
+    try:
+        status_item = ns_app.nsstatusitem
+        status_item.button().setImage_(None)
+        return True
+    except AttributeError:
+        return False
+
+
+def _set_key_equivalent(rumps_menu_item, key: str, modifier_mask: int | None = None) -> bool:
+    """Set a keyboard shortcut on a rumps MenuItem via its underlying NSMenuItem.
+
+    By default NSMenuItem key equivalents use Cmd as the modifier.
+    Returns True if set, False on failure (rumps may not expose the NS object).
+    """
+    try:
+        ns_menu_item = rumps_menu_item._menuitem
+        ns_menu_item.setKeyEquivalent_(key)
+        if modifier_mask is not None:
+            ns_menu_item.setKeyEquivalentModifierMask_(modifier_mask)
+        return True
+    except (AttributeError, TypeError):
+        return False
+
+
+def _show_about_dialog(snapshot: "MenuStatusSnapshot") -> None:
+    """Show a rich About dialog using NSAlert with a Copy Debug Info button.
+
+    Falls back to returning False if AppKit is unavailable so the caller
+    can use rumps.alert instead.
+    """
+    try:
+        from AppKit import (
+            NSAlert,
+            NSInformationalAlertStyle,
+            NSPasteboard,
+            NSStringPboardType,
+        )
+    except ImportError:
+        return False
+
+    version = "0.1.0"
+    python_version = sys.version.split()[0]
+    status_label = _primary_status_label(snapshot)
+    sync_mode = _sync_mode_label(snapshot)
+    pause_label = pause_menu_label(
+        SyncPauseState(paused=snapshot.paused, until=snapshot.paused_until)
+    )
+
+    info_lines = [
+        f"Version: {version}",
+        f"Python: {python_version}",
+        f"Platform: {platform.platform()}",
+        "",
+        f"Status: {status_label}",
+        f"Sync Mode: {sync_mode}",
+        f"Pause: {pause_label}",
+        f"Phase: {snapshot.sync_phase}",
+        f"Progress: {_progress_label(snapshot)}",
+        f"Time Remaining: {_format_eta(snapshot.eta_seconds) if snapshot.sync_state == 'syncing' else '--'}",
+        f"Current Item: {_shorten_path(snapshot.current_item, limit=52)}",
+        f"Last Sync: {snapshot.last_sync}",
+        f"Last Pull: {_format_last_sync(snapshot.last_remote_poll_at)}",
+        f"Next Pull: {_next_pull_label(snapshot)}",
+        f"Tracked Items: {snapshot.tracked_items}",
+        f"Upload Changes: {'On' if snapshot.sync_upload else 'Off'}",
+        f"Download Changes: {'On' if snapshot.sync_download else 'Off'}",
+        f"Menu Bar App at Login: {'On' if _autostart_enabled('gui') else 'Off'}",
+        f"Sync Engine at Login: {'On' if _autostart_enabled('daemon') else 'Off'}",
+    ]
+    if snapshot.last_error:
+        info_lines.append(f"Last Error: {snapshot.last_error}")
+
+    message_text = "\n".join(info_lines)
+
+    alert = NSAlert.alloc().init()
+    alert.setAlertStyle_(NSInformationalAlertStyle)
+    alert.setMessageText_(APP_NAME)
+    alert.setInformativeText_(message_text)
+    alert.addButtonWithTitle_("OK")
+    alert.addButtonWithTitle_("Copy Debug Info")
+
+    response = alert.runModal()
+    # NSAlertSecondButtonReturn = 1001
+    if response == 1001:
+        pasteboard = NSPasteboard.generalPasteboard()
+        pasteboard.clearContents()
+        pasteboard.setString_forType_(
+            f"{APP_NAME} {version}\n{message_text}", NSStringPboardType
+        )
+
+    return True
+
+
+def _make_section_header(rumps_module, label: str):
+    """Create a disabled menu item that acts as a section header."""
+    item = rumps_module.MenuItem(f"-- {label} --")
+    item.set_callback(None)
+    return item
 
 
 def _sync_mode_label(snapshot: MenuStatusSnapshot) -> str:
@@ -377,10 +512,14 @@ class ImageRelayMenuBarApp:
         )
         self.quit_item = self.rumps.MenuItem("Quit", callback=self.quit_app)
 
+        self.sync_section_header = _make_section_header(self.rumps, "Sync")
+        self.settings_section_header = _make_section_header(self.rumps, "Settings")
+
         self.app.menu = [
             self.overview_item,
             self.status_item,
             None,
+            self.sync_section_header,
             self.open_folder_item,
             self.sync_item,
             self.pause_menu_item,
@@ -389,6 +528,7 @@ class ImageRelayMenuBarApp:
             self.restart_item,
             self.stop_item,
             None,
+            self.settings_section_header,
             self.settings_menu_item,
             self.details_menu_item,
             self.recent_activity_menu_item,
@@ -396,6 +536,10 @@ class ImageRelayMenuBarApp:
             None,
             self.quit_item,
         ]
+
+        # Set keyboard shortcuts via AppKit (best-effort; no-op if unavailable)
+        _set_key_equivalent(self.sync_item, "s")
+        _set_key_equivalent(self.quit_item, "q")
 
         self.timer = self.rumps.Timer(self.refresh_status, 3)
         self.timer.start()
@@ -499,21 +643,13 @@ class ImageRelayMenuBarApp:
         self.daemon_autostart_item.state = 1 if _autostart_enabled("daemon") else 0
 
     def _apply_status_icon(self, snapshot: MenuStatusSnapshot) -> None:
-        image = _load_status_symbol(_status_symbol_name(snapshot))
-        if image is None:
+        symbol_name = _status_symbol_name(snapshot)
+        if _set_status_icon(self.app, symbol_name):
+            self._using_symbol_icon = True
+            self.app.title = None
+        else:
             self._using_symbol_icon = False
-            self.app._icon = None
-            self.app._icon_nsimage = None
-            if getattr(self.app, "_nsapp", None) is not None:
-                self.app._nsapp.setStatusBarIcon()
-            return
-
-        self._using_symbol_icon = True
-        self.app._icon = _status_symbol_name(snapshot)
-        self.app._icon_nsimage = image
-        if getattr(self.app, "_nsapp", None) is not None:
-            self.app._nsapp.setStatusBarIcon()
-        self.app.title = None
+            _clear_status_icon(self.app)
 
     def _toggle_direction(self, key: str, title: str) -> None:
         store = ConfigStore()
@@ -664,29 +800,17 @@ class ImageRelayMenuBarApp:
 
     def show_about(self, _sender) -> None:
         snapshot = load_menu_status()
+        if _show_about_dialog(snapshot):
+            return
+        # Fallback to rumps.alert if AppKit is unavailable
         self.rumps.alert(
             title=APP_NAME,
             message=(
+                f"Version: 0.1.0 / Python {sys.version.split()[0]}\n\n"
                 f"Status: {_primary_status_label(snapshot)}\n"
                 f"Sync Mode: {_sync_mode_label(snapshot)}\n"
-                f"Pause: {pause_menu_label(SyncPauseState(paused=snapshot.paused, until=snapshot.paused_until))}\n"
-                f"Phase: {snapshot.sync_phase}\n"
-                f"Progress: {_progress_label(snapshot)}\n"
-                f"Time Remaining: {_format_eta(snapshot.eta_seconds) if snapshot.sync_state == 'syncing' else '--'}\n"
-                f"Current Item: {_shorten_path(snapshot.current_item, limit=52)}\n"
-                f"Last Sync: {snapshot.last_sync}\n"
-                f"Last Pull: {_format_last_sync(snapshot.last_remote_poll_at)}\n"
-                f"Next Pull: {_next_pull_label(snapshot)}\n"
                 f"Tracked Items: {snapshot.tracked_items}\n"
-                f"Upload Changes: {'On' if snapshot.sync_upload else 'Off'}\n"
-                f"Download Changes: {'On' if snapshot.sync_download else 'Off'}\n"
-                f"Menu Bar App at Login: {'On' if _autostart_enabled('gui') else 'Off'}\n"
-                f"Sync Engine at Login: {'On' if _autostart_enabled('daemon') else 'Off'}"
-                + (
-                    f"\nLast Error: {snapshot.last_error}"
-                    if snapshot.last_error
-                    else ""
-                )
+                f"Last Sync: {snapshot.last_sync}"
             ),
         )
 

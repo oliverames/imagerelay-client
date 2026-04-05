@@ -11,7 +11,7 @@ from .appdirs import config_path, database_path, ensure_app_dirs
 from .maestral_compat.user_config import UserConfig
 
 
-DEFAULT_USER_AGENT = "ImageRelay Client (https://example.com/imagerelay-client)"
+DEFAULT_USER_AGENT = "ImageRelay Client/0.1.0 (github.com/oliverames/imagerelay-client)"
 CONFIG_VERSION = Version("1.0")
 
 CONFIG_DEFAULTS = {

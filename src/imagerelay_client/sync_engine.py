@@ -30,6 +30,7 @@ from .models import (
 )
 from .progress import SyncProgressTracker
 from .sync_pause import SyncPausedError, SyncPauseState, describe_pause_state, load_pause_state
+from .user_messages import cross_parent_move_message
 
 
 IGNORED_EXACT_NAMES = {".DS_Store"}
@@ -524,11 +525,37 @@ class SyncEngine:
             self.logger.info("Renamed remote folder %s -> %s", action.previous_rel_path, action.rel_path)
             return True
 
+        # Cross-parent folder moves are not supported by Image Relay.
+        # Revert the local folder back to its original location to keep local and remote in sync.
+        msg = cross_parent_move_message(action.previous_rel_path, action.rel_path)
         self.logger.warning(
-            "Folder moves across parents are not implemented yet: %s -> %s",
+            "Reverting cross-parent folder move: %s -> %s",
             action.previous_rel_path,
             action.rel_path,
         )
+
+        src = self.local_root / action.rel_path
+        dst = self.local_root / action.previous_rel_path
+
+        if dst.exists():
+            dst = dst.with_name(dst.name + " (reverted)")
+
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+        except OSError as exc:
+            self.logger.error(
+                "Failed to revert cross-parent folder move %s -> %s: %s",
+                action.rel_path,
+                dst.relative_to(self.local_root),
+                exc,
+            )
+            self.progress.state.last_error = msg
+            self.progress.record_step("Blocked", action.rel_path, phase="Pushing local changes")
+            return False
+
+        self.progress.state.last_error = msg
+        self.progress.record_step("Blocked", action.rel_path, phase="Pushing local changes")
         return False
 
     def _apply_local_folder_delete(self, action: LocalAction) -> bool:
