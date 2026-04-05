@@ -471,7 +471,7 @@ class ImageRelayApiClient:
         file_type_id = payload.get("file_type_id")
         return RemoteFile(
             file_id=int(payload["id"]),
-            name=str(payload["name"]),
+            name=str(payload.get("filename") or payload.get("name") or ""),
             size=int(payload.get("size") or 0),
             updated_on=str(payload.get("updated_on")) if payload.get("updated_on") else None,
             content_type=str(payload.get("content_type")) if payload.get("content_type") else None,
