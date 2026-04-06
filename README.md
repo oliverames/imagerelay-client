@@ -31,6 +31,7 @@ sync, and state tracking.
 - Respect `sync_upload` and `sync_download` direction flags
 - Publish the last remote pull time and next scheduled remote pull into shared state
 - Pause syncing for 30 minutes, 1 hour, until tomorrow at 9 AM local time, or indefinitely
+- Select specific folders to sync via CLI (`folders list/select/show/clear`) or a native macOS folder picker dialog in the menu bar app
 
 ## Current Assumptions
 
