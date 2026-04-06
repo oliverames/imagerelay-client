@@ -40,6 +40,7 @@ class RemoteFolder:
     full_path: str
     updated_on: str | None
     rel_path: str = ""
+    child_count: int = 0
 
 
 @dataclass(slots=True)

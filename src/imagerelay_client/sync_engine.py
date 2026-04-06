@@ -81,6 +81,9 @@ class SyncEngine:
         self.logger = logger
         self.progress = SyncProgressTracker(db)
         self.local_root = settings.resolved_local_root()
+        self._selected_folder_ids = set(settings.selected_folder_ids)
+        self._content_folder_ids: set[int] | None = None
+        self._allowed_rel_prefixes: set[str] | None = None
         self._observer: Observer | None = None
         self._stop_requested = False
         self._local_dirty = True
@@ -215,11 +218,58 @@ class SyncEngine:
             root_folder = self.api.get_root_folder()
             folders_by_id[root_folder.folder_id] = root_folder
 
+        # Fetch files. When specific folders are selected, fetch from each
+        # selected folder to avoid scanning the entire account.  Otherwise
+        # fetch from the configured root.
+        file_source_ids: list[int] = (
+            sorted(self._selected_folder_ids)
+            if self._selected_folder_ids
+            else [configured_root_id]
+        )
+        files: list[RemoteFile] = []
+        seen_file_ids: set[int] = set()
+        for source_id in file_source_ids:
+            for f in self.api.list_files(source_id, recursive=True):
+                if f.file_id not in seen_file_ids:
+                    files.append(f)
+                    seen_file_ids.add(f.file_id)
+
+        # Collect all folder IDs referenced by files that we don't know yet.
+        unknown_folder_ids: set[int] = set()
+        for remote_file in files:
+            for folder_id in remote_file.folder_ids:
+                if folder_id not in folders_by_id:
+                    unknown_folder_ids.add(folder_id)
+
+        # Fetch metadata for each discovered subfolder and walk up to
+        # fill any gaps in the ancestor chain.
+        fetched: set[int] = set()
+        to_fetch = list(unknown_folder_ids)
+        while to_fetch:
+            folder_id = to_fetch.pop()
+            if folder_id in fetched or folder_id in folders_by_id:
+                continue
+            fetched.add(folder_id)
+            try:
+                folder = self.api.get_folder(folder_id)
+                folders_by_id[folder.folder_id] = folder
+                # Also fetch the parent if unknown, so the path can be resolved.
+                if folder.parent_id and folder.parent_id not in folders_by_id:
+                    to_fetch.append(folder.parent_id)
+            except Exception:
+                self.logger.warning("Could not fetch folder %d; skipping.", folder_id)
+
         descendants = self._descendant_folder_ids(folders_by_id, configured_root_id)
+
+        # When specific folders are selected, restrict to those and their descendants.
+        allowed_ids = self._compute_allowed_folder_ids(folders_by_id, configured_root_id, descendants)
+
         remote_folders: dict[int, RemoteFolder] = {}
 
         for folder_id in descendants:
             if folder_id == configured_root_id:
+                continue
+            if allowed_ids is not None and folder_id not in allowed_ids:
                 continue
 
             folder = folders_by_id[folder_id]
@@ -233,7 +283,17 @@ class SyncEngine:
                 rel_path=rel_path,
             )
 
-        files = self.api.list_files(configured_root_id, recursive=True)
+        # Cache allowed rel_path prefixes for upload filtering.
+        # Only include content folders (selected + descendants), not
+        # structure-only ancestors, to prevent uploads from ancestor dirs.
+        if self._content_folder_ids is not None:
+            self._allowed_rel_prefixes = {
+                rf.rel_path for rf in remote_folders.values()
+                if rf.folder_id in self._content_folder_ids
+            }
+        else:
+            self._allowed_rel_prefixes = None
+
         remote_files: dict[int, RemoteFile] = {}
 
         for remote_file in files:
@@ -248,7 +308,8 @@ class SyncEngine:
                     if folder_id in remote_folders
                     else normalize_rel_path(remote_file.name)
                     for folder_id in remote_file.folder_ids
-                    if folder_id == configured_root_id or folder_id in remote_folders
+                    if (folder_id == configured_root_id and allowed_ids is None)
+                    or folder_id in remote_folders
                 }
             )
 
@@ -353,6 +414,8 @@ class SyncEngine:
             )
 
     def _plan_local_actions(self, entries: list[TrackedEntry], scan: dict[str, ScannedEntry]) -> list[LocalAction]:
+        if self._allowed_rel_prefixes is not None:
+            scan = {rp: e for rp, e in scan.items() if self._is_rel_path_allowed(rp)}
         tracked = {entry.rel_path: entry for entry in entries if not entry.is_alias and entry.rel_path}
         missing = {rel_path: entry for rel_path, entry in tracked.items() if rel_path not in scan}
         new = {rel_path: entry for rel_path, entry in scan.items() if rel_path not in tracked}
@@ -926,6 +989,77 @@ class SyncEngine:
             descendants.add(folder_id)
             stack.extend(children_by_parent.get(folder_id, []))
         return descendants
+
+    def _compute_allowed_folder_ids(
+        self,
+        folders_by_id: dict[int, RemoteFolder],
+        root_folder_id: int,
+        all_descendants: set[int],
+    ) -> set[int] | None:
+        """Return the set of folder IDs to sync, or None to sync everything.
+
+        When selected_folder_ids is empty, returns None (sync all).
+        Otherwise, returns the union of each selected folder and its descendants,
+        plus ancestor folders needed for directory structure.
+
+        Also populates ``_content_folder_ids`` with the subset that should have
+        their files synced (selected folders + their descendants, but NOT
+        structure-only ancestors).
+        """
+        if not self._selected_folder_ids:
+            self._content_folder_ids = None
+            return None
+
+        children_by_parent: dict[int | None, list[int]] = defaultdict(list)
+        for folder in folders_by_id.values():
+            if folder.folder_id in all_descendants:
+                children_by_parent[folder.parent_id].append(folder.folder_id)
+
+        content: set[int] = set()
+        for selected_id in self._selected_folder_ids:
+            if selected_id not in all_descendants:
+                self.logger.warning(
+                    "Selected folder ID %d is not a descendant of the sync root; skipping.",
+                    selected_id,
+                )
+                continue
+            stack = [selected_id]
+            while stack:
+                folder_id = stack.pop()
+                if folder_id in content:
+                    continue
+                content.add(folder_id)
+                stack.extend(children_by_parent.get(folder_id, []))
+
+        self._content_folder_ids = content
+
+        # Include ancestor folders so the local directory structure can be
+        # created, but these are NOT added to _content_folder_ids so their
+        # files won't be synced or uploaded.
+        allowed = set(content)
+        for selected_id in list(content):
+            current = selected_id
+            while current != root_folder_id and current in folders_by_id:
+                parent = folders_by_id[current].parent_id
+                if parent is None or parent == root_folder_id:
+                    break
+                allowed.add(parent)
+                current = parent
+
+        return allowed
+
+    def _is_rel_path_allowed(self, rel_path: str) -> bool:
+        """Check if a rel_path falls under any allowed folder prefix.
+
+        Returns True if no folder selection is active (sync all),
+        or if the path is under one of the selected folders' rel_paths.
+        """
+        if self._allowed_rel_prefixes is None:
+            return True
+        for prefix in self._allowed_rel_prefixes:
+            if rel_path == prefix or rel_path.startswith(prefix + "/"):
+                return True
+        return False
 
     def _relative_folder_path(
         self,

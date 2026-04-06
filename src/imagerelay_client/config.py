@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,7 @@ CONFIG_DEFAULTS = {
         "upload_chunk_size": 5 * 1024 * 1024,
         "version_chunk_size": 5 * 1024 * 1024,
         "request_timeout_seconds": 60,
+        "selected_folder_ids": [],
     },
 }
 
@@ -62,6 +63,7 @@ class Settings:
     upload_chunk_size: int = 5 * 1024 * 1024
     version_chunk_size: int = 5 * 1024 * 1024
     request_timeout_seconds: int = 60
+    selected_folder_ids: list[int] = field(default_factory=list)
 
     def resolved_api_key(self) -> str | None:
         return os.environ.get("IMAGERELAY_API_KEY") or self.api_key
@@ -156,6 +158,7 @@ class ConfigStore:
             upload_chunk_size=config.get("sync", "upload_chunk_size"),
             version_chunk_size=config.get("sync", "version_chunk_size"),
             request_timeout_seconds=config.get("sync", "request_timeout_seconds"),
+            selected_folder_ids=config.get("sync", "selected_folder_ids"),
         )
 
     def save(self, settings: Settings) -> None:
@@ -175,6 +178,7 @@ class ConfigStore:
         config.set("sync", "upload_chunk_size", settings.upload_chunk_size)
         config.set("sync", "version_chunk_size", settings.version_chunk_size)
         config.set("sync", "request_timeout_seconds", settings.request_timeout_seconds)
+        config.set("sync", "selected_folder_ids", settings.selected_folder_ids)
 
     def update(self, **changes: Any) -> Settings:
         settings = self.load()

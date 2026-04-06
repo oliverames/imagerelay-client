@@ -139,6 +139,18 @@ def _coerce_value(key: str, raw: str) -> Any:
         if not normalized:
             raise click.ClickException("`local_root` cannot be empty.")
         return str(Path(raw).expanduser())
+    if key == "selected_folder_ids":
+        if normalized.lower() in NULL_VALUES:
+            return []
+        try:
+            ids = sorted(int(v.strip()) for v in normalized.split(",") if v.strip())
+        except ValueError as exc:
+            raise click.ClickException(
+                "`selected_folder_ids` must be a comma-separated list of folder IDs (e.g., '5,12,30')."
+            ) from exc
+        if any(i < 1 for i in ids):
+            raise click.ClickException("`selected_folder_ids` values must be 1 or greater.")
+        return ids
     if key in {"download_purpose", "user_agent"} and not normalized:
         raise click.ClickException(f"`{key}` cannot be empty.")
     return raw
@@ -291,6 +303,103 @@ def config_set(key: str, value: str) -> None:
     elif saved_value is None:
         saved_value = "(cleared)"
     _echo_success(f"Updated {key}: {saved_value}")
+
+
+@main.group()
+def folders() -> None:
+    """List and select which remote folders to sync."""
+
+
+@folders.command("list")
+@click.pass_context
+def folders_list(ctx: click.Context) -> None:
+    """List available remote folders."""
+    logger = configure_logging(verbose=ctx.obj["verbose"])
+    store = ConfigStore()
+    settings = store.load()
+
+    if not settings.resolved_api_key():
+        raise click.ClickException("No API key configured. Run `imagerelay-client init` first.")
+    if settings.remote_root_folder_id is None:
+        raise click.ClickException("No remote root folder configured. Run `imagerelay-client init` first.")
+
+    try:
+        api = ImageRelayApiClient(settings=settings, logger=logger)
+        all_folders = api.list_folders()
+    except ImageRelayApiError as exc:
+        _fatal_error(exc)
+        return  # _fatal_error is NoReturn; satisfies type checker
+
+    root_id = settings.remote_root_folder_id
+    folders_by_id = {f.folder_id: f for f in all_folders}
+
+    # Build parent-children map and find descendants of root
+    children_by_parent: dict[int | None, list] = {}
+    for f in all_folders:
+        children_by_parent.setdefault(f.parent_id, []).append(f)
+
+    selected = set(settings.selected_folder_ids)
+
+    def print_tree(parent_id: int, indent: int = 0) -> None:
+        children = children_by_parent.get(parent_id, [])
+        for f in sorted(children, key=lambda x: x.name.lower()):
+            marker = click.style("*", fg="green") if f.folder_id in selected else " "
+            prefix = "  " * indent
+            click.echo(f"  {marker} {prefix}{f.name} (ID {f.folder_id})")
+            print_tree(f.folder_id, indent + 1)
+
+    click.echo()
+    click.echo(click.style("Remote Folders", bold=True))
+    if selected:
+        click.echo(f"  (* = selected for sync)")
+
+    has_children = root_id in children_by_parent
+    if has_children:
+        print_tree(root_id)
+    else:
+        click.echo("  No subfolders found under the configured root folder.")
+
+    if not selected:
+        click.echo()
+        click.echo("  All folders are synced. Use `folders select` to choose specific folders.")
+    click.echo()
+
+
+@folders.command("select")
+@click.argument("folder_ids", nargs=-1, type=int, required=True)
+@click.pass_context
+def folders_select(ctx: click.Context, folder_ids: tuple[int, ...]) -> None:
+    """Select specific folder IDs to sync. Only these folders (and their subfolders) will be synced."""
+    store = ConfigStore()
+    settings = store.load()
+    settings.selected_folder_ids = sorted(set(folder_ids))
+    store.save(settings)
+    _echo_success(f"Selected {len(settings.selected_folder_ids)} folder(s) for sync: {settings.selected_folder_ids}")
+    click.echo("Only these folders and their subfolders will be synced.")
+    click.echo("Restart the sync engine for changes to take effect.")
+
+
+@folders.command("show")
+def folders_show() -> None:
+    """Show currently selected folders."""
+    store = ConfigStore()
+    settings = store.load()
+
+    if not settings.selected_folder_ids:
+        click.echo("No folder selection active. All folders are synced.")
+    else:
+        click.echo(f"Selected folder IDs: {settings.selected_folder_ids}")
+        click.echo(f"Only these folders and their subfolders will be synced.")
+
+
+@folders.command("clear")
+def folders_clear() -> None:
+    """Clear folder selection and sync all folders."""
+    store = ConfigStore()
+    settings = store.load()
+    settings.selected_folder_ids = []
+    store.save(settings)
+    _echo_success("Folder selection cleared. All folders will be synced.")
 
 
 @main.group()

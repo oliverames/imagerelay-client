@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .appdirs import APP_NAME, config_path, database_path, log_path
 from .autostart import AutoStart, AutoStartError
+from .api import ImageRelayApiClient
 from .config import ConfigStore
 from .daemon import daemon_status, run_sync_once, start_daemon, stop_daemon
 from .database import Database
@@ -221,6 +222,139 @@ def _show_about_dialog(snapshot: "MenuStatusSnapshot") -> None:
         )
 
     return True
+
+
+def _build_folder_tree(folders, root_id):
+    """Return folders in tree-walk order as (folder, depth) pairs.
+
+    Walks descendants of *root_id*.  When no descendants exist (e.g. the
+    configured root is a leaf folder), falls back to showing siblings of
+    the root (all children of the same parent) so the user can still see
+    and select folders.
+    """
+    folders_by_id = {f.folder_id: f for f in folders}
+    children_by_parent: dict[int | None, list] = {}
+    for f in folders:
+        children_by_parent.setdefault(f.parent_id, []).append(f)
+
+    result: list[tuple] = []
+
+    def walk(parent_id, depth):
+        for f in sorted(children_by_parent.get(parent_id, []), key=lambda x: x.name.lower()):
+            result.append((f, depth))
+            walk(f.folder_id, depth + 1)
+
+    walk(root_id, 0)
+
+    # Fallback: if root has no children, show all folders under the same
+    # parent (siblings) so the user has something to work with.
+    if not result:
+        root_folder = folders_by_id.get(root_id)
+        if root_folder and root_folder.parent_id is not None:
+            walk(root_folder.parent_id, 0)
+
+    # Last resort: show all folders as a flat tree from the top-level roots.
+    if not result:
+        top_level_parents = {
+            f.parent_id
+            for f in folders
+            if f.parent_id not in folders_by_id
+        }
+        for parent_id in sorted(top_level_parents):
+            walk(parent_id, 0)
+
+    return result
+
+
+def _show_folder_picker_dialog(folders, root_id, current_selection):
+    """Show a native macOS dialog for selecting which folders to sync.
+
+    Returns a list of selected folder IDs, an empty list to sync all,
+    or None if the user cancelled.
+    """
+    try:
+        from AppKit import (
+            NSAlert,
+            NSButton,
+            NSFont,
+            NSInformationalAlertStyle,
+            NSMakeRect,
+            NSScrollView,
+            NSView,
+        )
+    except ImportError:
+        return None
+
+    tree_items = _build_folder_tree(folders, root_id)
+    if not tree_items:
+        alert = NSAlert.alloc().init()
+        alert.setAlertStyle_(NSInformationalAlertStyle)
+        alert.setMessageText_("No Folders Available")
+        alert.setInformativeText_("No folders were found in your Image Relay account.")
+        alert.addButtonWithTitle_("OK")
+        alert.runModal()
+        return None
+
+    selected_set = set(current_selection)
+    row_height = 24
+    indent_width = 20
+    view_width = 380
+
+    # Layout checkboxes inside a container view.
+    # NSView y=0 is bottom, so we lay out rows from the top downward.
+    view_height = len(tree_items) * row_height
+    container = NSView.alloc().initWithFrame_(NSMakeRect(0, 0, view_width, view_height))
+
+    checkboxes: dict[int, NSButton] = {}
+    for i, (folder, depth) in enumerate(tree_items):
+        x = 8 + depth * indent_width
+        y = view_height - (i + 1) * row_height
+        btn = NSButton.alloc().initWithFrame_(
+            NSMakeRect(x, y, view_width - x - 8, row_height)
+        )
+        btn.setButtonType_(3)  # NSSwitchButton
+        btn.setTitle_(folder.name)
+        btn.setFont_(NSFont.systemFontOfSize_(13))
+        btn.setState_(1 if folder.folder_id in selected_set else 0)
+        container.addSubview_(btn)
+        checkboxes[folder.folder_id] = btn
+
+    scroll_height = min(view_height + 4, 340)
+    scroll_view = NSScrollView.alloc().initWithFrame_(
+        NSMakeRect(0, 0, view_width + 24, scroll_height)
+    )
+    scroll_view.setHasVerticalScroller_(True)
+    scroll_view.setBorderType_(2)  # NSBezelBorder
+    scroll_view.setDocumentView_(container)
+
+    alert = NSAlert.alloc().init()
+    alert.setAlertStyle_(NSInformationalAlertStyle)
+    alert.setMessageText_("Select Folders to Sync")
+    alert.setInformativeText_(
+        "Only checked folders and their subfolders will sync.\n"
+        "Use Sync All to go back to syncing everything."
+    )
+    alert.addButtonWithTitle_("Save")
+    alert.addButtonWithTitle_("Sync All")
+    alert.addButtonWithTitle_("Cancel")
+    alert.setAccessoryView_(scroll_view)
+
+    # Scroll to top so the first folder is visible.
+    container.scrollPoint_(NSMakeRect(0, view_height, 0, 0).origin)
+
+    response = alert.runModal()
+
+    if response == 1002:  # Cancel
+        return None
+    if response == 1001:  # Sync All
+        return []
+
+    # Save: collect checked folder IDs
+    return sorted(
+        folder_id
+        for folder_id, btn in checkboxes.items()
+        if btn.state() == 1
+    )
 
 
 def _make_section_header(rumps_module, label: str):
@@ -456,9 +590,14 @@ class ImageRelayMenuBarApp:
         self.daemon_autostart_item = self.rumps.MenuItem(
             "Start Sync Engine at Login", callback=self.toggle_daemon_autostart
         )
+        self.select_folders_item = self.rumps.MenuItem(
+            "Select Folders to Sync...", callback=self.select_folders
+        )
         self.settings_menu_item = self.rumps.MenuItem("Settings")
         self.settings_menu_item.update(
             [
+                self.select_folders_item,
+                None,
                 self.uploads_item,
                 self.downloads_item,
                 None,
@@ -637,6 +776,15 @@ class ImageRelayMenuBarApp:
         self.open_folder_item.set_callback(
             self.open_sync_folder if not snapshot.missing_fields else None
         )
+        self.select_folders_item.set_callback(
+            self.select_folders if not snapshot.missing_fields else None
+        )
+        selected_count = len(ConfigStore().load().selected_folder_ids)
+        self.select_folders_item.title = (
+            f"Select Folders to Sync ({selected_count} selected)..."
+            if selected_count
+            else "Select Folders to Sync..."
+        )
         self.uploads_item.state = 1 if snapshot.sync_upload else 0
         self.downloads_item.state = 1 if snapshot.sync_download else 0
         self.menu_bar_autostart_item.state = 1 if _autostart_enabled("gui") else 0
@@ -674,6 +822,74 @@ class ImageRelayMenuBarApp:
 
     def toggle_downloads(self, _sender) -> None:
         self._toggle_direction("sync_download", "Download Changes")
+
+    def select_folders(self, _sender) -> None:
+        from .logging_utils import configure_logging
+
+        store = ConfigStore()
+        settings = store.load()
+        logger = configure_logging(verbose=False)
+
+        try:
+            api = ImageRelayApiClient(settings=settings, logger=logger)
+            all_folders = api.list_folders()
+
+            # Discover subfolders by fetching metadata for folders with children.
+            to_fetch = [f.folder_id for f in all_folders if getattr(f, "child_count", 0) or 0 > 0]
+            # Simpler: fetch child folders for any folder that reports child_count > 0.
+            # Since the API doesn't have a children endpoint, we fetch each folder
+            # individually by ID when we discover them from file folder_ids.
+            # For the picker, do a lightweight discovery: fetch files to find subfolder IDs.
+            root_id = settings.remote_root_folder_id
+            if root_id is not None:
+                files = api.list_files(root_id, recursive=True)
+                folders_by_id = {f.folder_id: f for f in all_folders}
+                unknown_ids: set[int] = set()
+                for rf in files:
+                    for fid in rf.folder_ids:
+                        if fid not in folders_by_id:
+                            unknown_ids.add(fid)
+                fetched: set[int] = set()
+                fetch_queue = list(unknown_ids)
+                while fetch_queue:
+                    fid = fetch_queue.pop()
+                    if fid in fetched or fid in folders_by_id:
+                        continue
+                    fetched.add(fid)
+                    try:
+                        folder = api.get_folder(fid)
+                        folders_by_id[folder.folder_id] = folder
+                        all_folders.append(folder)
+                        if folder.parent_id and folder.parent_id not in folders_by_id:
+                            fetch_queue.append(folder.parent_id)
+                    except Exception:
+                        pass
+        except Exception as exc:
+            self.notify("Could Not Load Folders", user_message_for_error(exc))
+            return
+
+        root_id = settings.remote_root_folder_id
+        if root_id is None:
+            self.notify("No Root Folder", "Run `imagerelay-client init` to set up the sync root.")
+            return
+
+        result = _show_folder_picker_dialog(all_folders, root_id, settings.selected_folder_ids)
+        if result is None:
+            return  # Cancelled
+
+        settings.selected_folder_ids = result
+        store.save(settings)
+
+        if result:
+            self.notify("Folder Selection Saved", f"Syncing {len(result)} selected folder(s).")
+        else:
+            self.notify("Folder Selection Cleared", "All folders will be synced.")
+
+        if daemon_status()[0]:
+            stop_daemon()
+            start_daemon()
+
+        self.refresh_status(None)
 
     def start_daemon(self, _sender) -> None:
         def work() -> None:

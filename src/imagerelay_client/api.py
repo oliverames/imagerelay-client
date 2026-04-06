@@ -115,6 +115,10 @@ class ImageRelayApiClient:
         items = self._paged_get("folders.json")
         return [self._parse_folder(item) for item in items]
 
+    def get_folder(self, folder_id: int) -> RemoteFolder:
+        data = self._json_request("GET", f"folders/{folder_id}.json")
+        return self._parse_folder(data)
+
     def get_root_folder(self) -> RemoteFolder:
         data = self._json_request("GET", "folders/root.json")
         return self._parse_folder(data)
@@ -137,7 +141,7 @@ class ImageRelayApiClient:
         query: str | None = None,
         uploaded_after: str | None = None,
     ) -> list[RemoteFile]:
-        params: dict[str, Any] = {"recursive": recursive}
+        params: dict[str, Any] = {"recursive": str(recursive).lower()}
         if query:
             params["query"] = query
         if uploaded_after:
@@ -461,8 +465,9 @@ class ImageRelayApiClient:
             folder_id=int(payload["id"]),
             name=str(payload["name"]),
             parent_id=int(parent_id) if parent_id is not None else None,
-            full_path=str(payload.get("full_path") or ""),
+            full_path=str(payload.get("full_path") or payload.get("full_catalog_path") or ""),
             updated_on=str(payload.get("updated_on")) if payload.get("updated_on") else None,
+            child_count=int(payload.get("child_count") or 0),
         )
 
     @staticmethod
