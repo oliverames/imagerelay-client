@@ -6,11 +6,13 @@ actor RemoteChangePoller {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Poller")
     private let domain: NSFileProviderDomain
     private let config: AppConfiguration
+    private let db: SyncDatabase?
     private var pollingTask: Task<Void, Never>?
 
-    init(domain: NSFileProviderDomain, config: AppConfiguration) {
+    init(domain: NSFileProviderDomain, config: AppConfiguration, db: SyncDatabase? = nil) {
         self.domain = domain
         self.config = config
+        self.db = db
     }
 
     func start() {
@@ -34,6 +36,18 @@ actor RemoteChangePoller {
                 try await Task.sleep(for: .seconds(config.pollIntervalSeconds))
             } catch {
                 break
+            }
+
+            // Skip signaling when sync download is disabled
+            guard config.syncDownload else {
+                logger.debug("Sync download disabled; skipping remote change signal")
+                continue
+            }
+
+            // Skip signaling when sync is paused
+            if let db, let pauseState = try? db.getPauseState(), pauseState.isActive {
+                logger.debug("Sync paused; skipping remote change signal")
+                continue
             }
 
             do {

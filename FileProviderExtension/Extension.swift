@@ -35,8 +35,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
         nonisolated(unsafe) let pollerDomain = domain
         let pollerConfig = config
+        let pollerDB = db
         Task { [weak self] in
-            let poller = RemoteChangePoller(domain: pollerDomain, config: pollerConfig)
+            let poller = RemoteChangePoller(domain: pollerDomain, config: pollerConfig, db: pollerDB)
             await poller.start()
             self?.poller = poller
         }
@@ -148,6 +149,28 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
         Task {
             do {
+                // Filter out .DS_Store and temp files
+                let ignoredNames: Set<String> = [".DS_Store"]
+                let ignoredSuffixes = [".imagerelay-download"]
+
+                if ignoredNames.contains(itemTemplate.filename) ||
+                   ignoredSuffixes.contains(where: { itemTemplate.filename.hasSuffix($0) }) {
+                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    return
+                }
+
+                // Block uploads when sync upload is disabled
+                if !config.syncUpload {
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
+                // Block uploads when sync is paused
+                if let pauseState = try? db.getPauseState(), pauseState.isActive {
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
                 let parentFolderID = self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
                 if itemTemplate.contentType == .folder {
@@ -239,12 +262,27 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     ) -> Progress {
         let db = self.db
         let api = self.api
+        let config = self.config
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
         nonisolated(unsafe) let item = item
+        nonisolated(unsafe) let version = version
 
         Task {
             do {
+                // Block content uploads when sync upload is disabled
+                if !config.syncUpload && changedFields.contains(.contents) {
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
+                // Block content uploads when sync is paused
+                if changedFields.contains(.contents),
+                   let pauseState = try? db.getPauseState(), pauseState.isActive {
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
                 guard let tracked = try db.item(for: item.itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: item.itemIdentifier.rawValue),
                       let remoteID = itemID.numericID else {
@@ -253,6 +291,22 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 var updated = tracked
+
+                // Conflict detection: check if remote version changed since last enumeration
+                if changedFields.contains(.contents) {
+                    let baseContentVersion = String(data: Data(version.contentVersion), encoding: .utf8) ?? ""
+                    if tracked.contentVersion != baseContentVersion {
+                        // Conflict: remote changed since we last enumerated
+                        if newContents != nil {
+                            let conflictName = ConflictResolver.conflictName(for: tracked.name)
+                            logger.warning("Conflict detected for \(tracked.name), saving as \(conflictName)")
+                            try? db.logActivity(action: .conflicted, itemName: tracked.name, itemType: .file)
+                            // Tell the system to re-fetch the remote version
+                            completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
+                            return
+                        }
+                    }
+                }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
                     let fileData = try Data(contentsOf: contentURL)

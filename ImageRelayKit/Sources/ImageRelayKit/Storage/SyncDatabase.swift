@@ -55,6 +55,13 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v2") { db in
+            try db.create(table: "settings") { t in
+                t.primaryKey("key", .text).notNull()
+                t.column("value", .text).notNull()
+            }
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -141,6 +148,37 @@ public final class SyncDatabase: Sendable {
                 .order(Column("timestamp").desc)
                 .limit(limit)
                 .fetchAll(db)
+        }
+    }
+
+    // MARK: - Settings / Pause State
+
+    public func getPauseState() throws -> SyncPauseState {
+        let json: String? = try writer.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT value FROM settings WHERE key = ?",
+                arguments: ["sync_pause"]
+            )?["value"]
+        }
+        guard let json, let data = json.data(using: .utf8) else {
+            return .default
+        }
+        return (try? JSONDecoder().decode(SyncPauseState.self, from: data)) ?? .default
+    }
+
+    public func setPauseState(_ state: SyncPauseState) throws {
+        let data = try JSONEncoder().encode(state)
+        let json = String(data: data, encoding: .utf8) ?? "{}"
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                arguments: ["sync_pause", json]
+            )
         }
     }
 }
