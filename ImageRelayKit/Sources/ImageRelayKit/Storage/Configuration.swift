@@ -38,6 +38,10 @@ public struct AppConfiguration: Codable, Sendable {
     )
 
     public func save(to url: URL) throws {
+        let directory = url.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
         let data = try JSONEncoder.imageRelay.encode(self)
         try data.write(to: url, options: .atomic)
     }

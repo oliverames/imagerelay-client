@@ -33,19 +33,20 @@ struct ImageRelayClientApp: App {
 
         Settings {
             TabView {
-                GeneralSettingsView()
-                    .tabItem { Label("General", systemImage: "gear") }
-
-                FoldersSettingsView()
-                    .tabItem { Label("Folders", systemImage: "folder") }
-
-                ActivitySettingsView()
-                    .tabItem { Label("Activity", systemImage: "clock") }
-
-                AdvancedSettingsView()
-                    .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+                Tab("General", systemImage: "gear") {
+                    GeneralSettingsView()
+                }
+                Tab("Folders", systemImage: "folder") {
+                    FoldersSettingsView()
+                }
+                Tab("Activity", systemImage: "clock") {
+                    ActivitySettingsView()
+                }
+                Tab("Advanced", systemImage: "slider.horizontal.3") {
+                    AdvancedSettingsView()
+                }
             }
-            .frame(width: 500, height: 400)
+            .frame(width: 520, height: 420)
         }
     }
 }
