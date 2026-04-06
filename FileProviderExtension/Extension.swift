@@ -29,9 +29,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension {
         for itemIdentifier: NSFileProviderItemIdentifier,
         version requestedVersion: NSFileProviderItemVersion?,
         request: NSFileProviderRequest,
-        completionHandler: @escaping (URL?, NSFileProviderItem?, Bool, Error?) -> Void
+        completionHandler: @escaping (URL?, NSFileProviderItem?, (any Error)?) -> Void
     ) -> Progress {
-        completionHandler(nil, nil, false, NSFileProviderError(.noSuchItem))
+        completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
         return Progress()
     }
 
@@ -41,7 +41,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension {
         contents url: URL?,
         options: NSFileProviderCreateItemOptions = [],
         request: NSFileProviderRequest,
-        completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void
+        completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, (any Error)?) -> Void
     ) -> Progress {
         completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
         return Progress()
@@ -54,7 +54,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension {
         contents newContents: URL?,
         options: NSFileProviderModifyItemOptions = [],
         request: NSFileProviderRequest,
-        completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, Error?) -> Void
+        completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, (any Error)?) -> Void
     ) -> Progress {
         completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
         return Progress()

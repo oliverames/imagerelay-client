@@ -38,6 +38,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: true
         INFOPLIST_KEY_CFBundleDisplayName: "ImageRelay Client"
 
