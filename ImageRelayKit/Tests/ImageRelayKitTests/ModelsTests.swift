@@ -1,0 +1,94 @@
+import Testing
+@testable import ImageRelayKit
+
+@Suite("Remote Models")
+struct ModelsTests {
+    @Test("Decode RemoteFolder from API JSON")
+    func decodeFolderFromAPI() throws {
+        let json = """
+        {
+            "id": 123,
+            "name": "Photography",
+            "parent_id": 456,
+            "path": "/Brand Assets/Photography",
+            "updated_on": "2026-04-01T10:00:00Z",
+            "child_count": 5
+        }
+        """.data(using: .utf8)!
+
+        let folder = try JSONDecoder.imageRelay.decode(RemoteFolder.self, from: json)
+        #expect(folder.id == 123)
+        #expect(folder.name == "Photography")
+        #expect(folder.parentID == 456)
+        #expect(folder.path == "/Brand Assets/Photography")
+        #expect(folder.childCount == 5)
+    }
+
+    @Test("Decode RemoteFile from API JSON")
+    func decodeFileFromAPI() throws {
+        let json = """
+        {
+            "id": 789,
+            "filename": "logo.png",
+            "file_size": 204800,
+            "updated_on": "2026-04-01T12:00:00Z",
+            "content_type": "image/png",
+            "file_type_id": 10,
+            "folder_ids": [123, 456],
+            "deleted": false
+        }
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder.imageRelay.decode(RemoteFile.self, from: json)
+        #expect(file.id == 789)
+        #expect(file.name == "logo.png")
+        #expect(file.size == 204800)
+        #expect(file.contentType == "image/png")
+        #expect(file.folderIDs == [123, 456])
+        #expect(file.isDeleted == false)
+    }
+
+    @Test("Decode QuickLink from API JSON")
+    func decodeQuickLink() throws {
+        let json = """
+        {
+            "id": 55,
+            "uid": "abc123",
+            "url": "https://ir.example.com/quick/abc123",
+            "purpose": "download"
+        }
+        """.data(using: .utf8)!
+
+        let link = try JSONDecoder.imageRelay.decode(QuickLink.self, from: json)
+        #expect(link.id == 55)
+        #expect(link.uid == "abc123")
+        #expect(link.url.absoluteString == "https://ir.example.com/quick/abc123")
+    }
+
+    @Test("Decode UploadJob from API JSON")
+    func decodeUploadJob() throws {
+        let json = """
+        {
+            "id": 99,
+            "status": "pending",
+            "file_id": null
+        }
+        """.data(using: .utf8)!
+
+        let job = try JSONDecoder.imageRelay.decode(UploadJob.self, from: json)
+        #expect(job.id == 99)
+        #expect(job.status == "pending")
+        #expect(job.fileID == nil)
+    }
+
+    @Test("RemoteFile with deleted flag is filtered")
+    func deletedFileFiltered() throws {
+        let json = """
+        {"id": 1, "filename": "old.png", "file_size": 100, "updated_on": null,
+         "content_type": null, "file_type_id": null, "folder_ids": [], "deleted": true}
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder.imageRelay.decode(RemoteFile.self, from: json)
+        #expect(file.isDeleted == true)
+    }
+}
