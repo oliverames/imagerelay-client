@@ -12,6 +12,39 @@ final class DomainManager {
     var isDomainActive = false
     var lastError: String?
 
+    var syncProgress: SyncProgressState = .idle
+    var pauseState: SyncPauseState = .default
+    var recentActivity: [ActivityEntry] = []
+
+    private func openDatabase() -> SyncDatabase? {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+        ) else { return nil }
+        let dbURL = SyncDatabase.databaseURL(in: container)
+        return try? SyncDatabase(url: dbURL)
+    }
+
+    func refreshStatus() {
+        guard let db = openDatabase() else { return }
+        syncProgress = (try? db.getProgress()) ?? .idle
+        pauseState = (try? db.getPauseState()) ?? .default
+        recentActivity = (try? db.recentActivity(limit: 5)) ?? []
+    }
+
+    func setPause(choice: String?) {
+        guard let db = openDatabase() else { return }
+        if let choice {
+            var state = SyncPauseState.default
+            state.paused = true
+            state.until = SyncPauseState.deadline(for: choice)
+            state.updatedAt = Date()
+            try? db.setPauseState(state)
+        } else {
+            try? db.setPauseState(.default)
+        }
+        refreshStatus()
+    }
+
     func setupDomain() async {
         let domain = NSFileProviderDomain(
             identifier: Self.domainIdentifier,

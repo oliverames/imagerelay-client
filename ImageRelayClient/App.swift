@@ -5,8 +5,18 @@ import ImageRelayKit
 struct ImageRelayClientApp: App {
     @State private var domainManager = DomainManager()
 
+    private var menuBarIcon: String {
+        if !domainManager.isDomainActive { return "cloud" }
+        switch domainManager.syncProgress.state {
+        case .syncing: return "arrow.triangle.2.circlepath.circle"
+        case .paused: return "pause.circle"
+        case .error: return "exclamationmark.triangle"
+        case .idle: return "cloud.fill"
+        }
+    }
+
     var body: some Scene {
-        MenuBarExtra("ImageRelay", systemImage: domainManager.isDomainActive ? "cloud.fill" : "cloud") {
+        MenuBarExtra("ImageRelay", systemImage: menuBarIcon) {
             MenuBarView()
                 .environment(domainManager)
                 .task {

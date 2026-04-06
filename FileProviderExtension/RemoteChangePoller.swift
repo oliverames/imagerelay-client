@@ -55,6 +55,13 @@ actor RemoteChangePoller {
                 try await manager.signalEnumerator(for: .workingSet)
                 try await manager.signalEnumerator(for: .rootContainer)
                 logger.debug("Signaled enumerator for remote change check")
+
+                if let db {
+                    var progress = (try? db.getProgress()) ?? .idle
+                    progress.lastRemotePollAt = Date()
+                    progress.nextRemotePollAt = Date().addingTimeInterval(Double(config.pollIntervalSeconds))
+                    try? db.setProgress(progress)
+                }
             } catch {
                 logger.error("Failed to signal enumerator: \(error.localizedDescription)")
             }

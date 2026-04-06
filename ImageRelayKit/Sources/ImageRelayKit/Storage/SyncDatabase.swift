@@ -181,4 +181,37 @@ public final class SyncDatabase: Sendable {
             )
         }
     }
+
+    // MARK: - Sync Progress
+
+    public func getProgress() throws -> SyncProgressState {
+        let json: String? = try writer.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT value FROM settings WHERE key = ?",
+                arguments: ["sync_progress"]
+            )?["value"]
+        }
+        guard let json, let data = json.data(using: .utf8) else {
+            return .idle
+        }
+        return (try? JSONDecoder().decode(SyncProgressState.self, from: data)) ?? .idle
+    }
+
+    public func setProgress(_ state: SyncProgressState) throws {
+        var updated = state
+        updated.updatedAt = Date()
+        let data = try JSONEncoder().encode(updated)
+        let json = String(data: data, encoding: .utf8) ?? "{}"
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                arguments: ["sync_progress", json]
+            )
+        }
+    }
 }

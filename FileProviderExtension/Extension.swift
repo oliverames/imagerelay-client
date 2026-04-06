@@ -97,6 +97,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
+                self.updateProgress(state: .syncing, phase: "Downloading", currentItem: tracked.name)
+
                 let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
                 let quickLink: QuickLink = try await api.post(
                     "/quick_links.json",
@@ -118,11 +120,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 progress.completedUnitCount = 100
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
+                self.incrementProgress()
+                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 completionHandler(nil, nil, self.mapToFileProviderError(error))
             }
         }
@@ -173,6 +178,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let parentFolderID = self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
+                self.updateProgress(state: .syncing, phase: "Uploading", currentItem: itemTemplate.filename)
+
                 if itemTemplate.contentType == .folder {
                     let createRequest = CreateFolderRequest(name: itemTemplate.filename, parent_id: parentFolderID)
                     let folder: RemoteFolder = try await api.post(
@@ -189,6 +196,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
+                    self.incrementProgress()
+                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
                     completionHandler(item, [], false, nil)
@@ -235,6 +244,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
+                    self.incrementProgress()
+                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
                     completionHandler(item, [], false, nil)
@@ -243,6 +254,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
@@ -309,6 +321,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
+                    self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let fileData = try Data(contentsOf: contentURL)
 
                     let versionResponse: [String: String] = try await api.post(
@@ -355,10 +368,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 try db.upsertItem(updated)
+                self.incrementProgress()
+                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
                 completionHandler(resultItem, [], false, nil)
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
@@ -389,6 +405,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let tracked = try db.item(for: identifier.rawValue)
 
+                self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
+
                 if itemID.isFile {
                     try await api.delete("/files/\(remoteID).json")
                 } else {
@@ -399,10 +417,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 if let tracked {
                     try? db.logActivity(action: .deleted, itemName: tracked.name, itemType: tracked.itemType)
                 }
+                self.incrementProgress()
+                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 completionHandler(nil)
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 completionHandler(self.mapToFileProviderError(error))
             }
         }
@@ -430,6 +451,26 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             return config.remoteRootFolderID ?? 0
         }
         return ItemIdentifier(rawValue: identifier.rawValue)?.numericID ?? 0
+    }
+
+    private func updateProgress(
+        state: SyncProgressState.SyncState,
+        phase: String,
+        currentItem: String?,
+        lastError: String? = nil
+    ) {
+        var progress = (try? db.getProgress()) ?? .idle
+        progress.state = state
+        progress.phase = phase
+        progress.currentItem = currentItem
+        if let lastError { progress.lastError = lastError }
+        try? db.setProgress(progress)
+    }
+
+    private func incrementProgress() {
+        var progress = (try? db.getProgress()) ?? .idle
+        progress.completedSteps += 1
+        try? db.setProgress(progress)
     }
 
     private func mapToFileProviderError(_ error: Error) -> Error {
