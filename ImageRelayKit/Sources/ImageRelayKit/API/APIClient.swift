@@ -98,6 +98,26 @@ public actor APIClient {
         let _: EmptyResponse = try await execute(request)
     }
 
+    /// Upload data in chunks, returning the number of chunks uploaded.
+    public func uploadChunked(
+        fileData: Data,
+        pathBuilder: @Sendable (Int) -> String,
+        chunkSize: Int = 5 * 1024 * 1024
+    ) async throws -> Int {
+        var chunkNumber = 0
+        var offset = 0
+
+        while offset < fileData.count {
+            chunkNumber += 1
+            let end = min(offset + chunkSize, fileData.count)
+            let chunk = fileData[offset..<end]
+            try await upload(data: Data(chunk), to: pathBuilder(chunkNumber))
+            offset = end
+        }
+
+        return max(chunkNumber, 1)
+    }
+
     // MARK: - Private
 
     private func buildRequest(

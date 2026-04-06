@@ -96,7 +96,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                let quickLinkRequest = QuickLinkRequest(file_id: fileID, purpose: "download")
+                let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
                 let quickLink: QuickLink = try await api.post(
                     "/quick_links.json",
                     body: quickLinkRequest
@@ -175,27 +175,33 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let jobRequest = UploadJobRequest(
                         folder_id: parentFolderID,
                         file_type_id: config.defaultFileTypeID ?? 0,
-                        terms: [.init(term: "file_name", value: itemTemplate.filename)]
+                        files: [.init(file_name: itemTemplate.filename, file_size: fileData.count)]
                     )
 
                     let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
 
-                    try await api.upload(
-                        data: fileData,
-                        to: "/upload_jobs/\(job.id)/files/1/chunks/1"
+                    let uploadFileID = job.files?.first?.id ?? 0
+                    let chunkCount = try await api.uploadChunked(
+                        fileData: fileData,
+                        pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
+                        chunkSize: 5 * 1024 * 1024
                     )
+
+                    _ = chunkCount  // chunk count not needed for upload job completion
 
                     var completedJob = job
                     for _ in 0..<30 {
                         try await Task.sleep(for: .seconds(2))
                         completedJob = try await api.get("/upload_jobs/\(job.id).json")
-                        if completedJob.status == "complete" { break }
+                        if completedJob.finished == true { break }
                     }
 
-                    guard let fileID = completedJob.fileID else {
+                    guard completedJob.finished == true, let assetID = completedJob.assetID else {
                         completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
                         return
                     }
+
+                    let fileID = assetID
 
                     let tracked = TrackedItem(
                         identifier: ItemIdentifier.file(fileID).rawValue,
@@ -257,13 +263,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
 
                     if let uuid = versionResponse["uuid"] {
-                        try await api.upload(
-                            data: fileData,
-                            to: "/files/\(remoteID)/versions/\(uuid)/chunk/1"
+                        let chunkCount = try await api.uploadChunked(
+                            fileData: fileData,
+                            pathBuilder: { chunkNumber in "/files/\(remoteID)/versions/\(uuid)/chunk/\(chunkNumber)" },
+                            chunkSize: 5 * 1024 * 1024
                         )
                         try await api.post(
-                            "/files/\(remoteID)/versions/\(uuid)/complete.json"
-                            as String
+                            "/files/\(remoteID)/versions/\(uuid)/complete.json",
+                            body: VersionCompleteRequest(file_name: tracked.name, chunk_count: chunkCount)
                         )
                     }
 
@@ -287,7 +294,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let newParentID = self.resolveParentFolderID(item.parentItemIdentifier)
                     try await api.post(
                         "/files/\(remoteID)/move.json",
-                        body: MoveRequest(folder_id: newParentID)
+                        body: MoveRequest(folder_ids: [String(newParentID)])
                     )
                     updated.parentIdentifier = item.parentItemIdentifier.rawValue
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .file)
@@ -391,8 +398,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 // MARK: - Request Body Types
 
 private struct QuickLinkRequest: Encodable, Sendable {
-    let file_id: Int
+    let asset_id: Int
     let purpose: String
+    let disposition: String
 }
 
 private struct CreateFolderRequest: Encodable, Sendable {
@@ -403,11 +411,16 @@ private struct CreateFolderRequest: Encodable, Sendable {
 private struct UploadJobRequest: Encodable, Sendable {
     let folder_id: Int
     let file_type_id: Int
-    let terms: [Term]
-    struct Term: Encodable, Sendable {
-        let term: String
-        let value: String
+    let files: [FileEntry]
+    struct FileEntry: Encodable, Sendable {
+        let file_name: String
+        let file_size: Int
     }
+}
+
+private struct VersionCompleteRequest: Encodable, Sendable {
+    let file_name: String
+    let chunk_count: Int
 }
 
 private struct EmptyBody: Encodable, Sendable {}
@@ -417,5 +430,5 @@ private struct RenameRequest: Encodable, Sendable {
 }
 
 private struct MoveRequest: Encodable, Sendable {
-    let folder_id: Int
+    let folder_ids: [String]
 }

@@ -83,9 +83,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     private func fetchItems() async throws -> [NSFileProviderItem] {
         let folderID = resolveContainerFolderID()
 
-        let folders: [RemoteFolder] = try await api.get(
-            "/folders/\(folderID)/children.json"
-        )
+        let allFolders: [RemoteFolder] = try await api.get("/folders.json")
+        let folders = allFolders.filter { $0.parentID == folderID }
 
         let files: [RemoteFile] = try await api.get(
             "/folders/\(folderID)/files.json",
