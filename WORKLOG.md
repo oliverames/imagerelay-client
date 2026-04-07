@@ -1,5 +1,35 @@
 # Worklog
 
+## 2026-04-07 -- Python removal, sync gap implementations, merged to main
+
+**What changed**: Removed all Python implementation; project is now Swift-only. Merged `feature/native-macos-rebuild` into main and force-pushed after scrubbing 226MB GRDB pack file from git history with `git-filter-repo`. Implemented all remaining sync feature gaps:
+
+- **Remote deletion propagation**: `Enumerator.fetchItems()` now diffs remote identifier set against `db.children(of:)` and returns deleted identifiers. Only `enumerateChanges` reports deletions to the File Provider; `enumerateItems` ignores them (correct per Apple API contract).
+- **Folder filtering (UI)**: `FoldersSettingsView` replaced pin toggles with sync toggles backed by `AppConfiguration.selectedFolderIDs`. Empty selection = all folders sync. UI shows "X of Y selected" when a subset is chosen.
+- **Conflict copy preservation**: When content version mismatch is detected in `modifyItem`, local edits are uploaded to Image Relay as a new asset with a conflict name (`filename (conflict copy YYYY-MM-DD HH:MM:SS).ext`) before re-fetching the canonical remote version. Both copies appear in Finder on next enumeration.
+- **Folder move emulation**: Folder renames-with-parent-change are emulated via create-new → move-children → delete-original sequence, since the Image Relay API has no direct folder-move endpoint.
+- **Progress tracking (totalSteps)**: Added `beginOperation()` helper that increments `totalSteps` on each sync op, reset when transitioning idle→syncing. Progress bar now shows live "X of Y" rather than indeterminate.
+- **Retry-After honoring**: `APIClient.executeRaw` now inspects `lastError` for `.rateLimited(retryAfter:)` and uses the server-specified delay (capped at `maxRetryDelay`) instead of exponential backoff.
+- **`TrackedItem.isPinned` removed**: Folder selection moved entirely to `AppConfiguration.selectedFolderIDs`. DB v3 migration drops the column.
+
+**Decisions made**:
+- **Conflict copy lives in IR, not just local**: Uploading the conflict copy to Image Relay as a new file rather than saving it locally means both versions appear in Finder naturally and the user can decide what to keep. Neither version is silently discarded.
+- **Folder filtering is visibility, not availability**: Unselected folders don't appear in Finder but their API data is still fetched; they're filtered client-side at the root enumerator. This avoids a gap where child folders could accidentally inherit an unselected parent.
+- **Folder move emulation is non-atomic**: Move-via-recreate is inherently lossy if the process is interrupted mid-sequence. Accepted this limitation -- atomic folder move would require IR API support.
+- **`selectedFolderIDs` semantics**: Empty array = all sync. Toggling on a subset fills the set with all folder IDs minus the deselected ones; toggling all back on reverts to empty. Stored in `config.json`, not the DB.
+
+**Left off at**:
+- Still open: Never tested with real Image Relay credentials. No actual sync run against the live account; API key, domain registration, and enumeration all untested end-to-end.
+- Still open: `move_file` API -- unknown whether `folder_ids` still expects an array of strings in v2.
+- Conflict copy upload uses a full new upload job (not a file version). The conflict file lands in the same folder as the original but has no relationship to the original in IR. User must manually delete it after resolving.
+- `beginOperation()` increments `totalSteps` but `completedSteps` increment happens in `incrementProgress()` -- verify these stay in sync if an operation errors partway through.
+
+**Open questions**:
+- Will the File Provider extension correctly load the app group container when launched outside of Xcode?
+- The macOS 26 `MenuBarExtra .window` style renders with system menu chrome -- is there a way to override for a more custom look?
+
+---
+
 ## 2026-04-06 -- Native macOS rebuild: complete File Provider app with SwiftUI
 
 **What changed**: Built a complete native macOS rebuild of the Python sync client on `feature/native-macos-rebuild` branch (in `.worktrees/native-rebuild`). 17-task plan executed via subagent-driven development, then all 13 feature gaps from the Python version filled in:
