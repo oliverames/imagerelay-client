@@ -203,10 +203,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     completionHandler(item, [], false, nil)
                 } else if let contentURL = url {
                     let fileData = try Data(contentsOf: contentURL)
+                    guard let fileTypeID = config.defaultFileTypeID else {
+                        throw ExtensionError.missingDefaultFileTypeID
+                    }
 
                     let jobRequest = UploadJobRequest(
                         folder_id: parentFolderID,
-                        file_type_id: config.defaultFileTypeID ?? 0,
+                        file_type_id: fileTypeID,
                         files: [.init(file_name: itemTemplate.filename, file_size: fileData.count)]
                     )
 
@@ -347,7 +350,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if changedFields.contains(.filename) {
-                    if itemID.isFolder {
+                    if itemID.isFile {
+                        throw ExtensionError.fileRenameUnsupported
+                    } else {
                         let _: RemoteFolder = try await api.put(
                             "/folders/\(remoteID).json",
                             body: RenameRequest(name: item.filename)
@@ -526,4 +531,18 @@ private struct RenameRequest: Encodable, Sendable {
 
 private struct MoveRequest: Encodable, Sendable {
     let folder_ids: [String]
+}
+
+private enum ExtensionError: LocalizedError {
+    case missingDefaultFileTypeID
+    case fileRenameUnsupported
+
+    var errorDescription: String? {
+        switch self {
+        case .missingDefaultFileTypeID:
+            return "Set a Default File Type ID in Settings before uploading new files."
+        case .fileRenameUnsupported:
+            return "Renaming files from Finder is not supported yet."
+        }
+    }
 }

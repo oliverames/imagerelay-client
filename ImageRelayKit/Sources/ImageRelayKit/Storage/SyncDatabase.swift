@@ -146,6 +146,7 @@ public final class SyncDatabase: Sendable {
         try writer.read { db in
             try ActivityEntry
                 .order(Column("timestamp").desc)
+                .order(Column("id").desc)
                 .limit(limit)
                 .fetchAll(db)
         }

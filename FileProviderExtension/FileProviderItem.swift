@@ -34,7 +34,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
                                   .allowsDeleting, .allowsAddingSubItems]
         } else {
             self.contentType = UTType(filenameExtension: URL(fileURLWithPath: trackedItem.name).pathExtension) ?? .data
-            self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
+            self._capabilities = [.allowsReading, .allowsWriting,
                                   .allowsReparenting, .allowsDeleting]
         }
         super.init()
@@ -71,7 +71,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             metadataVersion: Data((file.updatedOn ?? "0").utf8)
         )
         self.contentModificationDate = nil
-        self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
+        self._capabilities = [.allowsReading, .allowsWriting,
                               .allowsReparenting, .allowsDeleting]
         super.init()
     }

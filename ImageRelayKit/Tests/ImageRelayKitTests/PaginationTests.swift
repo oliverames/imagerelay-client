@@ -25,7 +25,7 @@ struct PaginationTests {
     @Test("Parse JSON pagination object")
     func parseJSONPagination() throws {
         let json = """
-        {"page": 1, "per_page": 20, "total_entries": 55, "total_pages": 3}
+        {"current": 1, "next": "/folders?page=2", "per_page": 20, "count": 55, "pages": 3}
         """.data(using: .utf8)!
         let page = try JSONDecoder().decode(Pagination.PageInfo.self, from: json)
         #expect(page.page == 1)
@@ -36,7 +36,7 @@ struct PaginationTests {
     @Test("Last page has no next")
     func lastPage() throws {
         let json = """
-        {"page": 3, "per_page": 20, "total_entries": 55, "total_pages": 3}
+        {"current": 3, "next": null, "per_page": 20, "count": 55, "pages": 3}
         """.data(using: .utf8)!
         let page = try JSONDecoder().decode(Pagination.PageInfo.self, from: json)
         #expect(page.hasNextPage == false)

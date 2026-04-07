@@ -37,6 +37,8 @@ public actor APIClient {
     public func getAllPages<T: Decodable & Sendable>(_ path: String, query: [String: String] = [:]) async throws -> [T] {
         var allItems: [T] = []
         var currentQuery = query
+        let perPage = currentQuery["per_page"].flatMap(Int.init) ?? 100
+        currentQuery["per_page"] = "\(perPage)"
         var page = 1
 
         while true {
@@ -44,18 +46,12 @@ public actor APIClient {
             let request = try buildRequest(method: "GET", path: path, query: currentQuery)
             let (data, response) = try await executeRaw(request)
 
-            let items = try JSONDecoder.imageRelay.decode([T].self, from: data)
+            let pageResult = try decodePage([T].self, from: data, response: response, perPage: perPage)
+            let items = pageResult.items
             allItems.append(contentsOf: items)
 
-            if let linkHeader = response.value(forHTTPHeaderField: "Link"),
-               Pagination.nextURL(fromLinkHeader: linkHeader) != nil {
-                page += 1
-                continue
-            }
-
-            if items.isEmpty { break }
+            guard pageResult.hasNext else { break }
             page += 1
-            if response.value(forHTTPHeaderField: "Link") == nil { break }
         }
 
         return allItems
@@ -132,7 +128,7 @@ public actor APIClient {
 
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        request.setValue("Basic \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -190,6 +186,64 @@ public actor APIClient {
         }
 
         throw lastError ?? APIError.invalidResponse
+    }
+
+    private func decodePage<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        response: HTTPURLResponse,
+        perPage: Int
+    ) throws -> (items: T, hasNext: Bool) {
+        if let linkHeader = response.value(forHTTPHeaderField: "Link"),
+           Pagination.nextURL(fromLinkHeader: linkHeader) != nil {
+            let items = try JSONDecoder.imageRelay.decode(type, from: data)
+            return (items, true)
+        }
+
+        guard !data.isEmpty else {
+            let items = try JSONDecoder.imageRelay.decode(type, from: Data("[]".utf8))
+            return (items, false)
+        }
+
+        let jsonObject = try JSONSerialization.jsonObject(with: data)
+
+        if let body = jsonObject as? [String: Any], body["pagination"] != nil {
+            let items = try decodeItemsFromPaginatedObject(type, body: body)
+            let pageInfo = try decodePageInfo(from: body["pagination"])
+            return (items, pageInfo?.hasNextPage ?? false)
+        }
+
+        if let body = jsonObject as? [Any] {
+            let items = try JSONDecoder.imageRelay.decode(type, from: data)
+            return (items, body.count >= perPage)
+        }
+
+        throw APIError.decodingError(
+            underlying: NSError(
+                domain: "ImageRelayKit.APIClient",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected paginated response format"]
+            )
+        )
+    }
+
+    private func decodeItemsFromPaginatedObject<T: Decodable>(
+        _ type: T.Type,
+        body: [String: Any]
+    ) throws -> T {
+        guard let itemsJSON = body.first(where: { $0.key != "pagination" && $0.value is [Any] })?.value else {
+            let emptyItems = try JSONSerialization.data(withJSONObject: [])
+            return try JSONDecoder.imageRelay.decode(type, from: emptyItems)
+        }
+
+        let itemsData = try JSONSerialization.data(withJSONObject: itemsJSON)
+        return try JSONDecoder.imageRelay.decode(type, from: itemsData)
+    }
+
+    private func decodePageInfo(from value: Any?) throws -> Pagination.PageInfo? {
+        guard let value else { return nil }
+        let data = try JSONSerialization.data(withJSONObject: value)
+        return try JSONDecoder.imageRelay.decode(Pagination.PageInfo.self, from: data)
     }
 
     private func checkStatus(_ response: HTTPURLResponse, data: Data?) throws {

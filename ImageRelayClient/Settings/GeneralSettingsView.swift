@@ -54,7 +54,7 @@ struct GeneralSettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
                     Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**.")
-                    Text("Default File Type ID is used when uploading new files. Leave blank to use Image Relay's default.")
+                    Text("Default File Type ID is required for uploading new files.")
                 }
                 .font(.caption)
             }

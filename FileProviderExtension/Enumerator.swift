@@ -83,13 +83,22 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     private func fetchItems() async throws -> [NSFileProviderItem] {
         let folderID = resolveContainerFolderID()
 
-        let allFolders: [RemoteFolder] = try await api.get("/folders.json")
-        let folders = allFolders.filter { $0.parentID == folderID }
+        let folders: [RemoteFolder]
+        if containerIdentifier == .rootContainer, config.remoteRootFolderID == nil {
+            folders = try await api.getAllPages("/folders")
+        } else {
+            folders = try await api.getAllPages("/folders/\(folderID)/children")
+        }
 
-        let files: [RemoteFile] = try await api.get(
-            "/folders/\(folderID)/files.json",
-            query: ["recursive": "false"]
-        )
+        let files: [RemoteFile]
+        if containerIdentifier == .rootContainer, config.remoteRootFolderID == nil {
+            files = []
+        } else {
+            files = try await api.getAllPages(
+                "/folders/\(folderID)/files",
+                query: ["recursive": "false"]
+            )
+        }
 
         var items: [NSFileProviderItem] = []
 
