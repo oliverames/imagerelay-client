@@ -307,22 +307,83 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
+                self.beginOperation()
                 var updated = tracked
 
                 // Conflict detection: check if remote version changed since last enumeration
                 if changedFields.contains(.contents) {
                     let baseContentVersion = String(data: Data(version.contentVersion), encoding: .utf8) ?? ""
-                    if tracked.contentVersion != baseContentVersion {
-                        // Conflict: remote changed since we last enumerated
-                        if newContents != nil {
-                            let conflictName = ConflictResolver.conflictName(for: tracked.name)
-                            logger.warning("Conflict detected for \(tracked.name), saving as \(conflictName)")
-                            try? db.logActivity(action: .conflicted, itemName: tracked.name, itemType: .file)
-                            // Tell the system to re-fetch the remote version
-                            completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
-                            return
+                    if tracked.contentVersion != baseContentVersion, let contentURL = newContents {
+                        let conflictName = ConflictResolver.conflictName(for: tracked.name)
+                        logger.warning("Conflict detected for \(tracked.name), saving as \(conflictName)")
+                        try? db.logActivity(action: .conflicted, itemName: tracked.name, itemType: .file)
+
+                        // Upload local edits as a conflict copy so neither version is lost.
+                        if let fileTypeID = config.defaultFileTypeID {
+                            let parentFolderID = self.resolveParentFolderID(item.parentItemIdentifier)
+                            let fileData = try Data(contentsOf: contentURL)
+                            let jobRequest = UploadJobRequest(
+                                folder_id: parentFolderID,
+                                file_type_id: fileTypeID,
+                                files: [.init(file_name: conflictName, file_size: fileData.count)]
+                            )
+                            if let job: UploadJob = try? await api.post("/upload_jobs.json", body: jobRequest) {
+                                let uploadFileID = job.files?.first?.id ?? 0
+                                try? await api.uploadChunked(
+                                    fileData: fileData,
+                                    pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
+                                    chunkSize: 5 * 1024 * 1024
+                                )
+                            }
+                        }
+
+                        // Tell the OS to re-fetch the remote canonical version.
+                        self.incrementProgress()
+                        self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
+                        completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
+                        return
+                    }
+                }
+
+                // Folder move across parents: emulated as create → move children → delete original
+                if changedFields.contains(.parentItemIdentifier) && !itemID.isFile {
+                    let newParentID = self.resolveParentFolderID(item.parentItemIdentifier)
+                    self.updateProgress(state: .syncing, phase: "Moving folder", currentItem: tracked.name)
+
+                    let createRequest = CreateFolderRequest(name: tracked.name, parent_id: newParentID)
+                    let newFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
+
+                    let childFiles = try db.children(of: item.itemIdentifier.rawValue)
+                        .filter { $0.itemType == .file }
+                    for child in childFiles {
+                        if let childItemID = ItemIdentifier(rawValue: child.identifier),
+                           let childRemoteID = childItemID.numericID {
+                            try? await api.post(
+                                "/files/\(childRemoteID)/move.json",
+                                body: MoveRequest(folder_ids: [String(newFolder.id)])
+                            )
+                            var updatedChild = child
+                            updatedChild.parentIdentifier = ItemIdentifier.folder(newFolder.id).rawValue
+                            try db.upsertItem(updatedChild)
                         }
                     }
+
+                    try await api.delete("/folders/\(remoteID).json")
+                    try db.deleteItem(item.itemIdentifier.rawValue)
+
+                    let newTracked = TrackedItem(
+                        identifier: ItemIdentifier.folder(newFolder.id).rawValue,
+                        parentIdentifier: item.parentItemIdentifier.rawValue,
+                        remoteID: newFolder.id, itemType: .folder, name: newFolder.name,
+                        size: 0, contentVersion: newFolder.updatedOn ?? "0",
+                        metadataVersion: newFolder.updatedOn ?? "0"
+                    )
+                    try db.upsertItem(newTracked)
+                    try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
+                    self.incrementProgress()
+                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
+                    completionHandler(FileProviderItem(trackedItem: newTracked), [], false, nil)
+                    return
                 }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
@@ -337,7 +398,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     if let uuid = versionResponse["uuid"] {
                         let chunkCount = try await api.uploadChunked(
                             fileData: fileData,
-                            pathBuilder: { chunkNumber in "/files/\(remoteID)/versions/\(uuid)/chunk/\(chunkNumber)" },
+                            pathBuilder: { n in "/files/\(remoteID)/versions/\(uuid)/chunk/\(n)" },
                             chunkSize: 5 * 1024 * 1024
                         )
                         try await api.post(

@@ -38,17 +38,17 @@ struct SyncDatabaseTests {
         let folder = TrackedItem(
             identifier: "folder-10", parentIdentifier: "root",
             remoteID: 10, itemType: .folder, name: "Photos",
-            size: 0, contentVersion: "v1", metadataVersion: "m1", isPinned: false
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
         )
         let file1 = TrackedItem(
             identifier: "file-20", parentIdentifier: "folder-10",
             remoteID: 20, itemType: .file, name: "a.jpg",
-            size: 100, contentVersion: "v1", metadataVersion: "m1", isPinned: false
+            size: 100, contentVersion: "v1", metadataVersion: "m1"
         )
         let file2 = TrackedItem(
             identifier: "file-21", parentIdentifier: "folder-10",
             remoteID: 21, itemType: .file, name: "b.jpg",
-            size: 200, contentVersion: "v1", metadataVersion: "m1", isPinned: false
+            size: 200, contentVersion: "v1", metadataVersion: "m1"
         )
 
         try db.upsertItem(folder)
@@ -66,7 +66,7 @@ struct SyncDatabaseTests {
         let item = TrackedItem(
             identifier: "file-99", parentIdentifier: "folder-1",
             remoteID: 99, itemType: .file, name: "delete-me.png",
-            size: 50, contentVersion: "v1", metadataVersion: "m1", isPinned: false
+            size: 50, contentVersion: "v1", metadataVersion: "m1"
         )
         try db.upsertItem(item)
         try db.deleteItem("file-99")
