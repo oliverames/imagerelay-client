@@ -1,0 +1,528 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
+		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
+		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
+		6133A31DE66194B43990F655 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8DC1E00B04FE23A41E220AAF /* Assets.xcassets */; };
+		8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		960B40F8B168A16893E05254 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
+		9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */; };
+		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
+		CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
+		CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */; };
+		D39BABEE6FA73544F07647C6 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */; };
+		D9C9F0316A42E9720EF939C9 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */; };
+		DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5214AA13DEAEE7F7687D4000 /* Enumerator.swift */; };
+		DE4D78A483B3275786907ADA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46B76A4D571BB9BA19CDE4B /* App.swift */; };
+		E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6B484F18C4C86D49798D03D6 /* ImageRelayKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C3DA156C6C0B5E881BB54375 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 80C293D6F3A19389FD7ACA92 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7753FDCBBDB77346A54BDEFC;
+			remoteInfo = FileProviderExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		EDE0797623EC6AD4D6CB9F1E /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		10E8B32366DC8A4264C5216C /* ImageRelayClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ImageRelayClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1907D94A32A3AE0968238BFE /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
+		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
+		413441CD471A316A1D63A161 /* FileProviderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FileProviderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteChangePoller.swift; sourceTree = "<group>"; };
+		521080E6927D868992384F20 /* ImageRelayKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ImageRelayKit; path = ImageRelayKit; sourceTree = SOURCE_ROOT; };
+		5214AA13DEAEE7F7687D4000 /* Enumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enumerator.swift; sourceTree = "<group>"; };
+		66E79A8CCDC204940416820E /* DomainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainManager.swift; sourceTree = "<group>"; };
+		6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
+		71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
+		8474CE4312626B6DF40DEB47 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		8DC1E00B04FE23A41E220AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtension.entitlements; sourceTree = "<group>"; };
+		B2FE83D474ABB6C82A35F22A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClient.entitlements; sourceTree = "<group>"; };
+		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
+		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
+		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6C1CEBF8D3444A82DC47198D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DE074C4F9F17B028317B86E5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1337FB025DB622C6D770D76F /* FileProviderExtension */ = {
+			isa = PBXGroup;
+			children = (
+				5214AA13DEAEE7F7687D4000 /* Enumerator.swift */,
+				1907D94A32A3AE0968238BFE /* Extension.swift */,
+				B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */,
+				E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */,
+				B2FE83D474ABB6C82A35F22A /* Info.plist */,
+				4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */,
+			);
+			path = FileProviderExtension;
+			sourceTree = "<group>";
+		};
+		3D41B1758BA324C54D725161 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */,
+				71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */,
+				24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */,
+				6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		6F1461F0AB0F2B619A85BB1B /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				521080E6927D868992384F20 /* ImageRelayKit */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		AA5C8E04043665C3E3F0251C = {
+			isa = PBXGroup;
+			children = (
+				1337FB025DB622C6D770D76F /* FileProviderExtension */,
+				CF9CEB146B013A57E60F8BED /* ImageRelayClient */,
+				6F1461F0AB0F2B619A85BB1B /* Packages */,
+				F080F5CB09D5EBB077BC0E92 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CF9CEB146B013A57E60F8BED /* ImageRelayClient */ = {
+			isa = PBXGroup;
+			children = (
+				3D41B1758BA324C54D725161 /* Settings */,
+				F46B76A4D571BB9BA19CDE4B /* App.swift */,
+				8DC1E00B04FE23A41E220AAF /* Assets.xcassets */,
+				66E79A8CCDC204940416820E /* DomainManager.swift */,
+				D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */,
+				8474CE4312626B6DF40DEB47 /* MenuBarView.swift */,
+			);
+			path = ImageRelayClient;
+			sourceTree = "<group>";
+		};
+		F080F5CB09D5EBB077BC0E92 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				413441CD471A316A1D63A161 /* FileProviderExtension.appex */,
+				10E8B32366DC8A4264C5216C /* ImageRelayClient.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		7753FDCBBDB77346A54BDEFC /* FileProviderExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A8B4E626E36E68BF2A44AB14 /* Build configuration list for PBXNativeTarget "FileProviderExtension" */;
+			buildPhases = (
+				1EA70B551CCC15E1D87729DF /* Sources */,
+				DE074C4F9F17B028317B86E5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FileProviderExtension;
+			packageProductDependencies = (
+				6B484F18C4C86D49798D03D6 /* ImageRelayKit */,
+			);
+			productName = FileProviderExtension;
+			productReference = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7D99ADACA8F4377D63E996E2 /* ImageRelayClient */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 10B7F13C8EEABD9B05F5DDB7 /* Build configuration list for PBXNativeTarget "ImageRelayClient" */;
+			buildPhases = (
+				705723069330C0C3ACEE76A4 /* Sources */,
+				7879B424A9E93E1EC23F945C /* Resources */,
+				6C1CEBF8D3444A82DC47198D /* Frameworks */,
+				EDE0797623EC6AD4D6CB9F1E /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B744B747E8485558BE316036 /* PBXTargetDependency */,
+			);
+			name = ImageRelayClient;
+			packageProductDependencies = (
+				9EC291125448216A6C5FE8C2 /* ImageRelayKit */,
+			);
+			productName = ImageRelayClient;
+			productReference = 10E8B32366DC8A4264C5216C /* ImageRelayClient.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		80C293D6F3A19389FD7ACA92 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					7753FDCBBDB77346A54BDEFC = {
+						DevelopmentTeam = PV3W52NDZ3;
+					};
+					7D99ADACA8F4377D63E996E2 = {
+						DevelopmentTeam = PV3W52NDZ3;
+					};
+				};
+			};
+			buildConfigurationList = DE8DD9FFF9D65B1B725D1205 /* Build configuration list for PBXProject "ImageRelayClient" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = AA5C8E04043665C3E3F0251C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA55A8F4871F53667E7C8EB9 /* XCLocalSwiftPackageReference "ImageRelayKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F080F5CB09D5EBB077BC0E92 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7753FDCBBDB77346A54BDEFC /* FileProviderExtension */,
+				7D99ADACA8F4377D63E996E2 /* ImageRelayClient */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7879B424A9E93E1EC23F945C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6133A31DE66194B43990F655 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1EA70B551CCC15E1D87729DF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */,
+				960B40F8B168A16893E05254 /* Extension.swift in Sources */,
+				2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */,
+				CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		705723069330C0C3ACEE76A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */,
+				D39BABEE6FA73544F07647C6 /* AdvancedSettingsView.swift in Sources */,
+				DE4D78A483B3275786907ADA /* App.swift in Sources */,
+				2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */,
+				9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */,
+				D9C9F0316A42E9720EF939C9 /* GeneralSettingsView.swift in Sources */,
+				13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B744B747E8485558BE316036 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7753FDCBBDB77346A54BDEFC /* FileProviderExtension */;
+			targetProxy = C3DA156C6C0B5E881BB54375 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		13726E5A498AC4FD5F888635 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = PV3W52NDZ3;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		3A3E5056962935CCE89483C6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FileProviderExtension/FileProviderExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = FileProviderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		52177CC5F8A505E88FCB6C23 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ImageRelayClient/ImageRelayClient.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ImageRelay Client";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		5B73251BED380150A82E5D7F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = PV3W52NDZ3;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		68F93311BDAED12839B0B530 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FileProviderExtension/FileProviderExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = FileProviderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		FF6633D1579072EEF65A764D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ImageRelayClient/ImageRelayClient.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "ImageRelay Client";
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		10B7F13C8EEABD9B05F5DDB7 /* Build configuration list for PBXNativeTarget "ImageRelayClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				52177CC5F8A505E88FCB6C23 /* Debug */,
+				FF6633D1579072EEF65A764D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A8B4E626E36E68BF2A44AB14 /* Build configuration list for PBXNativeTarget "FileProviderExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3A3E5056962935CCE89483C6 /* Debug */,
+				68F93311BDAED12839B0B530 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DE8DD9FFF9D65B1B725D1205 /* Build configuration list for PBXProject "ImageRelayClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				13726E5A498AC4FD5F888635 /* Debug */,
+				5B73251BED380150A82E5D7F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA55A8F4871F53667E7C8EB9 /* XCLocalSwiftPackageReference "ImageRelayKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ImageRelayKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6B484F18C4C86D49798D03D6 /* ImageRelayKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImageRelayKit;
+		};
+		9EC291125448216A6C5FE8C2 /* ImageRelayKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImageRelayKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 80C293D6F3A19389FD7ACA92 /* Project object */;
+}
