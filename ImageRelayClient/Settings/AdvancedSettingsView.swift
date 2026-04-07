@@ -8,26 +8,40 @@ struct AdvancedSettingsView: View {
     @State private var userAgent = ""
     @State private var saveError: String?
 
-    private let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
-    )!
+    private var container: URL? {
+        FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+        )
+    }
 
     var body: some View {
         Form {
-            Section("Sync") {
+            Section {
                 VStack(alignment: .leading) {
                     Text("Poll Interval: \(Int(pollInterval))s")
                     Slider(value: $pollInterval, in: 15...300, step: 5) {
                         Text("Poll Interval")
                     }
+                    .labelsHidden()
                 }
 
                 Toggle("Upload Changes", isOn: $syncUpload)
                 Toggle("Download Changes", isOn: $syncDownload)
+            } header: {
+                Text("Sync")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Poll interval controls how often the app checks Image Relay for remote changes. Shorter intervals mean faster syncing but more API requests.")
+                    Text("Disable Upload to make this a read-only sync. Disable Download to push local changes without pulling remote ones.")
+                }
+                .font(.caption)
             }
 
-            Section("Network") {
+            Section {
                 TextField("User Agent", text: $userAgent)
+                    .help("Custom User-Agent header sent with all API requests. Leave blank to use the default.")
+            } header: {
+                Text("Network")
             }
 
             if let saveError {
@@ -44,6 +58,7 @@ struct AdvancedSettingsView: View {
     }
 
     private func loadConfig() {
+        guard let container else { return }
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         pollInterval = Double(config.pollIntervalSeconds)
         syncUpload = config.syncUpload
@@ -52,6 +67,7 @@ struct AdvancedSettingsView: View {
     }
 
     private func saveConfig() {
+        guard let container else { return }
         var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         config.pollIntervalSeconds = Int(pollInterval)
         config.syncUpload = syncUpload

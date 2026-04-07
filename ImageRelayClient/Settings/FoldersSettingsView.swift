@@ -5,9 +5,11 @@ struct FoldersSettingsView: View {
     @State private var folders: [TrackedItem] = []
     @State private var loadError: String?
 
-    private let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
-    )!
+    private var container: URL? {
+        FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+        )
+    }
 
     var body: some View {
         Group {
@@ -42,6 +44,7 @@ struct FoldersSettingsView: View {
     }
 
     private func loadFolders() {
+        guard let container else { return }
         do {
             let db = try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
             folders = try db.allItems().filter { $0.itemType == .folder }
@@ -54,6 +57,7 @@ struct FoldersSettingsView: View {
         Binding(
             get: { folder.isPinned },
             set: { newValue in
+                guard let container else { return }
                 do {
                     let db = try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
                     var updated = folder

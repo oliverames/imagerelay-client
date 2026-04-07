@@ -6,6 +6,7 @@ import os.log
 @Observable @MainActor
 final class DomainManager {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "DomainManager")
+    static let appGroupIdentifier = "group.com.oliverames.imagerelay-client"
     static let domainIdentifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.domain")
     static let domainDisplayName = "Image Relay"
 
@@ -16,12 +17,35 @@ final class DomainManager {
     var pauseState: SyncPauseState = .default
     var recentActivity: [ActivityEntry] = []
 
+    init() {
+        Task { @MainActor in
+            await bootstrap()
+        }
+    }
+
     private func openDatabase() -> SyncDatabase? {
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+            forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
         ) else { return nil }
         let dbURL = SyncDatabase.databaseURL(in: container)
         return try? SyncDatabase(url: dbURL)
+    }
+
+    private func loadConfiguration() -> AppConfiguration {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
+        ) else { return .default }
+        return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+    }
+
+    func bootstrap() async {
+        refreshStatus()
+
+        let config = loadConfiguration()
+        guard config.isConfigured else { return }
+
+        await setupDomain()
+        refreshStatus()
     }
 
     func refreshStatus() {

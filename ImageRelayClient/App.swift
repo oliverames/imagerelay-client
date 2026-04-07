@@ -5,31 +5,18 @@ import ImageRelayKit
 struct ImageRelayClientApp: App {
     @State private var domainManager = DomainManager()
 
-    private var menuBarIcon: String {
-        if !domainManager.isDomainActive { return "cloud" }
-        switch domainManager.syncProgress.state {
-        case .syncing: return "arrow.triangle.2.circlepath.circle"
-        case .paused: return "pause.circle"
-        case .error: return "exclamationmark.triangle"
-        case .idle: return "cloud.fill"
-        }
-    }
-
     var body: some Scene {
-        MenuBarExtra("ImageRelay", systemImage: menuBarIcon) {
+        MenuBarExtra {
             MenuBarView()
                 .environment(domainManager)
-                .task {
-                    let container = FileManager.default.containerURL(
-                        forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
-                    )!
-                    let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-                    if config.isConfigured {
-                        await domainManager.setupDomain()
-                    }
-                }
+        } label: {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 16, height: 16)
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Settings {
             TabView {

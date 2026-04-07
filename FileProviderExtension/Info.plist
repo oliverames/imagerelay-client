@@ -23,7 +23,7 @@
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionFileProviderDocumentGroup</key>
-		<string>$(TeamIdentifierPrefix)com.oliverames.imagerelay-client</string>
+		<string>$(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client</string>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.fileprovider-nonui</string>
 		<key>NSExtensionPrincipalClass</key>
