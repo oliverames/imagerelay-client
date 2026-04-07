@@ -8,6 +8,8 @@ public struct AppConfiguration: Codable, Sendable {
     public var syncUpload: Bool
     public var syncDownload: Bool
     public var userAgent: String
+    /// Folder remote IDs to include in sync. Empty means all folders sync.
+    public var selectedFolderIDs: [Int]
 
     enum CodingKeys: String, CodingKey {
         case apiKey = "api_key"
@@ -17,6 +19,39 @@ public struct AppConfiguration: Codable, Sendable {
         case syncUpload = "sync_upload"
         case syncDownload = "sync_download"
         case userAgent = "user_agent"
+        case selectedFolderIDs = "selected_folder_ids"
+    }
+
+    public init(
+        apiKey: String,
+        remoteRootFolderID: Int?,
+        defaultFileTypeID: Int?,
+        pollIntervalSeconds: Int,
+        syncUpload: Bool,
+        syncDownload: Bool,
+        userAgent: String,
+        selectedFolderIDs: [Int] = []
+    ) {
+        self.apiKey = apiKey
+        self.remoteRootFolderID = remoteRootFolderID
+        self.defaultFileTypeID = defaultFileTypeID
+        self.pollIntervalSeconds = pollIntervalSeconds
+        self.syncUpload = syncUpload
+        self.syncDownload = syncDownload
+        self.userAgent = userAgent
+        self.selectedFolderIDs = selectedFolderIDs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        remoteRootFolderID = try c.decodeIfPresent(Int.self, forKey: .remoteRootFolderID)
+        defaultFileTypeID = try c.decodeIfPresent(Int.self, forKey: .defaultFileTypeID)
+        pollIntervalSeconds = try c.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds) ?? 60
+        syncUpload = try c.decodeIfPresent(Bool.self, forKey: .syncUpload) ?? true
+        syncDownload = try c.decodeIfPresent(Bool.self, forKey: .syncDownload) ?? true
+        userAgent = try c.decodeIfPresent(String.self, forKey: .userAgent) ?? "ImageRelayClient/1.0 (macOS)"
+        selectedFolderIDs = try c.decodeIfPresent([Int].self, forKey: .selectedFolderIDs) ?? []
     }
 
     public var isConfigured: Bool {
@@ -34,7 +69,8 @@ public struct AppConfiguration: Codable, Sendable {
         pollIntervalSeconds: 60,
         syncUpload: true,
         syncDownload: true,
-        userAgent: "ImageRelayClient/1.0 (macOS)"
+        userAgent: "ImageRelayClient/1.0 (macOS)",
+        selectedFolderIDs: []
     )
 
     public func save(to url: URL) throws {

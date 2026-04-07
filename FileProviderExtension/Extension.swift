@@ -97,6 +97,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
+                self.beginOperation()
                 self.updateProgress(state: .syncing, phase: "Downloading", currentItem: tracked.name)
 
                 let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
@@ -178,6 +179,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let parentFolderID = self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
+                self.beginOperation()
                 self.updateProgress(state: .syncing, phase: "Uploading", currentItem: itemTemplate.filename)
 
                 if itemTemplate.contentType == .folder {
@@ -192,7 +194,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: folder.id, itemType: .folder, name: folder.name,
                         size: 0, contentVersion: folder.updatedOn ?? "0",
-                        metadataVersion: folder.updatedOn ?? "0", isPinned: false
+                        metadataVersion: folder.updatedOn ?? "0"
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
@@ -243,7 +245,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: fileID, itemType: .file, name: itemTemplate.filename,
                         size: Int64(fileData.count), contentVersion: "1",
-                        metadataVersion: "1", isPinned: false
+                        metadataVersion: "1"
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
@@ -410,6 +412,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let tracked = try db.item(for: identifier.rawValue)
 
+                self.beginOperation()
                 self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
 
                 if itemID.isFile {
@@ -469,6 +472,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         progress.phase = phase
         progress.currentItem = currentItem
         if let lastError { progress.lastError = lastError }
+        try? db.setProgress(progress)
+    }
+
+    /// Marks the start of a new operation. Resets counters if transitioning from idle.
+    private func beginOperation() {
+        var progress = (try? db.getProgress()) ?? .idle
+        if progress.state != .syncing {
+            progress.completedSteps = 0
+            progress.totalSteps = 0
+        }
+        progress.state = .syncing
+        progress.totalSteps += 1
         try? db.setProgress(progress)
     }
 

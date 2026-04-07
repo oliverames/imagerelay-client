@@ -31,7 +31,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         nonisolated(unsafe) let observer = observer
         Task {
             do {
-                let items = try await self.fetchItems()
+                let (items, _) = try await fetchItems()
                 observer.didEnumerate(items)
                 observer.finishEnumerating(upTo: nil)
             } catch {
@@ -49,8 +49,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         Task {
             do {
                 let currentAnchor = SyncAnchor(data: syncAnchor.rawValue)
-                let items = try await self.fetchItems()
+                let (items, deletedIdentifiers) = try await fetchItems()
 
+                if !deletedIdentifiers.isEmpty {
+                    observer.didDeleteItems(withIdentifiers: deletedIdentifiers)
+                }
                 observer.didUpdate(items)
 
                 let newAnchor = (currentAnchor ?? SyncAnchor()).incremented()
@@ -80,14 +83,23 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
     // MARK: - Private
 
-    private func fetchItems() async throws -> [NSFileProviderItem] {
+    /// Fetches current remote items and detects deletions against the database.
+    /// Returns (current items, identifiers of items no longer on the remote).
+    private func fetchItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
         let folderID = resolveContainerFolderID()
 
-        let folders: [RemoteFolder]
+        var folders: [RemoteFolder]
         if containerIdentifier == .rootContainer, config.remoteRootFolderID == nil {
             folders = try await api.getAllPages("/folders")
         } else {
             folders = try await api.getAllPages("/folders/\(folderID)/children")
+        }
+
+        // Apply folder selection filter at the root level only.
+        // Empty selectedFolderIDs means all folders are included.
+        if containerIdentifier == .rootContainer && !config.selectedFolderIDs.isEmpty {
+            let selectedSet = Set(config.selectedFolderIDs)
+            folders = folders.filter { selectedSet.contains($0.id) }
         }
 
         let files: [RemoteFile]
@@ -101,44 +113,58 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         var items: [NSFileProviderItem] = []
+        var remoteIdentifiers = Set<String>()
 
         for folder in folders {
+            let identifier = ItemIdentifier.folder(folder.id).rawValue
+            remoteIdentifiers.insert(identifier)
+
             let item = FileProviderItem(folder: folder, parentItemIdentifier: containerIdentifier)
             items.append(item)
 
             let tracked = TrackedItem(
-                identifier: ItemIdentifier.folder(folder.id).rawValue,
+                identifier: identifier,
                 parentIdentifier: containerIdentifier.rawValue,
                 remoteID: folder.id,
                 itemType: .folder,
                 name: folder.name,
                 size: 0,
                 contentVersion: folder.updatedOn ?? "0",
-                metadataVersion: folder.updatedOn ?? "0",
-                isPinned: false
+                metadataVersion: folder.updatedOn ?? "0"
             )
             try db.upsertItem(tracked)
         }
 
         for file in files where !file.isDeleted {
+            let identifier = ItemIdentifier.file(file.id).rawValue
+            remoteIdentifiers.insert(identifier)
+
             let item = FileProviderItem(file: file, parentItemIdentifier: containerIdentifier)
             items.append(item)
 
             let tracked = TrackedItem(
-                identifier: ItemIdentifier.file(file.id).rawValue,
+                identifier: identifier,
                 parentIdentifier: containerIdentifier.rawValue,
                 remoteID: file.id,
                 itemType: .file,
                 name: file.name,
                 size: Int64(file.size),
                 contentVersion: file.updatedOn ?? "0",
-                metadataVersion: file.updatedOn ?? "0",
-                isPinned: false
+                metadataVersion: file.updatedOn ?? "0"
             )
             try db.upsertItem(tracked)
         }
 
-        return items
+        // Detect deletions: anything tracked for this container that's no longer remote.
+        var deletedIdentifiers: [NSFileProviderItemIdentifier] = []
+        let trackedChildren = try db.children(of: containerIdentifier.rawValue)
+        for tracked in trackedChildren where !remoteIdentifiers.contains(tracked.identifier) {
+            deletedIdentifiers.append(NSFileProviderItemIdentifier(tracked.identifier))
+            try db.deleteItem(tracked.identifier)
+            logger.info("Remote deletion detected: \(tracked.name) (\(tracked.identifier))")
+        }
+
+        return (items, deletedIdentifiers)
     }
 
     private func resolveContainerFolderID() -> Int {

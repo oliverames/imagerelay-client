@@ -157,7 +157,12 @@ public actor APIClient {
 
         for attempt in 0...maxRetries {
             if attempt > 0 {
-                let delay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
+                let delay: TimeInterval
+                if case .rateLimited(let retryAfter) = lastError as? APIError, let seconds = retryAfter {
+                    delay = min(seconds, maxRetryDelay)
+                } else {
+                    delay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
+                }
                 try await Task.sleep(for: .seconds(delay))
             }
 

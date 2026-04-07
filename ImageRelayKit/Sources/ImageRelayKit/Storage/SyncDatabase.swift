@@ -38,7 +38,7 @@ public final class SyncDatabase: Sendable {
                 t.column("size", .integer).notNull().defaults(to: 0)
                 t.column("contentVersion", .text).notNull()
                 t.column("metadataVersion", .text).notNull()
-                t.column("isPinned", .boolean).notNull().defaults(to: false)
+                t.column("isPinned", .boolean).notNull().defaults(to: false)  // removed in v3
             }
 
             try db.create(table: "sync_anchors") { t in
@@ -59,6 +59,12 @@ public final class SyncDatabase: Sendable {
             try db.create(table: "settings") { t in
                 t.primaryKey("key", .text).notNull()
                 t.column("value", .text).notNull()
+            }
+        }
+
+        migrator.registerMigration("v3") { db in
+            try db.alter(table: "tracked_items") { t in
+                t.drop(column: "isPinned")
             }
         }
 
@@ -99,11 +105,10 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    public func pinnedFolders() throws -> [TrackedItem] {
+    public func folders() throws -> [TrackedItem] {
         try writer.read { db in
             try TrackedItem
                 .filter(Column("itemType") == TrackedItemType.folder.rawValue)
-                .filter(Column("isPinned") == true)
                 .fetchAll(db)
         }
     }

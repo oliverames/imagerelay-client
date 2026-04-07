@@ -20,12 +20,11 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
     public var size: Int64
     public var contentVersion: String
     public var metadataVersion: String
-    public var isPinned: Bool
 
     public init(
         identifier: String, parentIdentifier: String, remoteID: Int,
         itemType: TrackedItemType, name: String, size: Int64,
-        contentVersion: String, metadataVersion: String, isPinned: Bool
+        contentVersion: String, metadataVersion: String
     ) {
         self.identifier = identifier
         self.parentIdentifier = parentIdentifier
@@ -35,7 +34,6 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
         self.size = size
         self.contentVersion = contentVersion
         self.metadataVersion = metadataVersion
-        self.isPinned = isPinned
     }
 }
 
