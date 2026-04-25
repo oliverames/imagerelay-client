@@ -9,7 +9,7 @@ on:
 jobs:
   test-kit:
     name: ImageRelayKit unit tests
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +19,7 @@ jobs:
 
   build:
     name: Build (host app + extension)
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
