@@ -10,13 +10,27 @@ public final class SyncDatabase: Sendable {
         } else {
             let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            writer = try DatabasePool(path: path)
+            var config = GRDB.Configuration()
+            // Retry for up to 5 s before returning SQLITE_BUSY, avoiding silent write drops
+            // when the host app and the extension both hold a connection to the same file.
+            config.busyMode = .timeout(5)
+            let pool = try DatabasePool(path: path, configuration: config)
+            // WAL mode allows concurrent readers without blocking writers.
+            try pool.write { db in try db.execute(sql: "PRAGMA journal_mode=WAL") }
+            writer = pool
         }
         try migrate()
     }
 
     public convenience init(url: URL) throws {
         try self.init(path: url.path)
+    }
+
+    /// Returns an in-memory database for use in degraded/fallback scenarios.
+    /// Operations succeed but nothing is persisted across process restarts.
+    public static func makeInMemory() -> SyncDatabase {
+        // Force-try is acceptable here: an in-memory GRDB queue never fails to open.
+        try! SyncDatabase(path: ":memory:")
     }
 
     public static func databaseURL(in container: URL) -> URL {

@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 public actor APIClient {
     private let baseURL: URL
@@ -8,6 +9,7 @@ public actor APIClient {
     private let rateLimiter: RateLimiter
     private let maxRetries: Int
     private let maxRetryDelay: TimeInterval
+    private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "APIClient")
 
     public init(
         baseURL: URL,
@@ -21,6 +23,10 @@ public actor APIClient {
         self.baseURL = baseURL
         self.apiKey = apiKey
         self.userAgent = userAgent
+        // 30 s per request, 10 min total resource timeout (large uploads excluded — they
+        // use URLSession.upload which has its own deadline per chunk).
+        sessionConfiguration.timeoutIntervalForRequest = 30
+        sessionConfiguration.timeoutIntervalForResource = 600
         self.session = URLSession(configuration: sessionConfiguration)
         self.rateLimiter = rateLimiter
         self.maxRetries = maxRetries
@@ -121,12 +127,17 @@ public actor APIClient {
         query: [String: String] = [:],
         body: (any Encodable & Sendable)? = nil
     ) throws -> URLRequest {
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else {
+            throw APIError.invalidURL(path: path)
+        }
         if !query.isEmpty {
             components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
 
-        var request = URLRequest(url: components.url!)
+        guard let url = components.url else {
+            throw APIError.invalidURL(path: path)
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
@@ -154,16 +165,24 @@ public actor APIClient {
 
     private func executeRaw(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         var lastError: (any Error)?
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? ""
 
         for attempt in 0...maxRetries {
+            try Task.checkCancellation()
+
             if attempt > 0 {
                 let delay: TimeInterval
                 if case .rateLimited(let retryAfter) = lastError as? APIError, let seconds = retryAfter {
                     delay = min(seconds, maxRetryDelay)
+                    logger.debug("Rate-limited on \(method) \(path) — waiting \(delay, format: .fixed(precision: 1)) s (attempt \(attempt))")
                 } else {
                     delay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
+                    logger.debug("Retrying \(method) \(path) in \(delay, format: .fixed(precision: 1)) s (attempt \(attempt))")
                 }
                 try await Task.sleep(for: .seconds(delay))
+            } else {
+                logger.debug("\(method) \(path)")
             }
 
             await rateLimiter.acquire()
@@ -173,6 +192,7 @@ public actor APIClient {
             do {
                 (data, response) = try await session.data(for: request)
             } catch {
+                logger.warning("\(method) \(path) network error: \(error.localizedDescription)")
                 lastError = APIError.networkError(underlying: error)
                 continue
             }
@@ -181,10 +201,13 @@ public actor APIClient {
                 throw APIError.invalidResponse
             }
 
+            logger.debug("\(method) \(path) → \(httpResponse.statusCode)")
+
             do {
                 try checkStatus(httpResponse, data: data)
                 return (data, httpResponse)
             } catch let error as APIError where error.isRetryable && attempt < maxRetries {
+                logger.warning("\(method) \(path) retryable error: \(error.userMessage)")
                 lastError = error
                 continue
             }
@@ -251,6 +274,20 @@ public actor APIClient {
         return try JSONDecoder.imageRelay.decode(Pagination.PageInfo.self, from: data)
     }
 
+    private static func parseRetryAfter(_ value: String?) -> TimeInterval? {
+        guard let value else { return nil }
+        // Numeric seconds form: "120"
+        if let seconds = TimeInterval(value) { return seconds }
+        // HTTP-date form: "Wed, 21 Oct 2025 07:28:00 GMT"
+        let httpDateFormatter = DateFormatter()
+        httpDateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        httpDateFormatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        if let date = httpDateFormatter.date(from: value) {
+            return max(0, date.timeIntervalSinceNow)
+        }
+        return nil
+    }
+
     private func checkStatus(_ response: HTTPURLResponse, data: Data?) throws {
         switch response.statusCode {
         case 200...299:
@@ -262,8 +299,7 @@ public actor APIClient {
         case 404:
             throw APIError.notFound(resource: "resource")
         case 429:
-            let retryAfter = response.value(forHTTPHeaderField: "Retry-After")
-                .flatMap(TimeInterval.init)
+            let retryAfter = Self.parseRetryAfter(response.value(forHTTPHeaderField: "Retry-After"))
             throw APIError.rateLimited(retryAfter: retryAfter)
         default:
             let message = data.flatMap { String(data: $0, encoding: .utf8) }
