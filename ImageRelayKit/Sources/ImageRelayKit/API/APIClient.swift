@@ -175,10 +175,10 @@ public actor APIClient {
                 let delay: TimeInterval
                 if case .rateLimited(let retryAfter) = lastError as? APIError, let seconds = retryAfter {
                     delay = min(seconds, maxRetryDelay)
-                    logger.debug("Rate-limited on \(method) \(path) — waiting \(delay, format: .fixed(precision: 1)) s (attempt \(attempt))")
+                    logger.debug("Rate-limited on \(method) \(path) — waiting \(delay) s (attempt \(attempt))")
                 } else {
                     delay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
-                    logger.debug("Retrying \(method) \(path) in \(delay, format: .fixed(precision: 1)) s (attempt \(attempt))")
+                    logger.debug("Retrying \(method) \(path) in \(delay) s (attempt \(attempt))")
                 }
                 try await Task.sleep(for: .seconds(delay))
             } else {

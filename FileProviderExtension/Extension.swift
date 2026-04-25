@@ -107,20 +107,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
-        // Sentinel: if any future code path exits without calling the handler, defer fires it.
-        nonisolated(unsafe) var handlerCalled = false
 
         Task {
-            defer {
-                if !handlerCalled {
-                    completionHandler(nil, nil, NSFileProviderError(.cannotSynchronize))
-                }
-            }
             do {
                 guard let tracked = try db.item(for: itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
                       let fileID = itemID.numericID else {
-                    handlerCalled = true
                     completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
                     return
                 }
@@ -152,12 +144,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
-                handlerCalled = true
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handlerCalled = true
                 completionHandler(nil, nil, self.mapToFileProviderError(error))
             }
         }
@@ -181,14 +171,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
         nonisolated(unsafe) let itemTemplate = itemTemplate
-        nonisolated(unsafe) var handlerCalled = false
 
         Task {
-            defer {
-                if !handlerCalled {
-                    completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
-                }
-            }
             do {
                 // Filter out .DS_Store and temp files
                 let ignoredNames: Set<String> = [".DS_Store"]
@@ -196,19 +180,19 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 if ignoredNames.contains(itemTemplate.filename) ||
                    ignoredSuffixes.contains(where: { itemTemplate.filename.hasSuffix($0) }) {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
                 // Block uploads when sync upload is disabled
                 if !config.syncUpload {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block uploads when sync is paused
                 if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
@@ -237,7 +221,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    handlerCalled = true; completionHandler(item, [], false, nil)
+                    completionHandler(item, [], false, nil)
                 } else if let contentURL = url {
                     let fileData = try Data(contentsOf: contentURL)
                     guard let fileTypeID = config.defaultFileTypeID else {
@@ -274,7 +258,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     }
 
                     guard let assetID = completedJob.assetID else {
-                        handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
+                        completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
                         return
                     }
 
@@ -293,14 +277,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    handlerCalled = true; completionHandler(item, [], false, nil)
+                    completionHandler(item, [], false, nil)
                 } else {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handlerCalled = true; completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -324,32 +308,26 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         nonisolated(unsafe) let completionHandler = completionHandler
         nonisolated(unsafe) let item = item
         nonisolated(unsafe) let version = version
-        nonisolated(unsafe) var handlerCalled = false
 
         Task {
-            defer {
-                if !handlerCalled {
-                    completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
-                }
-            }
             do {
                 // Block content uploads when sync upload is disabled
                 if !config.syncUpload && changedFields.contains(.contents) {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block content uploads when sync is paused
                 if changedFields.contains(.contents),
                    let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 guard let tracked = try db.item(for: item.itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: item.itemIdentifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -387,7 +365,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         // Tell the OS to re-fetch the remote canonical version.
                         self.incrementProgress()
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
-                        handlerCalled = true
                         completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
                         return
                     }
@@ -423,7 +400,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
                     self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
-                    handlerCalled = true
                     completionHandler(FileProviderItem(trackedItem: newTracked), [], false, nil)
                     return
                 }
@@ -481,12 +457,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
-                handlerCalled = true
                 completionHandler(resultItem, [], false, nil)
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handlerCalled = true; completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -505,18 +480,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
-        nonisolated(unsafe) var handlerCalled = false
 
         Task {
-            defer {
-                if !handlerCalled {
-                    completionHandler(NSFileProviderError(.cannotSynchronize))
-                }
-            }
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    handlerCalled = true; completionHandler(NSFileProviderError(.noSuchItem))
+                    completionHandler(NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -538,11 +507,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
-                handlerCalled = true; completionHandler(nil)
+                completionHandler(nil)
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handlerCalled = true; completionHandler(self.mapToFileProviderError(error))
+                completionHandler(self.mapToFileProviderError(error))
             }
         }
         return Progress()
