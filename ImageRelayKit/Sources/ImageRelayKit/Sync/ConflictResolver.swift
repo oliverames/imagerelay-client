@@ -2,7 +2,12 @@ import Foundation
 
 public enum ConflictResolver {
     public static func conflictName(for originalName: String) -> String {
-        let timestamp = Self.timestampFormatter.string(from: Date())
+        // ISO8601DateFormatter is documented as thread-safe, unlike DateFormatter.
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withTime, .withColonSeparatorInTime]
+        let timestamp = formatter.string(from: Date())
+            .replacingOccurrences(of: ":", with: "")
+            .replacingOccurrences(of: "T", with: " ")
         let url = URL(fileURLWithPath: originalName)
         let ext = url.pathExtension
         let stem = url.deletingPathExtension().lastPathComponent
@@ -12,11 +17,4 @@ public enum ConflictResolver {
         }
         return "\(stem) (imagerelay conflict \(timestamp)).\(ext)"
     }
-
-    private static let timestampFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HHmmss"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
 }

@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-kit:
+    name: ImageRelayKit unit tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Swift test
+        working-directory: ImageRelayKit
+        run: swift test
+
+  build:
+    name: Build (host app + extension)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environment info
+        run: xcodebuild -version && swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Resolve ImageRelayKit dependencies
+        # Pre-populate Package.resolved so xcodebuild does not need to perform
+        # network resolution via Xcode's own resolver (which can fail in CI).
+        working-directory: ImageRelayKit
+        run: swift package resolve
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build ImageRelayClient
+        run: |
+          xcodebuild \
+            -project ImageRelayClient.xcodeproj \
+            -scheme ImageRelayClient \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
