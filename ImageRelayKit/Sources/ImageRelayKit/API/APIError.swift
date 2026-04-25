@@ -9,6 +9,7 @@ public enum APIError: Error, Sendable {
     case networkError(underlying: any Error)
     case decodingError(underlying: any Error)
     case invalidResponse
+    case invalidURL(path: String)
 
     public var isRetryable: Bool {
         switch self {
@@ -38,6 +39,8 @@ public enum APIError: Error, Sendable {
             return "Received an unexpected response from Image Relay."
         case .invalidResponse:
             return "Received an invalid response from Image Relay."
+        case .invalidURL(let path):
+            return "Could not build a valid URL for path: \(path)"
         }
     }
 }

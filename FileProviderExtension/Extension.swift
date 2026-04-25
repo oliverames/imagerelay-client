@@ -14,9 +14,21 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     required init(domain: NSFileProviderDomain) {
         self.domain = domain
 
-        let container = FileManager.default.containerURL(
+        guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
-        )!
+        ) else {
+            // App group container unavailable — surface a clear error rather than crashing.
+            // The extension will be in a degraded state; every entry point checks db/api
+            // and returns .cannotSynchronize, which Finder shows to the user.
+            Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
+                .fault("App group container unavailable — check entitlements")
+            self.config = .default
+            self.api = APIClient(baseURL: AppConfiguration.default.baseURL, apiKey: "", userAgent: "")
+            self.db = SyncDatabase.makeInMemory()
+            super.init()
+            return
+        }
+
         let configURL = AppConfiguration.fileURL(in: container)
         let loadedConfig = (try? AppConfiguration.load(from: configURL)) ?? .default
         self.config = loadedConfig
@@ -28,7 +40,15 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         )
 
         let dbURL = SyncDatabase.databaseURL(in: container)
-        self.db = (try? SyncDatabase(url: dbURL))!
+        let database: SyncDatabase
+        do {
+            database = try SyncDatabase(url: dbURL)
+        } catch {
+            Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
+                .fault("SyncDatabase init failed (\(error.localizedDescription)) — extension degraded")
+            database = SyncDatabase.makeInMemory()
+        }
+        self.db = database
 
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
@@ -87,12 +107,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
+        // Sentinel: if any future code path exits without calling the handler, defer fires it.
+        nonisolated(unsafe) var handlerCalled = false
 
         Task {
+            defer {
+                if !handlerCalled {
+                    completionHandler(nil, nil, NSFileProviderError(.cannotSynchronize))
+                }
+            }
             do {
                 guard let tracked = try db.item(for: itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
                       let fileID = itemID.numericID else {
+                    handlerCalled = true
                     completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
                     return
                 }
@@ -108,11 +136,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 progress.completedUnitCount = 30
 
+                // Use a UUID-based temp filename to avoid collisions between concurrent fetches
+                // of identically-named files.
                 let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent(tracked.name)
-                if FileManager.default.fileExists(atPath: tempFile.path) {
-                    try FileManager.default.removeItem(at: tempFile)
-                }
+                let tempFile = tempDir.appendingPathComponent(UUID().uuidString + "-" + tracked.name)
 
                 try await api.download(quickLink.url, to: tempFile)
                 progress.completedUnitCount = 90
@@ -125,10 +152,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
+                handlerCalled = true
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
+                handlerCalled = true
                 completionHandler(nil, nil, self.mapToFileProviderError(error))
             }
         }
@@ -152,8 +181,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
         nonisolated(unsafe) let itemTemplate = itemTemplate
+        nonisolated(unsafe) var handlerCalled = false
 
         Task {
+            defer {
+                if !handlerCalled {
+                    completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
+                }
+            }
             do {
                 // Filter out .DS_Store and temp files
                 let ignoredNames: Set<String> = [".DS_Store"]
@@ -161,19 +196,19 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 if ignoredNames.contains(itemTemplate.filename) ||
                    ignoredSuffixes.contains(where: { itemTemplate.filename.hasSuffix($0) }) {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
                 // Block uploads when sync upload is disabled
                 if !config.syncUpload {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block uploads when sync is paused
                 if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
@@ -202,7 +237,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    completionHandler(item, [], false, nil)
+                    handlerCalled = true; completionHandler(item, [], false, nil)
                 } else if let contentURL = url {
                     let fileData = try Data(contentsOf: contentURL)
                     guard let fileTypeID = config.defaultFileTypeID else {
@@ -226,15 +261,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                     _ = chunkCount  // chunk count not needed for upload job completion
 
+                    // Poll with exponential backoff until the server marks the job finished.
+                    // No hard iteration cap: we keep polling until the task is cancelled or
+                    // the OS extension deadline fires, which is the right termination condition.
                     var completedJob = job
-                    for _ in 0..<30 {
-                        try await Task.sleep(for: .seconds(2))
+                    var pollDelay: TimeInterval = 2
+                    while completedJob.finished != true {
+                        try Task.checkCancellation()
+                        try await Task.sleep(for: .seconds(pollDelay))
                         completedJob = try await api.get("/upload_jobs/\(job.id).json")
-                        if completedJob.finished == true { break }
+                        pollDelay = min(pollDelay * 2, 30)
                     }
 
-                    guard completedJob.finished == true, let assetID = completedJob.assetID else {
-                        completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
+                    guard let assetID = completedJob.assetID else {
+                        handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
                         return
                     }
 
@@ -253,14 +293,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    completionHandler(item, [], false, nil)
+                    handlerCalled = true; completionHandler(item, [], false, nil)
                 } else {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                handlerCalled = true; completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -284,26 +324,32 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         nonisolated(unsafe) let completionHandler = completionHandler
         nonisolated(unsafe) let item = item
         nonisolated(unsafe) let version = version
+        nonisolated(unsafe) var handlerCalled = false
 
         Task {
+            defer {
+                if !handlerCalled {
+                    completionHandler(nil, [], false, NSFileProviderError(.cannotSynchronize))
+                }
+            }
             do {
                 // Block content uploads when sync upload is disabled
                 if !config.syncUpload && changedFields.contains(.contents) {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block content uploads when sync is paused
                 if changedFields.contains(.contents),
                    let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 guard let tracked = try db.item(for: item.itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: item.itemIdentifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handlerCalled = true; completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -319,6 +365,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         try? db.logActivity(action: .conflicted, itemName: tracked.name, itemType: .file)
 
                         // Upload local edits as a conflict copy so neither version is lost.
+                        // If the upload fails, surface the error — do NOT tell the OS the
+                        // operation succeeded while silently discarding the user's edits.
                         if let fileTypeID = config.defaultFileTypeID {
                             let parentFolderID = self.resolveParentFolderID(item.parentItemIdentifier)
                             let fileData = try Data(contentsOf: contentURL)
@@ -327,19 +375,19 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                                 file_type_id: fileTypeID,
                                 files: [.init(file_name: conflictName, file_size: fileData.count)]
                             )
-                            if let job: UploadJob = try? await api.post("/upload_jobs.json", body: jobRequest) {
-                                let uploadFileID = job.files?.first?.id ?? 0
-                                try? await api.uploadChunked(
-                                    fileData: fileData,
-                                    pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
-                                    chunkSize: 5 * 1024 * 1024
-                                )
-                            }
+                            let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
+                            let uploadFileID = job.files?.first?.id ?? 0
+                            try await api.uploadChunked(
+                                fileData: fileData,
+                                pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
+                                chunkSize: 5 * 1024 * 1024
+                            )
                         }
 
                         // Tell the OS to re-fetch the remote canonical version.
                         self.incrementProgress()
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
+                        handlerCalled = true
                         completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
                         return
                     }
@@ -353,20 +401,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let createRequest = CreateFolderRequest(name: tracked.name, parent_id: newParentID)
                     let newFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
 
-                    let childFiles = try db.children(of: item.itemIdentifier.rawValue)
-                        .filter { $0.itemType == .file }
-                    for child in childFiles {
-                        if let childItemID = ItemIdentifier(rawValue: child.identifier),
-                           let childRemoteID = childItemID.numericID {
-                            try? await api.post(
-                                "/files/\(childRemoteID)/move.json",
-                                body: MoveRequest(folder_ids: [String(newFolder.id)])
-                            )
-                            var updatedChild = child
-                            updatedChild.parentIdentifier = ItemIdentifier.folder(newFolder.id).rawValue
-                            try db.upsertItem(updatedChild)
-                        }
-                    }
+                    // Recursively migrate all children (files and subfolders) into the new folder.
+                    try await self.migrateChildren(
+                        of: item.itemIdentifier.rawValue,
+                        intoNewFolderID: newFolder.id,
+                        db: db,
+                        api: api
+                    )
 
                     try await api.delete("/folders/\(remoteID).json")
                     try db.deleteItem(item.itemIdentifier.rawValue)
@@ -382,6 +423,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
                     self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
+                    handlerCalled = true
                     completionHandler(FileProviderItem(trackedItem: newTracked), [], false, nil)
                     return
                 }
@@ -439,11 +481,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
+                handlerCalled = true
                 completionHandler(resultItem, [], false, nil)
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                handlerCalled = true; completionHandler(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -462,12 +505,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let logger = self.logger
         nonisolated(unsafe) let completionHandler = completionHandler
+        nonisolated(unsafe) var handlerCalled = false
 
         Task {
+            defer {
+                if !handlerCalled {
+                    completionHandler(NSFileProviderError(.cannotSynchronize))
+                }
+            }
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    completionHandler(NSFileProviderError(.noSuchItem))
+                    handlerCalled = true; completionHandler(NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -489,11 +538,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
-                completionHandler(nil)
+                handlerCalled = true; completionHandler(nil)
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(self.mapToFileProviderError(error))
+                handlerCalled = true; completionHandler(self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -514,6 +563,58 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     }
 
     // MARK: - Helpers
+
+    /// Recursively moves all children of `parentIdentifier` into `newFolderID` on the remote,
+    /// updating the local DB to reflect each change. Subfolders are created on the remote then
+    /// their own children are migrated before the old remote folder is deleted.
+    private func migrateChildren(
+        of parentIdentifier: String,
+        intoNewFolderID newFolderID: Int,
+        db: SyncDatabase,
+        api: APIClient
+    ) async throws {
+        let children = try db.children(of: parentIdentifier)
+        for child in children {
+            guard let childItemID = ItemIdentifier(rawValue: child.identifier),
+                  let childRemoteID = childItemID.numericID else { continue }
+
+            if child.itemType == .file {
+                try? await api.post(
+                    "/files/\(childRemoteID)/move.json",
+                    body: MoveRequest(folder_ids: [String(newFolderID)])
+                )
+                var updatedChild = child
+                updatedChild.parentIdentifier = ItemIdentifier.folder(newFolderID).rawValue
+                try db.upsertItem(updatedChild)
+            } else {
+                // Create a mirror folder inside the new parent, then recurse.
+                let createRequest = CreateFolderRequest(name: child.name, parent_id: newFolderID)
+                let createdFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
+
+                try await migrateChildren(
+                    of: child.identifier,
+                    intoNewFolderID: createdFolder.id,
+                    db: db,
+                    api: api
+                )
+
+                try? await api.delete("/folders/\(childRemoteID).json")
+                try db.deleteItem(child.identifier)
+
+                let newSubfolder = TrackedItem(
+                    identifier: ItemIdentifier.folder(createdFolder.id).rawValue,
+                    parentIdentifier: ItemIdentifier.folder(newFolderID).rawValue,
+                    remoteID: createdFolder.id,
+                    itemType: .folder,
+                    name: createdFolder.name,
+                    size: 0,
+                    contentVersion: createdFolder.updatedOn ?? "0",
+                    metadataVersion: createdFolder.updatedOn ?? "0"
+                )
+                try db.upsertItem(newSubfolder)
+            }
+        }
+    }
 
     private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) -> Int {
         if identifier == .rootContainer {

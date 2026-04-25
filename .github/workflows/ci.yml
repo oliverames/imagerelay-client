@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-kit:
+    name: ImageRelayKit unit tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift test
+        working-directory: ImageRelayKit
+        run: swift test
+
+  build:
+    name: Build (host app + extension)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build ImageRelayClient
+        run: |
+          xcodebuild \
+            -project ImageRelayClient.xcodeproj \
+            -scheme ImageRelayClient \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            build

@@ -7,7 +7,7 @@ struct ActivitySettingsView: View {
 
     private let container = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
-    )!
+    )
 
     var body: some View {
         Group {
@@ -49,6 +49,10 @@ struct ActivitySettingsView: View {
     }
 
     private func loadActivity() {
+        guard let container else {
+            loadError = "App group container unavailable — check entitlements."
+            return
+        }
         do {
             let db = try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
             entries = try db.recentActivity(limit: 50)
