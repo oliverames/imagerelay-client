@@ -10,15 +10,15 @@ public final class SyncDatabase: Sendable {
         } else {
             let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            var config = GRDB.Configuration()
+            let pool = try DatabasePool(path: path)
             // WAL mode allows concurrent readers without blocking writers.
             // busy_timeout retries for up to 5 s before returning SQLITE_BUSY, avoiding
             // silent write drops when the host app and extension share the same file.
-            config.prepareDatabase { db in
+            try pool.write { db in
                 try db.execute(sql: "PRAGMA journal_mode=WAL")
                 try db.execute(sql: "PRAGMA busy_timeout=5000")
             }
-            writer = try DatabasePool(path: path, configuration: config)
+            writer = pool
         }
         try migrate()
     }
