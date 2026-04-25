@@ -79,15 +79,16 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         completionHandler: @escaping (NSFileProviderItem?, (any Error)?) -> Void
     ) -> Progress {
         let db = self.db
+        let handler = UncheckedBox(value: completionHandler)
         Task {
             do {
                 if let tracked = try db.item(for: identifier.rawValue) {
-                    completionHandler(FileProviderItem(trackedItem: tracked), nil)
+                    handler.value(FileProviderItem(trackedItem: tracked), nil)
                 } else {
-                    completionHandler(nil, NSFileProviderError(.noSuchItem))
+                    handler.value(nil, NSFileProviderError(.noSuchItem))
                 }
             } catch {
-                completionHandler(nil, error)
+                handler.value(nil, error)
             }
         }
         return Progress()
@@ -105,13 +106,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let db = self.db
         let api = self.api
         let logger = self.logger
+        let handler = UncheckedBox(value: completionHandler)
 
         Task {
             do {
                 guard let tracked = try db.item(for: itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
                       let fileID = itemID.numericID else {
-                    completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
+                    handler.value(nil, nil, NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -142,11 +144,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
-                completionHandler(tempFile, item, nil)
+                handler.value(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(nil, nil, self.mapToFileProviderError(error))
+                handler.value(nil, nil, self.mapToFileProviderError(error))
             }
         }
 
@@ -167,6 +169,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let config = self.config
         let logger = self.logger
+        let handler = UncheckedBox(value: completionHandler)
 
         Task {
             do {
@@ -176,19 +179,19 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 if ignoredNames.contains(itemTemplate.filename) ||
                    ignoredSuffixes.contains(where: { itemTemplate.filename.hasSuffix($0) }) {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
                 // Block uploads when sync upload is disabled
                 if !config.syncUpload {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block uploads when sync is paused
                 if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
@@ -217,7 +220,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    completionHandler(item, [], false, nil)
+                    handler.value(item, [], false, nil)
                 } else if let contentURL = url {
                     let fileData = try Data(contentsOf: contentURL)
                     guard let fileTypeID = config.defaultFileTypeID else {
@@ -254,7 +257,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     }
 
                     guard let assetID = completedJob.assetID else {
-                        completionHandler(nil, [], false, NSFileProviderError(.serverUnreachable))
+                        handler.value(nil, [], false, NSFileProviderError(.serverUnreachable))
                         return
                     }
 
@@ -273,14 +276,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
-                    completionHandler(item, [], false, nil)
+                    handler.value(item, [], false, nil)
                 } else {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                handler.value(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -301,26 +304,27 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let config = self.config
         let logger = self.logger
+        let handler = UncheckedBox(value: completionHandler)
 
         Task {
             do {
                 // Block content uploads when sync upload is disabled
                 if !config.syncUpload && changedFields.contains(.contents) {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 // Block content uploads when sync is paused
                 if changedFields.contains(.contents),
                    let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
                     return
                 }
 
                 guard let tracked = try db.item(for: item.itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: item.itemIdentifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    completionHandler(nil, [], false, NSFileProviderError(.noSuchItem))
+                    handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -358,7 +362,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         // Tell the OS to re-fetch the remote canonical version.
                         self.incrementProgress()
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
-                        completionHandler(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
+                        handler.value(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
                         return
                     }
                 }
@@ -393,7 +397,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
                     self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
-                    completionHandler(FileProviderItem(trackedItem: newTracked), [], false, nil)
+                    handler.value(FileProviderItem(trackedItem: newTracked), [], false, nil)
                     return
                 }
 
@@ -450,11 +454,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
-                completionHandler(resultItem, [], false, nil)
+                handler.value(resultItem, [], false, nil)
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(nil, [], false, self.mapToFileProviderError(error))
+                handler.value(nil, [], false, self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -472,12 +476,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let db = self.db
         let api = self.api
         let logger = self.logger
+        let handler = UncheckedBox(value: completionHandler)
 
         Task {
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
-                    completionHandler(NSFileProviderError(.noSuchItem))
+                    handler.value(NSFileProviderError(.noSuchItem))
                     return
                 }
 
@@ -499,11 +504,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
-                completionHandler(nil)
+                handler.value(nil)
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                completionHandler(self.mapToFileProviderError(error))
+                handler.value(self.mapToFileProviderError(error))
             }
         }
         return Progress()
@@ -683,4 +688,11 @@ private enum ExtensionError: LocalizedError {
             return "Renaming files from Finder is not supported yet."
         }
     }
+}
+
+// Wraps a non-Sendable value (typically a completion handler function type) so it
+// can be safely captured in a @Sendable Task closure. The caller is responsible for
+// ensuring the wrapped value is not accessed concurrently from multiple threads.
+private struct UncheckedBox<T>: @unchecked Sendable {
+    let value: T
 }

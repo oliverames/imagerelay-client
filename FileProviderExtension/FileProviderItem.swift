@@ -1,4 +1,4 @@
-import FileProvider
+@preconcurrency import FileProvider
 import ImageRelayKit
 import UniformTypeIdentifiers
 
