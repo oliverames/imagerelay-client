@@ -1,4 +1,4 @@
-import FileProvider
+@preconcurrency import FileProvider
 import ImageRelayKit
 import os.log
 
@@ -53,7 +53,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
 
-        nonisolated(unsafe) let pollerDomain = domain
+        let pollerDomain = domain
         let pollerConfig = config
         let pollerDB = db
         Task { [weak self] in
@@ -79,7 +79,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         completionHandler: @escaping (NSFileProviderItem?, (any Error)?) -> Void
     ) -> Progress {
         let db = self.db
-        nonisolated(unsafe) let completionHandler = completionHandler
         Task {
             do {
                 if let tracked = try db.item(for: identifier.rawValue) {
@@ -106,7 +105,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let db = self.db
         let api = self.api
         let logger = self.logger
-        nonisolated(unsafe) let completionHandler = completionHandler
 
         Task {
             do {
@@ -169,8 +167,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let config = self.config
         let logger = self.logger
-        nonisolated(unsafe) let completionHandler = completionHandler
-        nonisolated(unsafe) let itemTemplate = itemTemplate
 
         Task {
             do {
@@ -305,9 +301,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let api = self.api
         let config = self.config
         let logger = self.logger
-        nonisolated(unsafe) let completionHandler = completionHandler
-        nonisolated(unsafe) let item = item
-        nonisolated(unsafe) let version = version
 
         Task {
             do {
@@ -479,7 +472,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let db = self.db
         let api = self.api
         let logger = self.logger
-        nonisolated(unsafe) let completionHandler = completionHandler
 
         Task {
             do {
