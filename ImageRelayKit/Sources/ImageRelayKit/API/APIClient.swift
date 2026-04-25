@@ -101,6 +101,7 @@ public actor APIClient {
     }
 
     /// Upload data in chunks, returning the number of chunks uploaded.
+    @discardableResult
     public func uploadChunked(
         fileData: Data,
         pathBuilder: @Sendable (Int) -> String,
