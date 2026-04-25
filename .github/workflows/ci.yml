@@ -32,15 +32,14 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Resolve ImageRelayKit dependencies
+        # Pre-populate Package.resolved so xcodebuild does not need to perform
+        # network resolution via Xcode's own resolver (which can fail in CI).
+        working-directory: ImageRelayKit
+        run: swift package resolve
+
       - name: Generate Xcode project
         run: xcodegen generate
-
-      - name: Resolve package dependencies
-        run: |
-          xcodebuild \
-            -project ImageRelayClient.xcodeproj \
-            -scheme ImageRelayClient \
-            -resolvePackageDependencies
 
       - name: Build ImageRelayClient
         run: |
