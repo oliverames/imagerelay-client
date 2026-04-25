@@ -90,7 +90,7 @@ public final class SyncDatabase: Sendable {
 
     public func upsertItem(_ item: TrackedItem) throws {
         try writer.write { db in
-            try item.save(db, onConflict: .replace)
+            try item.insert(db, onConflict: .replace)
         }
     }
 
