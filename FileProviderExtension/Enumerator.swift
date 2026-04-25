@@ -1,4 +1,4 @@
-import FileProvider
+@preconcurrency import FileProvider
 import ImageRelayKit
 import os.log
 
@@ -28,7 +28,6 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         for observer: NSFileProviderEnumerationObserver,
         startingAt page: NSFileProviderPage
     ) {
-        nonisolated(unsafe) let observer = observer
         Task {
             do {
                 let (items, _) = try await fetchItems()
@@ -45,7 +44,6 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         for observer: NSFileProviderChangeObserver,
         from syncAnchor: NSFileProviderSyncAnchor
     ) {
-        nonisolated(unsafe) let observer = observer
         Task {
             do {
                 let currentAnchor = SyncAnchor(data: syncAnchor.rawValue)

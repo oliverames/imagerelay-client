@@ -20,8 +20,7 @@ struct SyncDatabaseTests {
             name: "photo.jpg",
             size: 1024,
             contentVersion: "v1",
-            metadataVersion: "m1",
-            isPinned: false
+            metadataVersion: "m1"
         )
 
         try db.upsertItem(item)
