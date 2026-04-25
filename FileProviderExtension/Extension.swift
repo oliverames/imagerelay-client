@@ -635,7 +635,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             return NSFileProviderError(.serverUnreachable)
         case .networkError:
             return NSFileProviderError(.serverUnreachable)
-        case .forbidden, .decodingError, .invalidResponse:
+        case .forbidden, .decodingError, .invalidResponse, .invalidURL:
             return NSFileProviderError(.cannotSynchronize)
         }
     }
