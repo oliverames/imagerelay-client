@@ -12,7 +12,24 @@ FileProviderExtension/       # NSFileProviderReplicatedExtension
 ImageRelayClient/            # Host app (MenuBarExtra + Settings)
 ```
 
-Run `xcodegen generate` to regenerate the xcodeproj from `Project.yml`.
+## Commands
+
+```bash
+# Regenerate Xcode project after any Project.yml change
+xcodegen generate
+
+# Build host app (macOS 26 SDK required)
+xcodebuild build \
+  -project ImageRelayClient.xcodeproj \
+  -scheme ImageRelayClient \
+  -destination 'platform=macOS'
+
+# Run ImageRelayKit unit tests (30 tests)
+xcodebuild test \
+  -project ImageRelayClient.xcodeproj \
+  -scheme ImageRelayClient \
+  -destination 'platform=macOS'
+```
 
 ## Key Constants
 
@@ -31,6 +48,8 @@ Run `xcodegen generate` to regenerate the xcodeproj from `Project.yml`.
 
 **Config JSON backward compatibility**: `AppConfiguration` uses `decodeIfPresent` with defaults throughout its `init(from:)`. When adding new fields, always use `decodeIfPresent` -- never plain `decode` -- so existing `config.json` files load without error.
 
+**`AppConfiguration.save` must create the parent directory**: On first launch the app group container directory does not exist. Call `FileManager.default.createDirectory(at:withIntermediateDirectories:)` before writing `config.json`, or the write throws "file not found".
+
 **Folder filtering semantics**: `AppConfiguration.selectedFolderIDs` empty = all folders sync. Filtering applied client-side at the root enumerator only. Children of selected folders always enumerate normally.
 
 ## File Provider Patterns
@@ -44,6 +63,11 @@ Task { completionHandler(...) }
 **Enumeration vs. changes**: `enumerateItems` does a fresh full load -- never report deletions here. `enumerateChanges` does incremental updates -- this is the only place to call `observer.didDeleteItems(withIdentifiers:)`.
 
 **Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end.
+
+## Known State
+
+- **Live credentials never tested**: API key has not been entered; File Provider domain not yet registered with the system. No real sync run against a live Image Relay account.
+- **GitHub push blocked**: `feature/native-macos-rebuild` branch has a 226 MB pack file in history (from an accidentally committed `ImageRelayKit/.build/`). GitHub rejects it. Must run `git filter-repo --path ImageRelayKit/.build/ --invert-paths` to scrub history before pushing.
 
 ## macOS 26 SDK Gotchas
 

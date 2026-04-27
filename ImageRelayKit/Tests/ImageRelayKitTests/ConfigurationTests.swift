@@ -1,7 +1,8 @@
 import Testing
 @testable import ImageRelayKit
 
-@Suite("Configuration")
+// Serialized so tests don't race on the shared Keychain account "api-key".
+@Suite("Configuration", .serialized)
 struct ConfigurationTests {
     func tempURL() -> URL {
         FileManager.default.temporaryDirectory
@@ -9,10 +10,18 @@ struct ConfigurationTests {
             .appendingPathExtension("json")
     }
 
+    func cleanKeychain() {
+        KeychainStore.delete(account: AppConfiguration.keychainAccount)
+    }
+
     @Test("Save and load configuration")
     func saveAndLoad() throws {
+        cleanKeychain()
         let url = tempURL()
-        defer { try? FileManager.default.removeItem(at: url) }
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain()
+        }
 
         var config = AppConfiguration.default
         config.apiKey = "my-key"
@@ -28,6 +37,49 @@ struct ConfigurationTests {
         #expect(loaded.pollIntervalSeconds == 60)
     }
 
+    @Test("apiKey is absent from the saved JSON file")
+    func apiKeyNotInJSON() throws {
+        cleanKeychain()
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain()
+        }
+
+        var config = AppConfiguration.default
+        config.apiKey = "secret-token"
+        try config.save(to: url)
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(!raw.contains("secret-token"))
+        #expect(!raw.contains("api_key"))
+    }
+
+    @Test("Legacy config.json with api_key migrates to Keychain")
+    func legacyMigration() throws {
+        cleanKeychain()
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain()
+        }
+
+        // Write a legacy JSON that still contains api_key.
+        let legacyJSON = """
+        {"api_key":"legacy-secret","remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"test","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url)
+        #expect(loaded.apiKey == "legacy-secret")
+        #expect(loaded.remoteRootFolderID == 99)
+
+        // After migration, api_key must be gone from JSON on disk.
+        let rewritten = try String(contentsOf: url, encoding: .utf8)
+        #expect(!rewritten.contains("legacy-secret"))
+        #expect(!rewritten.contains("api_key"))
+    }
+
     @Test("Default configuration has sensible values")
     func defaults() {
         let config = AppConfiguration.default
@@ -39,6 +91,7 @@ struct ConfigurationTests {
 
     @Test("Load returns default when file missing")
     func missingFile() throws {
+        cleanKeychain()
         let url = tempURL()
         let loaded = try AppConfiguration.load(from: url)
         #expect(loaded.apiKey == "")
