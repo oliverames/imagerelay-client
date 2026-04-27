@@ -16,6 +16,19 @@ struct GeneralSettingsView: View {
         )
     }
 
+    // Folder IDs must be positive integers. Empty is allowed for defaultFileTypeID.
+    private var rootFolderIDValid: Bool {
+        remoteRootFolderID.isEmpty || Int(remoteRootFolderID).map { $0 > 0 } == true
+    }
+
+    private var defaultFileTypeIDValid: Bool {
+        defaultFileTypeID.isEmpty || Int(defaultFileTypeID).map { $0 > 0 } == true
+    }
+
+    private var hasValidationError: Bool {
+        !rootFolderIDValid || !defaultFileTypeIDValid
+    }
+
     var body: some View {
         Form {
             if !containerAvailable {
@@ -45,9 +58,23 @@ struct GeneralSettingsView: View {
                 SecureField("API Key", text: $apiKey)
                     .textContentType(.password)
 
-                TextField("Root Folder ID", text: $remoteRootFolderID)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("Root Folder ID", text: $remoteRootFolderID)
+                    if !rootFolderIDValid {
+                        Text("Must be a positive integer (e.g. 12345)")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
 
-                TextField("Default File Type ID", text: $defaultFileTypeID)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("Default File Type ID", text: $defaultFileTypeID)
+                    if !defaultFileTypeIDValid {
+                        Text("Must be a positive integer, or leave blank")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
             } header: {
                 Text("API Credentials")
             } footer: {
@@ -93,11 +120,11 @@ struct GeneralSettingsView: View {
     }
 
     private func saveConfig() {
-        guard let container else { return }
+        guard let container, !hasValidationError else { return }
         var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         config.apiKey = apiKey
-        config.remoteRootFolderID = Int(remoteRootFolderID)
-        config.defaultFileTypeID = Int(defaultFileTypeID)
+        config.remoteRootFolderID = remoteRootFolderID.isEmpty ? nil : Int(remoteRootFolderID)
+        config.defaultFileTypeID = defaultFileTypeID.isEmpty ? nil : Int(defaultFileTypeID)
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
             saveError = nil
