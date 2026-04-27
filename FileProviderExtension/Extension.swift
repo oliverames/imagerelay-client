@@ -53,6 +53,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
 
+        // Warn if a folder move was in progress when the extension last terminated.
+        // This indicates a potentially incomplete (create → move children → delete) sequence.
+        if let stale = try? database.staleFolderMovePayload() {
+            Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
+                .warning("Stale folder move detected on init — may require manual cleanup: \(stale)")
+        }
+
         let pollerDomain = domain
         let pollerConfig = config
         let pollerDB = db
@@ -118,6 +125,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 self.beginOperation()
+                defer { self.incrementProgress() }
                 self.updateProgress(state: .syncing, phase: "Downloading", currentItem: tracked.name)
 
                 let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
@@ -128,19 +136,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 progress.completedUnitCount = 30
 
-                // Use a UUID-based temp filename to avoid collisions between concurrent fetches
-                // of identically-named files.
                 let tempDir = FileManager.default.temporaryDirectory
                 let tempFile = tempDir.appendingPathComponent(UUID().uuidString + "-" + tracked.name)
 
-                try await api.download(quickLink.url, to: tempFile)
+                // Retry up to 3 times on transient network failures.
+                try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
                 progress.completedUnitCount = 90
 
                 try? await api.delete("/quick_links/\(quickLink.id).json")
                 progress.completedUnitCount = 100
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
-                self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
@@ -198,6 +204,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 let parentFolderID = self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
                 self.beginOperation()
+                defer { self.incrementProgress() }
                 self.updateProgress(state: .syncing, phase: "Uploading", currentItem: itemTemplate.filename)
 
                 if itemTemplate.contentType == .folder {
@@ -216,7 +223,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
-                    self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
@@ -272,7 +278,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
-                    self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
@@ -329,6 +334,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 self.beginOperation()
+                defer { self.incrementProgress() }
                 var updated = tracked
 
                 // Conflict detection: check if remote version changed since last enumeration
@@ -360,14 +366,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         }
 
                         // Tell the OS to re-fetch the remote canonical version.
-                        self.incrementProgress()
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                         handler.value(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
                         return
                     }
                 }
 
-                // Folder move across parents: emulated as create → move children → delete original
+                // Folder move across parents: emulated as create → move children → delete original.
+                // We record the in-progress state so a crash can be detected on next init.
                 if changedFields.contains(.parentItemIdentifier) && !itemID.isFile {
                     let newParentID = self.resolveParentFolderID(item.parentItemIdentifier)
                     self.updateProgress(state: .syncing, phase: "Moving folder", currentItem: tracked.name)
@@ -375,7 +381,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let createRequest = CreateFolderRequest(name: tracked.name, parent_id: newParentID)
                     let newFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
 
-                    // Recursively migrate all children (files and subfolders) into the new folder.
+                    try? db.recordFolderMoveInProgress(originalID: remoteID, newID: newFolder.id)
+
                     try await self.migrateChildren(
                         of: item.itemIdentifier.rawValue,
                         intoNewFolderID: newFolder.id,
@@ -386,6 +393,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     try await api.delete("/folders/\(remoteID).json")
                     try db.deleteItem(item.itemIdentifier.rawValue)
 
+                    try? db.clearFolderMoveInProgress()
+
                     let newTracked = TrackedItem(
                         identifier: ItemIdentifier.folder(newFolder.id).rawValue,
                         parentIdentifier: item.parentItemIdentifier.rawValue,
@@ -395,7 +404,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(newTracked)
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
-                    self.incrementProgress()
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                     handler.value(FileProviderItem(trackedItem: newTracked), [], false, nil)
                     return
@@ -451,7 +459,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 try db.upsertItem(updated)
-                self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
                 handler.value(resultItem, [], false, nil)
@@ -489,6 +496,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 let tracked = try db.item(for: identifier.rawValue)
 
                 self.beginOperation()
+                defer { self.incrementProgress() }
                 self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
 
                 if itemID.isFile {
@@ -501,7 +509,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 if let tracked {
                     try? db.logActivity(action: .deleted, itemName: tracked.name, itemType: tracked.itemType)
                 }
-                self.incrementProgress()
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 handler.value(nil)
@@ -529,6 +536,35 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     }
 
     // MARK: - Helpers
+
+    /// Downloads `url` to `destination`, retrying up to `maxAttempts` times on network errors.
+    private func downloadWithRetry(
+        api: APIClient,
+        url: URL,
+        to destination: URL,
+        logger: Logger,
+        maxAttempts: Int = 3
+    ) async throws {
+        var lastError: Error?
+        for attempt in 1...maxAttempts {
+            do {
+                try await api.download(url, to: destination)
+                return
+            } catch {
+                lastError = error
+                guard attempt < maxAttempts else { break }
+                // Guard against retrying auth/permission errors — those won't heal.
+                if let apiError = error as? APIError,
+                   case .notAuthenticated = apiError { break }
+                if let apiError = error as? APIError,
+                   case .forbidden = apiError { break }
+                let delay: TimeInterval = attempt == 1 ? 1 : 2
+                logger.warning("Download attempt \(attempt) failed, retrying in \(Int(delay))s: \(error.localizedDescription)")
+                try await Task.sleep(for: .seconds(delay))
+            }
+        }
+        throw lastError!
+    }
 
     /// Recursively moves all children of `parentIdentifier` into `newFolderID` on the remote,
     /// updating the local DB to reflect each change. Subfolders are created on the remote then

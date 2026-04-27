@@ -9,6 +9,11 @@ actor RemoteChangePoller {
     private let db: SyncDatabase?
     private var pollingTask: Task<Void, Never>?
 
+    // After this many consecutive signal failures, the error is written to SyncProgressState
+    // so the menu bar UI can surface it to the user.
+    private static let failureThreshold = 3
+    private var consecutiveFailures = 0
+
     init(domain: NSFileProviderDomain, config: AppConfiguration, db: SyncDatabase? = nil) {
         self.domain = domain
         self.config = config
@@ -56,14 +61,29 @@ actor RemoteChangePoller {
                 try await manager.signalEnumerator(for: .rootContainer)
                 logger.debug("Signaled enumerator for remote change check")
 
+                consecutiveFailures = 0
+
                 if let db {
                     var progress = (try? db.getProgress()) ?? .idle
+                    // Clear a persistent poll error if we succeed after failures.
+                    if progress.state == .error {
+                        progress.state = .idle
+                        progress.lastError = nil
+                    }
                     progress.lastRemotePollAt = Date()
                     progress.nextRemotePollAt = Date().addingTimeInterval(Double(config.pollIntervalSeconds))
                     try? db.setProgress(progress)
                 }
             } catch {
-                logger.error("Failed to signal enumerator: \(error.localizedDescription)")
+                consecutiveFailures += 1
+                logger.error("Failed to signal enumerator (\(self.consecutiveFailures) consecutive): \(error.localizedDescription)")
+
+                if consecutiveFailures >= Self.failureThreshold, let db {
+                    var progress = (try? db.getProgress()) ?? .idle
+                    progress.state = .error
+                    progress.lastError = "Remote change polling failed \(consecutiveFailures) times: \(error.localizedDescription)"
+                    try? db.setProgress(progress)
+                }
             }
         }
     }

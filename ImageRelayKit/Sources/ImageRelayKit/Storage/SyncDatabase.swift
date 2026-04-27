@@ -159,6 +159,13 @@ public final class SyncDatabase: Sendable {
         try writer.write { db in
             var entry = ActivityEntry(action: action, itemName: itemName, itemType: itemType)
             try entry.insert(db)
+            // Prune after insert so the table never grows beyond the retention window.
+            try db.execute(sql: """
+                DELETE FROM activity_log
+                WHERE id NOT IN (
+                    SELECT id FROM activity_log ORDER BY id DESC LIMIT \(Self.activityLogRetentionCount)
+                )
+                """)
         }
     }
 
@@ -171,6 +178,8 @@ public final class SyncDatabase: Sendable {
                 .fetchAll(db)
         }
     }
+
+    private static let activityLogRetentionCount = 500
 
     // MARK: - Settings / Pause State
 
@@ -233,6 +242,45 @@ public final class SyncDatabase: Sendable {
                 """,
                 arguments: ["sync_progress", json]
             )
+        }
+    }
+
+    // MARK: - Folder Move Crash Tracking
+
+    /// Records that a folder move is in progress, so a crash recovery check on the next
+    /// extension init can detect and warn about a potentially orphaned folder.
+    public func recordFolderMoveInProgress(originalID: Int, newID: Int) throws {
+        let payload = "{\"originalID\":\(originalID),\"newID\":\(newID),\"startedAt\":\(Date().timeIntervalSince1970)}"
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO settings (key, value)
+                VALUES ('folder_move_in_progress', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                arguments: [payload]
+            )
+        }
+    }
+
+    /// Clears the in-progress move record after a successful folder move.
+    public func clearFolderMoveInProgress() throws {
+        try writer.write { db in
+            try db.execute(
+                sql: "DELETE FROM settings WHERE key = 'folder_move_in_progress'"
+            )
+        }
+    }
+
+    /// Returns the in-progress move payload if one was left behind (e.g. after a crash),
+    /// or nil if no move was in progress. Callers should log a warning if non-nil.
+    public func staleFolderMovePayload() throws -> String? {
+        try writer.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT value FROM settings WHERE key = 'folder_move_in_progress'",
+                arguments: []
+            )?["value"]
         }
     }
 }
