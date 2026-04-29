@@ -10,17 +10,22 @@ struct ConfigurationTests {
             .appendingPathExtension("json")
     }
 
-    func cleanKeychain() {
-        KeychainStore.delete(account: AppConfiguration.keychainAccount)
+    func testKeychainAccount() -> String {
+        "test-config-api-key-\(UUID().uuidString)"
+    }
+
+    func cleanKeychain(account: String) {
+        KeychainStore.delete(account: account, accessGroup: nil)
     }
 
     @Test("Save and load configuration")
     func saveAndLoad() throws {
-        cleanKeychain()
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
         let url = tempURL()
         defer {
             try? FileManager.default.removeItem(at: url)
-            cleanKeychain()
+            cleanKeychain(account: account)
         }
 
         var config = AppConfiguration.default
@@ -28,9 +33,9 @@ struct ConfigurationTests {
         config.remoteRootFolderID = 123
         config.defaultFileTypeID = 456
 
-        try config.save(to: url)
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
 
-        let loaded = try AppConfiguration.load(from: url)
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "my-key")
         #expect(loaded.remoteRootFolderID == 123)
         #expect(loaded.defaultFileTypeID == 456)
@@ -39,16 +44,17 @@ struct ConfigurationTests {
 
     @Test("apiKey is absent from the saved JSON file")
     func apiKeyNotInJSON() throws {
-        cleanKeychain()
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
         let url = tempURL()
         defer {
             try? FileManager.default.removeItem(at: url)
-            cleanKeychain()
+            cleanKeychain(account: account)
         }
 
         var config = AppConfiguration.default
         config.apiKey = "secret-token"
-        try config.save(to: url)
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
 
         let raw = try String(contentsOf: url, encoding: .utf8)
         #expect(!raw.contains("secret-token"))
@@ -57,11 +63,12 @@ struct ConfigurationTests {
 
     @Test("Legacy config.json with api_key migrates to Keychain")
     func legacyMigration() throws {
-        cleanKeychain()
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
         let url = tempURL()
         defer {
             try? FileManager.default.removeItem(at: url)
-            cleanKeychain()
+            cleanKeychain(account: account)
         }
 
         // Write a legacy JSON that still contains api_key.
@@ -70,7 +77,7 @@ struct ConfigurationTests {
         """
         try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
 
-        let loaded = try AppConfiguration.load(from: url)
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "legacy-secret")
         #expect(loaded.remoteRootFolderID == 99)
 
@@ -91,9 +98,10 @@ struct ConfigurationTests {
 
     @Test("Load returns default when file missing")
     func missingFile() throws {
-        cleanKeychain()
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
         let url = tempURL()
-        let loaded = try AppConfiguration.load(from: url)
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "")
     }
 

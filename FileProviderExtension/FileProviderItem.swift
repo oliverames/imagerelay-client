@@ -14,6 +14,22 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
     private let _capabilities: NSFileProviderItemCapabilities
     var capabilities: NSFileProviderItemCapabilities { _capabilities }
 
+    /// Create a synthetic item for File Provider special containers.
+    init(containerIdentifier: NSFileProviderItemIdentifier, filename: String) {
+        self.itemIdentifier = containerIdentifier
+        self.parentItemIdentifier = .rootContainer
+        self.filename = filename
+        self.contentType = .folder
+        self.documentSize = nil
+        self.itemVersion = NSFileProviderItemVersion(
+            contentVersion: Data("0".utf8),
+            metadataVersion: Data("0".utf8)
+        )
+        self.contentModificationDate = nil
+        self._capabilities = [.allowsReading, .allowsAddingSubItems]
+        super.init()
+    }
+
     /// Create from a tracked database item
     init(trackedItem: TrackedItem) {
         self.itemIdentifier = NSFileProviderItemIdentifier(trackedItem.identifier)

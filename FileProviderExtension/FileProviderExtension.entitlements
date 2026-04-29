@@ -6,7 +6,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.oliverames.imagerelay-client</string>
+		<string>$(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client</string>
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>

@@ -154,7 +154,7 @@ struct MenuBarView: View {
     }
 
     private var statusIcon: String {
-        if !domainManager.isDomainActive { return "cloud.slash" }
+        if !domainManager.isDomainActive { return "cloud.slash.fill" }
         switch domainManager.syncProgress.state {
         case .syncing: return "arrow.triangle.2.circlepath.circle.fill"
         case .paused: return "pause.circle.fill"
@@ -216,6 +216,7 @@ struct MenuBarView: View {
         case .moved: return "Moved"
         case .conflicted: return "Conflict"
         case .created: return "Created"
+        case .discovered: return "Discovered"
         }
     }
 
@@ -228,6 +229,7 @@ struct MenuBarView: View {
         case .moved: return "folder"
         case .conflicted: return "exclamationmark.triangle"
         case .created: return "plus.circle"
+        case .discovered: return "sparkle.magnifyingglass"
         }
     }
 }

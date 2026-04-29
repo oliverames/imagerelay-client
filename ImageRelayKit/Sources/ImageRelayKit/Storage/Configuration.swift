@@ -80,7 +80,15 @@ public struct AppConfiguration: Codable, Sendable {
 
     /// Saves non-sensitive fields to `url` as JSON, and the API key to the Keychain.
     public func save(to url: URL) throws {
-        KeychainStore.save(apiKey, account: Self.keychainAccount)
+        try save(
+            to: url,
+            keychainAccount: Self.keychainAccount,
+            keychainAccessGroup: KeychainStore.sharedAccessGroup
+        )
+    }
+
+    func save(to url: URL, keychainAccount: String, keychainAccessGroup: String?) throws {
+        KeychainStore.save(apiKey, account: keychainAccount, accessGroup: keychainAccessGroup)
         let directory = url.deletingLastPathComponent()
         if !FileManager.default.fileExists(atPath: directory.path) {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -93,6 +101,14 @@ public struct AppConfiguration: Codable, Sendable {
     /// If Keychain is empty but the JSON still contains the legacy `api_key` field,
     /// the key is migrated to Keychain and the JSON is rewritten without it.
     public static func load(from url: URL) throws -> AppConfiguration {
+        try load(
+            from: url,
+            keychainAccount: keychainAccount,
+            keychainAccessGroup: KeychainStore.sharedAccessGroup
+        )
+    }
+
+    static func load(from url: URL, keychainAccount: String, keychainAccessGroup: String?) throws -> AppConfiguration {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .default
         }
@@ -100,7 +116,7 @@ public struct AppConfiguration: Codable, Sendable {
         var config = try JSONDecoder.imageRelay.decode(AppConfiguration.self, from: data)
 
         // Primary path: API key already in Keychain.
-        if let stored = KeychainStore.load(account: keychainAccount), !stored.isEmpty {
+        if let stored = KeychainStore.load(account: keychainAccount, accessGroup: keychainAccessGroup), !stored.isEmpty {
             config.apiKey = stored
             return config
         }
@@ -109,9 +125,9 @@ public struct AppConfiguration: Codable, Sendable {
         if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let legacyKey = raw["api_key"] as? String, !legacyKey.isEmpty {
             config.apiKey = legacyKey
-            KeychainStore.save(legacyKey, account: keychainAccount)
+            KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
             // Rewrite JSON without the plaintext key.
-            try? config.save(to: url)
+            try? config.save(to: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
         }
 
         return config

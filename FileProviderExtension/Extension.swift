@@ -15,7 +15,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         self.domain = domain
 
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+            forSecurityApplicationGroupIdentifier: "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
         ) else {
             // App group container unavailable — surface a clear error rather than crashing.
             // The extension will be in a degraded state; every entry point checks db/api
@@ -89,7 +89,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let handler = UncheckedBox(value: completionHandler)
         Task {
             do {
-                if let tracked = try db.item(for: identifier.rawValue) {
+                if identifier == .rootContainer {
+                    handler.value(FileProviderItem(containerIdentifier: .rootContainer, filename: "Image Relay"), nil)
+                } else if identifier == .workingSet {
+                    handler.value(FileProviderItem(containerIdentifier: .workingSet, filename: "Image Relay"), nil)
+                } else if let tracked = try db.item(for: identifier.rawValue) {
                     handler.value(FileProviderItem(trackedItem: tracked), nil)
                 } else {
                     handler.value(nil, NSFileProviderError(.noSuchItem))
@@ -236,24 +240,25 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let jobRequest = UploadJobRequest(
                         folder_id: parentFolderID,
                         file_type_id: fileTypeID,
-                        files: [.init(file_name: itemTemplate.filename, file_size: fileData.count)]
+                        files: [.init(name: itemTemplate.filename, size: fileData.count)]
                     )
 
                     let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
 
-                    let uploadFileID = job.files?.first?.id ?? 0
-                    let chunkCount = try await api.uploadChunked(
+                    guard let uploadFileID = job.files?.first?.id else {
+                        throw ExtensionError.uploadJobMissingFileID
+                    }
+                    let uploadResult = try await api.uploadChunked(
                         fileData: fileData,
                         pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
-                        chunkSize: 5 * 1024 * 1024
+                        chunkSize: 5 * 1024 * 1024,
+                        responseType: UploadJob.self
                     )
-
-                    _ = chunkCount  // chunk count not needed for upload job completion
 
                     // Poll with exponential backoff until the server marks the job finished.
                     // No hard iteration cap: we keep polling until the task is cancelled or
                     // the OS extension deadline fires, which is the right termination condition.
-                    var completedJob = job
+                    var completedJob = uploadResult.lastResponse ?? job
                     var pollDelay: TimeInterval = 2
                     while completedJob.finished != true {
                         try Task.checkCancellation()
@@ -354,10 +359,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                             let jobRequest = UploadJobRequest(
                                 folder_id: parentFolderID,
                                 file_type_id: fileTypeID,
-                                files: [.init(file_name: conflictName, file_size: fileData.count)]
+                                files: [.init(name: conflictName, size: fileData.count)]
                             )
                             let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
-                            let uploadFileID = job.files?.first?.id ?? 0
+                            guard let uploadFileID = job.files?.first?.id else {
+                                throw ExtensionError.uploadJobMissingFileID
+                            }
                             try await api.uploadChunked(
                                 fileData: fileData,
                                 pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
@@ -619,7 +626,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     }
 
     private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) -> Int {
-        if identifier == .rootContainer {
+        if identifier == .rootContainer || identifier == .workingSet {
             return config.remoteRootFolderID ?? 0
         }
         return ItemIdentifier(rawValue: identifier.rawValue)?.numericID ?? 0
@@ -692,8 +699,8 @@ private struct UploadJobRequest: Encodable, Sendable {
     let file_type_id: Int
     let files: [FileEntry]
     struct FileEntry: Encodable, Sendable {
-        let file_name: String
-        let file_size: Int
+        let name: String
+        let size: Int
     }
 }
 
@@ -714,12 +721,15 @@ private struct MoveRequest: Encodable, Sendable {
 
 private enum ExtensionError: LocalizedError {
     case missingDefaultFileTypeID
+    case uploadJobMissingFileID
     case fileRenameUnsupported
 
     var errorDescription: String? {
         switch self {
         case .missingDefaultFileTypeID:
             return "Set a Default File Type ID in Settings before uploading new files."
+        case .uploadJobMissingFileID:
+            return "Image Relay did not return an upload file ID for the new file."
         case .fileRenameUnsupported:
             return "Renaming files from Finder is not supported yet."
         }

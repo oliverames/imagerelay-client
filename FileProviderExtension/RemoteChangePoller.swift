@@ -59,6 +59,11 @@ actor RemoteChangePoller {
                 guard let manager = NSFileProviderManager(for: domain) else { continue }
                 try await manager.signalEnumerator(for: .workingSet)
                 try await manager.signalEnumerator(for: .rootContainer)
+                for folderID in folderIDsToSignal() {
+                    try await manager.signalEnumerator(
+                        for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
+                    )
+                }
                 logger.debug("Signaled enumerator for remote change check")
 
                 consecutiveFailures = 0
@@ -86,5 +91,14 @@ actor RemoteChangePoller {
                 }
             }
         }
+    }
+
+    private func folderIDsToSignal() -> [Int] {
+        if !config.selectedFolderIDs.isEmpty {
+            return config.selectedFolderIDs
+        }
+
+        guard let db else { return [] }
+        return (try? db.folders().map(\.remoteID)) ?? []
     }
 }

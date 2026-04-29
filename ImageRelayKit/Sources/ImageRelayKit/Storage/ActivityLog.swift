@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 public enum SyncAction: String, Codable, Sendable, DatabaseValueConvertible {
-    case downloaded, uploaded, deleted, renamed, moved, conflicted, created
+    case downloaded, uploaded, deleted, renamed, moved, conflicted, created, discovered
 }
 
 public enum TrackedItemType: String, Codable, Sendable, DatabaseValueConvertible {

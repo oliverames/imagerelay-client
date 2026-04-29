@@ -27,6 +27,8 @@ public actor APIClient {
         // use URLSession.upload which has its own deadline per chunk).
         sessionConfiguration.timeoutIntervalForRequest = 30
         sessionConfiguration.timeoutIntervalForResource = 600
+        sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        sessionConfiguration.urlCache = nil
         self.session = URLSession(configuration: sessionConfiguration)
         self.rateLimiter = rateLimiter
         self.maxRetries = maxRetries
@@ -100,6 +102,17 @@ public actor APIClient {
         let _: EmptyResponse = try await execute(request)
     }
 
+    public func upload<T: Decodable & Sendable>(
+        data: Data,
+        to path: String,
+        contentType: String = "application/octet-stream"
+    ) async throws -> T {
+        var request = try buildRequest(method: "POST", path: path)
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+        return try await execute(request)
+    }
+
     /// Upload data in chunks, returning the number of chunks uploaded.
     @discardableResult
     public func uploadChunked(
@@ -121,6 +134,29 @@ public actor APIClient {
         return max(chunkNumber, 1)
     }
 
+    /// Upload data in chunks and decode the response from the last uploaded chunk.
+    @discardableResult
+    public func uploadChunked<T: Decodable & Sendable>(
+        fileData: Data,
+        pathBuilder: @Sendable (Int) -> String,
+        chunkSize: Int = 5 * 1024 * 1024,
+        responseType: T.Type
+    ) async throws -> (chunkCount: Int, lastResponse: T?) {
+        var chunkNumber = 0
+        var offset = 0
+        var lastResponse: T?
+
+        while offset < fileData.count {
+            chunkNumber += 1
+            let end = min(offset + chunkSize, fileData.count)
+            let chunk = fileData[offset..<end]
+            lastResponse = try await upload(data: Data(chunk), to: pathBuilder(chunkNumber))
+            offset = end
+        }
+
+        return (max(chunkNumber, 1), lastResponse)
+    }
+
     // MARK: - Private
 
     private func buildRequest(
@@ -140,6 +176,7 @@ public actor APIClient {
         }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

@@ -36,7 +36,7 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups:
-          - group.com.oliverames.imagerelay-client
+          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
     settings:
@@ -62,14 +62,15 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups:
-          - group.com.oliverames.imagerelay-client
+          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
     info:
       path: FileProviderExtension/Info.plist
       properties:
         NSExtension:
-          NSExtensionFileProviderDocumentGroup: group.com.oliverames.imagerelay-client
+          NSExtensionFileProviderDocumentGroup: $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          NSExtensionFileProviderSupportsEnumeration: true
           NSExtensionPointIdentifier: com.apple.fileprovider-nonui
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).Extension
         CFBundleSymbolName: cloud

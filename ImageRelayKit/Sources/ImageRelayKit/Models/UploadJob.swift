@@ -2,7 +2,7 @@ import Foundation
 
 public struct UploadJob: Codable, Sendable, Identifiable {
     public let id: Int
-    public let status: String
+    public let status: String?
     public let fileID: Int?
     public let finished: Bool?
     public let assetID: Int?
@@ -10,9 +10,13 @@ public struct UploadJob: Codable, Sendable, Identifiable {
 
     public struct UploadFile: Codable, Sendable {
         public let id: Int
+        public let name: String?
+        public let size: Int?
 
-        public init(id: Int) {
+        public init(id: Int, name: String? = nil, size: Int? = nil) {
             self.id = id
+            self.name = name
+            self.size = size
         }
     }
 
@@ -22,7 +26,7 @@ public struct UploadJob: Codable, Sendable, Identifiable {
         case assetID = "asset_id"
     }
 
-    public init(id: Int, status: String, fileID: Int? = nil, finished: Bool? = nil, assetID: Int? = nil, files: [UploadFile]? = nil) {
+    public init(id: Int, status: String? = nil, fileID: Int? = nil, finished: Bool? = nil, assetID: Int? = nil, files: [UploadFile]? = nil) {
         self.id = id
         self.status = status
         self.fileID = fileID

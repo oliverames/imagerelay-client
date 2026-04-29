@@ -6,7 +6,7 @@ struct ActivitySettingsView: View {
     @State private var loadError: String?
 
     private let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+        forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
     )
 
     var body: some View {
@@ -70,6 +70,7 @@ struct ActivitySettingsView: View {
         case .moved: "arrow.right.circle.fill"
         case .conflicted: "exclamationmark.triangle.fill"
         case .created: "plus.circle.fill"
+        case .discovered: "sparkle.magnifyingglass"
         }
     }
 
@@ -82,6 +83,7 @@ struct ActivitySettingsView: View {
         case .moved: .purple
         case .conflicted: .yellow
         case .created: .teal
+        case .discovered: .indigo
         }
     }
 }

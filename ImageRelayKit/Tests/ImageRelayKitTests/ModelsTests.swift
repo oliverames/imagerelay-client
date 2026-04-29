@@ -125,6 +125,50 @@ struct ModelsTests {
         #expect(job.fileID == nil)
     }
 
+    @Test("Decode live UploadJob create and final chunk payloads")
+    func decodeLiveUploadJobPayloads() throws {
+        let createJSON = """
+        {
+            "id": 36305650,
+            "created_at": "2026-04-29T19:54:09.000Z",
+            "files": [
+                {
+                    "id": 32119192,
+                    "name": "Codex-Chunk-Probe-155407.txt",
+                    "size": 1
+                }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let createdJob = try JSONDecoder.imageRelay.decode(UploadJob.self, from: createJSON)
+        #expect(createdJob.id == 36305650)
+        #expect(createdJob.status == nil)
+        #expect(createdJob.files?.first?.id == 32119192)
+        #expect(createdJob.files?.first?.name == "Codex-Chunk-Probe-155407.txt")
+        #expect(createdJob.files?.first?.size == 1)
+
+        let chunkJSON = """
+        {
+            "id": 36305650,
+            "user_id": 274329,
+            "metagroup_id": 6096,
+            "catalog_id": 2907644,
+            "prefix": "/",
+            "finished": true,
+            "created_at": "2026-04-29T19:54:09.000Z",
+            "updated_at": "2026-04-29T19:54:12.000Z",
+            "retries": 0,
+            "unique_id": "88e63a280f5043f2a9127418acd4fd86",
+            "asset_id": 205729632
+        }
+        """.data(using: .utf8)!
+
+        let completedJob = try JSONDecoder.imageRelay.decode(UploadJob.self, from: chunkJSON)
+        #expect(completedJob.finished == true)
+        #expect(completedJob.assetID == 205729632)
+    }
+
     @Test("RemoteFile with deleted flag is filtered")
     func deletedFileFiltered() throws {
         let json = """

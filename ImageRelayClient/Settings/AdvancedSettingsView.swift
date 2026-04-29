@@ -10,7 +10,7 @@ struct AdvancedSettingsView: View {
 
     private var container: URL? {
         FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client"
+            forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
         )
     }
 

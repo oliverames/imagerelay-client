@@ -6,7 +6,7 @@ import os.log
 @Observable @MainActor
 final class DomainManager {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "DomainManager")
-    static let appGroupIdentifier = "group.com.oliverames.imagerelay-client"
+    static let appGroupIdentifier = "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
     static let domainIdentifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.domain")
     static let domainDisplayName = "Image Relay"
 
@@ -16,6 +16,7 @@ final class DomainManager {
     var syncProgress: SyncProgressState = .idle
     var pauseState: SyncPauseState = .default
     var recentActivity: [ActivityEntry] = []
+    private var remotePollingTask: Task<Void, Never>?
 
     init() {
         Task { @MainActor in
@@ -45,6 +46,7 @@ final class DomainManager {
         guard config.isConfigured else { return }
 
         await setupDomain()
+        startRemotePolling()
         refreshStatus()
     }
 
@@ -104,16 +106,87 @@ final class DomainManager {
     }
 
     func signalSync() async {
+        let config = loadConfiguration()
+        do {
+            try await signalEnumerators(config: config)
+            markRemotePollSucceeded(config: config)
+        } catch {
+            logger.error("Failed to signal sync: \(error.localizedDescription)")
+            markRemotePollFailed(error)
+        }
+    }
+
+    private func signalEnumerators(config: AppConfiguration) async throws {
         let domain = NSFileProviderDomain(
             identifier: Self.domainIdentifier,
             displayName: Self.domainDisplayName
         )
         guard let manager = NSFileProviderManager(for: domain) else { return }
-        do {
-            try await manager.signalEnumerator(for: .workingSet)
-        } catch {
-            logger.error("Failed to signal sync: \(error.localizedDescription)")
+        try await manager.signalEnumerator(for: .workingSet)
+        try await manager.signalEnumerator(for: .rootContainer)
+        for folderID in folderIDsToSignal(config: config) {
+            try await manager.signalEnumerator(
+                for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
+            )
         }
+    }
+
+    private func folderIDsToSignal(config: AppConfiguration) -> [Int] {
+        if !config.selectedFolderIDs.isEmpty {
+            return config.selectedFolderIDs
+        }
+        return (try? openDatabase()?.folders().map(\.remoteID)) ?? []
+    }
+
+    private func startRemotePolling() {
+        guard remotePollingTask == nil else { return }
+        remotePollingTask = Task { @MainActor [weak self] in
+            await self?.remotePollLoop()
+        }
+    }
+
+    private func remotePollLoop() async {
+        while !Task.isCancelled {
+            let config = loadConfiguration()
+            do {
+                try await Task.sleep(for: .seconds(config.pollIntervalSeconds))
+            } catch {
+                return
+            }
+
+            refreshStatus()
+            guard isDomainActive, config.syncDownload, !pauseState.isActive else { continue }
+
+            do {
+                try await signalEnumerators(config: config)
+                markRemotePollSucceeded(config: config)
+            } catch {
+                logger.error("Remote poll signal failed: \(error.localizedDescription)")
+                markRemotePollFailed(error)
+            }
+        }
+    }
+
+    private func markRemotePollSucceeded(config: AppConfiguration) {
+        guard let db = openDatabase() else { return }
+        var progress = (try? db.getProgress()) ?? .idle
+        if progress.state == .error {
+            progress.state = .idle
+            progress.lastError = nil
+        }
+        progress.lastRemotePollAt = Date()
+        progress.nextRemotePollAt = Date().addingTimeInterval(Double(config.pollIntervalSeconds))
+        try? db.setProgress(progress)
+        refreshStatus()
+    }
+
+    private func markRemotePollFailed(_ error: any Error) {
+        guard let db = openDatabase() else { return }
+        var progress = (try? db.getProgress()) ?? .idle
+        progress.state = .error
+        progress.lastError = "Remote change polling failed: \(error.localizedDescription)"
+        try? db.setProgress(progress)
+        refreshStatus()
     }
 
     func openInFinder() {
@@ -123,8 +196,25 @@ final class DomainManager {
         )
         guard let manager = NSFileProviderManager(for: domain) else { return }
         manager.getUserVisibleURL(for: .rootContainer) { url, error in
-            if let url {
-                NSWorkspace.shared.open(url)
+            if let error {
+                self.logger.error("Failed to resolve user-visible File Provider URL: \(error.localizedDescription)")
+                return
+            }
+
+            guard let url else {
+                self.logger.error("File Provider manager returned no user-visible URL")
+                return
+            }
+
+            DispatchQueue.main.async {
+                let didStartAccessing = url.startAccessingSecurityScopedResource()
+                defer {
+                    if didStartAccessing {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                NSWorkspace.shared.activateFileViewerSelecting([url])
             }
         }
     }
