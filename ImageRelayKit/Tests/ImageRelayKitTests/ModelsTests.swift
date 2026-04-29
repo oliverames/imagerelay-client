@@ -24,6 +24,27 @@ struct ModelsTests {
         #expect(folder.childCount == 5)
     }
 
+    @Test("Decode live RemoteFolder payload")
+    func decodeLiveFolderPayload() throws {
+        let json = """
+        {
+            "id": 1909821,
+            "name": "5050",
+            "parent_id": null,
+            "full_catalog_path": "",
+            "updated_on": "2026-04-29T12:47:47.000Z",
+            "child_count": 13
+        }
+        """.data(using: .utf8)!
+
+        let folder = try JSONDecoder.imageRelay.decode(RemoteFolder.self, from: json)
+        #expect(folder.id == 1909821)
+        #expect(folder.name == "5050")
+        #expect(folder.parentID == nil)
+        #expect(folder.path == "")
+        #expect(folder.childCount == 13)
+    }
+
     @Test("Decode RemoteFile from API JSON")
     func decodeFileFromAPI() throws {
         let json = """
@@ -45,6 +66,29 @@ struct ModelsTests {
         #expect(file.size == 204800)
         #expect(file.contentType == "image/png")
         #expect(file.folderIDs == [123, 456])
+        #expect(file.isDeleted == false)
+    }
+
+    @Test("Decode live RemoteFile payload")
+    func decodeLiveFilePayload() throws {
+        let json = """
+        {
+            "id": 205636740,
+            "filename": "Green-Up-Day.PNG",
+            "size": 668335,
+            "updated_on": "2026-04-28T19:55:58.000Z",
+            "content_type": "image/png",
+            "file_type_id": 6096,
+            "folder_ids": [2910316],
+            "deleted": null
+        }
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder.imageRelay.decode(RemoteFile.self, from: json)
+        #expect(file.id == 205636740)
+        #expect(file.name == "Green-Up-Day.PNG")
+        #expect(file.size == 668335)
+        #expect(file.folderIDs == [2910316])
         #expect(file.isDeleted == false)
     }
 

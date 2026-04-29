@@ -14,11 +14,38 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         case id
         case name = "filename"
         case size = "file_size"
+        case liveSize = "size"
         case updatedOn = "updated_on"
         case contentType = "content_type"
         case fileTypeID = "file_type_id"
         case folderIDs = "folder_ids"
         case isDeleted = "deleted"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        size = try c.decodeIfPresent(Int.self, forKey: .size)
+            ?? c.decodeIfPresent(Int.self, forKey: .liveSize)
+            ?? 0
+        updatedOn = try c.decodeIfPresent(String.self, forKey: .updatedOn)
+        contentType = try c.decodeIfPresent(String.self, forKey: .contentType)
+        fileTypeID = try c.decodeIfPresent(Int.self, forKey: .fileTypeID)
+        folderIDs = try Self.decodeFolderIDs(from: c)
+        isDeleted = try c.decodeIfPresent(Bool.self, forKey: .isDeleted) ?? false
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(size, forKey: .size)
+        try c.encodeIfPresent(updatedOn, forKey: .updatedOn)
+        try c.encodeIfPresent(contentType, forKey: .contentType)
+        try c.encodeIfPresent(fileTypeID, forKey: .fileTypeID)
+        try c.encode(folderIDs, forKey: .folderIDs)
+        try c.encode(isDeleted, forKey: .isDeleted)
     }
 
     public init(
@@ -34,5 +61,15 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         self.fileTypeID = fileTypeID
         self.folderIDs = folderIDs
         self.isDeleted = isDeleted
+    }
+
+    private static func decodeFolderIDs(from c: KeyedDecodingContainer<CodingKeys>) throws -> [Int] {
+        if let ids = try c.decodeIfPresent([Int].self, forKey: .folderIDs) {
+            return ids
+        }
+        if let strings = try c.decodeIfPresent([String].self, forKey: .folderIDs) {
+            return strings.compactMap(Int.init)
+        }
+        return []
     }
 }

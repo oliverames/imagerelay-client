@@ -84,14 +84,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     /// Fetches current remote items and detects deletions against the database.
     /// Returns (current items, identifiers of items no longer on the remote).
     private func fetchItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
-        let folderID = resolveContainerFolderID()
-
-        var folders: [RemoteFolder]
-        if containerIdentifier == .rootContainer, config.remoteRootFolderID == nil {
-            folders = try await api.getAllPages("/folders")
-        } else {
-            folders = try await api.getAllPages("/folders/\(folderID)/children")
-        }
+        let folderID = try await resolveContainerFolderID()
+        var folders = try await childFolders(of: folderID)
 
         // Apply folder selection filter at the root level only.
         // Empty selectedFolderIDs means all folders are included.
@@ -100,15 +94,10 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             folders = folders.filter { selectedSet.contains($0.id) }
         }
 
-        let files: [RemoteFile]
-        if containerIdentifier == .rootContainer, config.remoteRootFolderID == nil {
-            files = []
-        } else {
-            files = try await api.getAllPages(
-                "/folders/\(folderID)/files",
-                query: ["recursive": "false"]
-            )
-        }
+        let files: [RemoteFile] = try await api.getAllPages(
+            "/folders/\(folderID)/files.json",
+            query: ["recursive": "false"]
+        )
 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
@@ -165,9 +154,45 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return (items, deletedIdentifiers)
     }
 
-    private func resolveContainerFolderID() -> Int {
+    private func childFolders(of folderID: Int) async throws -> [RemoteFolder] {
+        let discovered = try await discoverFoldersUnder(folderID)
+        return discovered
+            .filter { $0.parentID == folderID }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private func discoverFoldersUnder(_ rootFolderID: Int) async throws -> [RemoteFolder] {
+        let recursiveFiles: [RemoteFile] = try await api.getAllPages(
+            "/folders/\(rootFolderID)/files.json",
+            query: ["recursive": "true"]
+        )
+
+        var pending = Array(Set(recursiveFiles.flatMap(\.folderIDs))).filter { $0 != rootFolderID }
+        var foldersByID: [Int: RemoteFolder] = [:]
+
+        while let folderID = pending.popLast() {
+            guard foldersByID[folderID] == nil else { continue }
+
+            let folder: RemoteFolder = try await api.get("/folders/\(folderID).json")
+            foldersByID[folder.id] = folder
+
+            if let parentID = folder.parentID,
+               parentID != rootFolderID,
+               foldersByID[parentID] == nil {
+                pending.append(parentID)
+            }
+        }
+
+        return Array(foldersByID.values)
+    }
+
+    private func resolveContainerFolderID() async throws -> Int {
         if containerIdentifier == .rootContainer {
-            return config.remoteRootFolderID ?? 0
+            if let remoteRootFolderID = config.remoteRootFolderID {
+                return remoteRootFolderID
+            }
+            let root: RemoteFolder = try await api.get("/folders/root.json")
+            return root.id
         }
         guard let itemID = ItemIdentifier(rawValue: containerIdentifier.rawValue),
               let numericID = itemID.numericID else {
