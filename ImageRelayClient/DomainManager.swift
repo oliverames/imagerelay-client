@@ -105,6 +105,13 @@ final class DomainManager {
         }
     }
 
+    func resetDomain() async {
+        await removeDomain()
+        try? await Task.sleep(for: .seconds(1))
+        await setupDomain()
+        await signalSync()
+    }
+
     func signalSync() async {
         let config = loadConfiguration()
         do {

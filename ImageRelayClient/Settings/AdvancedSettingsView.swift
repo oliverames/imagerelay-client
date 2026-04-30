@@ -2,11 +2,13 @@ import SwiftUI
 import ImageRelayKit
 
 struct AdvancedSettingsView: View {
+    @Environment(DomainManager.self) private var domainManager
     @State private var pollInterval: Double = 60
     @State private var syncUpload = true
     @State private var syncDownload = true
     @State private var userAgent = ""
     @State private var saveError: String?
+    @State private var isResettingDomain = false
 
     private var container: URL? {
         FileManager.default.containerURL(
@@ -42,6 +44,25 @@ struct AdvancedSettingsView: View {
                     .help("Custom User-Agent header sent with all API requests. Leave blank to use the default.")
             } header: {
                 Text("Network")
+            }
+
+            Section {
+                Button {
+                    Task {
+                        isResettingDomain = true
+                        await domainManager.resetDomain()
+                        isResettingDomain = false
+                    }
+                } label: {
+                    if isResettingDomain {
+                        Label("Resetting Finder Sync", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Reset Finder Sync", systemImage: "arrow.clockwise")
+                    }
+                }
+                .disabled(isResettingDomain)
+            } header: {
+                Text("Finder")
             }
 
             if let saveError {

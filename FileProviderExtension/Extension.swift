@@ -255,16 +255,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         responseType: UploadJob.self
                     )
 
-                    // Poll with exponential backoff until the server marks the job finished.
-                    // No hard iteration cap: we keep polling until the task is cancelled or
-                    // the OS extension deadline fires, which is the right termination condition.
                     var completedJob = uploadResult.lastResponse ?? job
-                    var pollDelay: TimeInterval = 2
-                    while completedJob.finished != true {
+                    if completedJob.finished != true || completedJob.assetID == nil {
                         try Task.checkCancellation()
-                        try await Task.sleep(for: .seconds(pollDelay))
                         completedJob = try await api.get("/upload_jobs/\(job.id).json")
-                        pollDelay = min(pollDelay * 2, 30)
                     }
 
                     guard let assetID = completedJob.assetID else {

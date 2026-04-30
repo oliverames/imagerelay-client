@@ -1,9 +1,19 @@
+import AppKit
 import SwiftUI
 import ImageRelayKit
 
 @main
 struct ImageRelayClientApp: App {
     @State private var domainManager = DomainManager()
+
+    init() {
+        guard CommandLine.arguments.contains("--reset-file-provider-domain") else { return }
+        Task { @MainActor in
+            let manager = DomainManager()
+            await manager.resetDomain()
+            NSApplication.shared.terminate(nil)
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra {
