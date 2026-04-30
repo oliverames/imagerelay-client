@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-04-29 - 1.0.0 BETA 1 release
+
+**What changed**: Finished the native macOS ImageRelayClient beta and published GitHub prerelease `v1.0.0-beta.1`. Added the Icon Composer source asset under `ImageRelayIcon.icon`, generated a standard `AppIcon.appiconset` so macOS emits `AppIcon.icns`, moved the host app to marketing version `1.0.0`, and made the File Provider extension inherit the shared version/build values. Added a hidden `--reset-file-provider-domain` maintenance launch argument and a visible Advanced settings "Reset Finder Sync" button so the signed host app can remove/re-add the local File Provider domain.
+
+**Decisions made**: Kept the Icon Composer `.icon` package bundled as source material, but generated a normal macOS app icon set because the `.icon` package alone compiled into `Assets.car` without producing `CFBundleIconFile`/`AppIcon.icns`. Kept the upload completion path simple: trust the final chunk response when it includes `finished` and `asset_id`, with one immediate upload-job fallback fetch if that response is incomplete.
+
+**Left off at**: Released DMG is at GitHub release `v1.0.0-beta.1`, attached with checksum. Local File Provider domain was reset and verified against the live Image Relay account. Oliver's Stuff now shows remote-only files plus the local two-way upload in Finder. Local untracked `build/` and `.codex-backups/20260429/` remain intentionally outside git.
+
+**Open questions**: Still open: delete temporary local notarization key copy at `build/release-1.0.0-beta.1/AuthKey.p8` after explicit confirmation. Still open: dates in Finder currently show Dec 31, 1969 for remote placeholder files because item date metadata is not yet mapped to a useful Finder date.
+
+---
+
 ## 2026-04-07 -- Python removal, sync gap implementations, merged to main
 
 **What changed**: Removed all Python implementation; project is now Swift-only. Merged `feature/native-macos-rebuild` into main and force-pushed after scrubbing 226MB GRDB pack file from git history with `git-filter-repo`. Implemented all remaining sync feature gaps:
