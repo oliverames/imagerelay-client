@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-04-30 - Local beta wipe and repo purge
+
+**What changed**: Removed the local `/Applications` beta app, beta backup copies, release export directories, Image Relay-specific app containers, app group data, CloudStorage mount, and the lingering DerivedData File Provider registration from this Mac. Deleted the GitHub prerelease and tag `v1.0.0-beta.1`. Rewrote git history to purge `build/` and `.codex-backups/`, then force-pushed the cleaned `main` branch.
+
+**Decisions made**: Kept the new Developer ID release scripts and worklog trail in the repo, but treated all beta artifacts and repo-local key copies as disposable after explicit approval. Left the 1Password-managed App Store Connect key alone, even though it should still be considered exposed and rotated later.
+
+**Left off at**: The machine is back to a clean slate for ImageRelayClient, with no registered File Provider extension and no installed beta build. The repo is ready for a fresh clean packaging and install verification pass before any future beta release.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient. Still open: run a fresh end-to-end Beta 2 smoke packaging and install pass from the cleaned state before creating another release.
+
+---
+
 ## 2026-04-30 - Developer ID release workflow fixed for Beta 2
 
 **What changed**: Built and verified a clean Developer ID release path outside the repo's iCloud-synced tree. Added `scripts/ensure-developer-id-profiles.py` to create or reuse the explicit App Store Connect bundle IDs for `com.oliverames.imagerelay-client` and `com.oliverames.imagerelay-client.fileprovider`, create `MAC_APP_DIRECT` Developer ID provisioning profiles for both targets, and install those profiles locally. Added `scripts/build-developer-id-release.sh` to run `xcodegen`, archive to `/tmp`, manually export with the correct Developer ID certificate and profile names, notarize and staple the app zip, create a DMG from the stapled app, notarize and staple the DMG, and run `codesign --verify --deep --strict`, `spctl`, and `stapler validate` checks. The script also supports `--smoke-install`, which replaces `/Applications/ImageRelayClient.app` from the notarized DMG and verifies both the host app process and embedded `FileProviderExtension` process launch.
