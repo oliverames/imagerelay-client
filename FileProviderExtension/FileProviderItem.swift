@@ -42,7 +42,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             contentVersion: Data(trackedItem.contentVersion.utf8),
             metadataVersion: Data(trackedItem.metadataVersion.utf8)
         )
-        self.contentModificationDate = nil
+        self.contentModificationDate = trackedItem.contentModifiedAt
 
         if trackedItem.itemType == .folder {
             self.contentType = .folder
@@ -68,7 +68,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             contentVersion: Data((folder.updatedOn ?? "0").utf8),
             metadataVersion: Data((folder.updatedOn ?? "0").utf8)
         )
-        self.contentModificationDate = nil
+        self.contentModificationDate = folder.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
                               .allowsDeleting, .allowsAddingSubItems]
         super.init()
@@ -86,7 +86,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             contentVersion: Data((file.updatedOn ?? "0").utf8),
             metadataVersion: Data((file.updatedOn ?? "0").utf8)
         )
-        self.contentModificationDate = nil
+        self.contentModificationDate = file.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting,
                               .allowsReparenting, .allowsDeleting]
         super.init()

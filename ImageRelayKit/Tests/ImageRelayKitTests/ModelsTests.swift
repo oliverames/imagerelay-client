@@ -67,6 +67,7 @@ struct ModelsTests {
         #expect(file.contentType == "image/png")
         #expect(file.folderIDs == [123, 456])
         #expect(file.isDeleted == false)
+        #expect(file.contentModifiedAt != nil)
     }
 
     @Test("Decode live RemoteFile payload")
@@ -90,6 +91,16 @@ struct ModelsTests {
         #expect(file.size == 668335)
         #expect(file.folderIDs == [2910316])
         #expect(file.isDeleted == false)
+        #expect(file.contentModifiedAt != nil)
+    }
+
+    @Test("Parse Image Relay date metadata")
+    func parseImageRelayDateMetadata() throws {
+        let withFractionalSeconds = try #require(ImageRelayDateParser.date(from: "2026-04-28T19:55:58.000Z"))
+        let withoutFractionalSeconds = try #require(ImageRelayDateParser.date(from: "2026-04-01T12:00:00Z"))
+
+        #expect(withFractionalSeconds.timeIntervalSince1970 == 1_777_406_158)
+        #expect(withoutFractionalSeconds.timeIntervalSince1970 == 1_775_044_800)
     }
 
     @Test("Decode QuickLink from API JSON")

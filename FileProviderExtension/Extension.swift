@@ -223,7 +223,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: folder.id, itemType: .folder, name: folder.name,
                         size: 0, contentVersion: folder.updatedOn ?? "0",
-                        metadataVersion: folder.updatedOn ?? "0"
+                        metadataVersion: folder.updatedOn ?? "0",
+                        contentModifiedAt: folder.contentModifiedAt
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
@@ -273,7 +274,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: fileID, itemType: .file, name: itemTemplate.filename,
                         size: Int64(fileData.count), contentVersion: "1",
-                        metadataVersion: "1"
+                        metadataVersion: "1",
+                        contentModifiedAt: Date()
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
@@ -401,7 +403,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: item.parentItemIdentifier.rawValue,
                         remoteID: newFolder.id, itemType: .folder, name: newFolder.name,
                         size: 0, contentVersion: newFolder.updatedOn ?? "0",
-                        metadataVersion: newFolder.updatedOn ?? "0"
+                        metadataVersion: newFolder.updatedOn ?? "0",
+                        contentModifiedAt: newFolder.contentModifiedAt
                     )
                     try db.upsertItem(newTracked)
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
@@ -433,6 +436,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                     updated.size = Int64(fileData.count)
                     updated.contentVersion = UUID().uuidString
+                    updated.contentModifiedAt = Date()
                     try? db.logActivity(action: .uploaded, itemName: tracked.name, itemType: .file)
                 }
 
@@ -612,7 +616,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     name: createdFolder.name,
                     size: 0,
                     contentVersion: createdFolder.updatedOn ?? "0",
-                    metadataVersion: createdFolder.updatedOn ?? "0"
+                    metadataVersion: createdFolder.updatedOn ?? "0",
+                    contentModifiedAt: createdFolder.contentModifiedAt
                 )
                 try db.upsertItem(newSubfolder)
             }

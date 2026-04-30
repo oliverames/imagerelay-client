@@ -124,7 +124,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 name: folder.name,
                 size: 0,
                 contentVersion: folder.updatedOn ?? "0",
-                metadataVersion: folder.updatedOn ?? "0"
+                metadataVersion: folder.updatedOn ?? "0",
+                contentModifiedAt: folder.contentModifiedAt
             )
             try db.upsertItem(tracked)
             if existingItem == nil {
@@ -149,7 +150,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 name: file.name,
                 size: Int64(file.size),
                 contentVersion: file.updatedOn ?? "0",
-                metadataVersion: file.updatedOn ?? "0"
+                metadataVersion: file.updatedOn ?? "0",
+                contentModifiedAt: file.contentModifiedAt
             )
             try db.upsertItem(tracked)
             if existingItem == nil {

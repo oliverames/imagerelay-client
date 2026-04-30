@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ImageRelayKit
 
@@ -9,6 +10,8 @@ struct AdvancedSettingsView: View {
     @State private var userAgent = ""
     @State private var saveError: String?
     @State private var isResettingDomain = false
+    @State private var isExportingDiagnostics = false
+    @State private var diagnosticsMessage: String?
 
     private var container: URL? {
         FileManager.default.containerURL(
@@ -65,6 +68,30 @@ struct AdvancedSettingsView: View {
                 Text("Finder")
             }
 
+            Section {
+                Button {
+                    exportDiagnostics()
+                } label: {
+                    if isExportingDiagnostics {
+                        Label("Exporting Diagnostics", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Export Diagnostics", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isExportingDiagnostics)
+
+                if let diagnosticsMessage {
+                    Text(diagnosticsMessage)
+                        .font(.caption)
+                        .foregroundStyle(diagnosticsMessage.hasPrefix("Exported") ? Color.secondary : Color.red)
+                }
+            } header: {
+                Text("Diagnostics")
+            } footer: {
+                Text("Exports sanitized configuration, recent activity, sync state, domain status, and recent ImageRelayClient logs without API keys.")
+                    .font(.caption)
+            }
+
             if let saveError {
                 Section {
                     Text(saveError)
@@ -99,6 +126,48 @@ struct AdvancedSettingsView: View {
             saveError = nil
         } catch {
             saveError = error.localizedDescription
+        }
+    }
+
+    private func exportDiagnostics() {
+        saveConfig()
+
+        let panel = NSOpenPanel()
+        panel.title = "Export Diagnostics"
+        panel.prompt = "Export"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        isExportingDiagnostics = true
+        diagnosticsMessage = nil
+
+        Task {
+            do {
+                let didStartAccessing = destination.startAccessingSecurityScopedResource()
+                defer {
+                    if didStartAccessing {
+                        destination.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                let exportedURL = try await DiagnosticsExporter.export(
+                    to: destination,
+                    domainManager: domainManager
+                )
+                await MainActor.run {
+                    diagnosticsMessage = "Exported \(exportedURL.lastPathComponent)"
+                    isExportingDiagnostics = false
+                }
+            } catch {
+                await MainActor.run {
+                    diagnosticsMessage = error.localizedDescription
+                    isExportingDiagnostics = false
+                }
+            }
         }
     }
 }

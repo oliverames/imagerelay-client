@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-04-29 - Beta continuation after 1.0.0 BETA 1
+
+**What changed**: Added `BETA_TESTING.md` with the practical tester checklist for first launch, credentials, selected-folder sync, remote discovery, upload, download-on-open, pause/resume, quit/relaunch, domain reset, file operations, bad API key, network failure, and diagnostics export. Fixed the Finder placeholder date bug by parsing Image Relay `updated_on` metadata into `RemoteFile`/`RemoteFolder`, persisting it on `TrackedItem`, migrating the sync database to `v4`, and returning it through `FileProviderItem.contentModificationDate`. Added focused model/database tests for date parsing and persistence. Added Advanced settings "Export Diagnostics", which writes sanitized config, recent activity, sync progress, File Provider domain status, and recent ImageRelayClient subsystem logs to a user-chosen folder without exporting API keys.
+
+**Verification**: `swift test --package-path ImageRelayKit` passes with 44 tests. `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeds. `xcodegen generate` was run after adding `DiagnosticsExporter.swift`; `Project.yml` now explicitly keeps the extension version/build fields tied to `$(MARKETING_VERSION)` and `$(CURRENT_PROJECT_VERSION)`.
+
+**Release DMG smoke result**: Downloaded GitHub prerelease `v1.0.0-beta.1` DMG and verified the SHA-256 digest matched GitHub's asset digest (`e1279673de7ea4894e5615962474d3363906f21320e08218bce81edcdcc4a77d`). `spctl` accepts the DMG and mounted app as notarized Developer ID from Oliver Ames. Installing the released app from the DMG failed to launch: macOS blocked the embedded File Provider extension with AMFI `No matching profile found` for restricted entitlements `com.apple.developer.team-identifier` and `keychain-access-groups`. The released app and appex contain an Xcode-managed `Mac Team Provisioning Profile: *` development profile with provisioned devices even though the binaries are Developer ID signed. Also observed `codesign --deep --strict` failure because `com.apple.FinderInfo` xattrs are present on the embedded appex/bundles. The previous `/Applications/ImageRelayClient.app` was backed up before install and restored after the failed launch; the failed release install was moved to `~/Applications/Codex Backups/ImageRelayClient.app.v1.0.0-beta.1.failed-launch`.
+
+**Left off at**: Live smoke testing against Image Relay did not proceed because the released DMG cannot launch its File Provider extension. No File Provider domain reset was attempted and no Image Relay folder content was touched. When the release packaging is fixed, restrict all live Finder/Image Relay smoke activity to the selected `Oliver's Stuff` folder only.
+
+**Open questions**: Need a source-controlled release/export workflow that produces Developer ID signed/notarized DMGs without embedding development provisioning profiles or FinderInfo xattrs. Still open: delete temporary local notarization key copy at `build/release-1.0.0-beta.1/AuthKey.p8` after explicit confirmation.
+
+---
+
 ## 2026-04-29 - 1.0.0 BETA 1 release
 
 **What changed**: Finished the native macOS ImageRelayClient beta and published GitHub prerelease `v1.0.0-beta.1`. Added the Icon Composer source asset under `ImageRelayIcon.icon`, generated a standard `AppIcon.appiconset` so macOS emits `AppIcon.icns`, moved the host app to marketing version `1.0.0`, and made the File Provider extension inherit the shared version/build values. Added a hidden `--reset-file-provider-domain` maintenance launch argument and a visible Advanced settings "Reset Finder Sync" button so the signed host app can remove/re-add the local File Provider domain.

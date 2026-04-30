@@ -8,6 +8,10 @@ public struct RemoteFolder: Codable, Sendable, Identifiable, Hashable {
     public let updatedOn: String?
     public let childCount: Int
 
+    public var contentModifiedAt: Date? {
+        updatedOn.flatMap(ImageRelayDateParser.date)
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case name

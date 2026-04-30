@@ -20,7 +20,8 @@ struct SyncDatabaseTests {
             name: "photo.jpg",
             size: 1024,
             contentVersion: "v1",
-            metadataVersion: "m1"
+            metadataVersion: "m1",
+            contentModifiedAt: Date(timeIntervalSince1970: 1_777_404_958)
         )
 
         try db.upsertItem(item)
@@ -28,6 +29,7 @@ struct SyncDatabaseTests {
         #expect(retrieved?.name == "photo.jpg")
         #expect(retrieved?.size == 1024)
         #expect(retrieved?.itemType == .file)
+        #expect(retrieved?.contentModifiedAt?.timeIntervalSince1970 == 1_777_404_958)
     }
 
     @Test("List children of a parent")

@@ -83,6 +83,12 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v4") { db in
+            try db.alter(table: "tracked_items") { t in
+                t.add(column: "contentModifiedAt", .datetime)
+            }
+        }
+
         try migrator.migrate(writer)
     }
 

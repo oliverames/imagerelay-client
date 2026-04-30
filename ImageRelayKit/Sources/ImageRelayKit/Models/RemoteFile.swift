@@ -10,6 +10,10 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
     public let folderIDs: [Int]
     public let isDeleted: Bool
 
+    public var contentModifiedAt: Date? {
+        updatedOn.flatMap(ImageRelayDateParser.date)
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case name = "filename"
@@ -71,5 +75,19 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
             return strings.compactMap(Int.init)
         }
         return []
+    }
+}
+
+public enum ImageRelayDateParser {
+    public static func date(from value: String) -> Date? {
+        let fractionalSecondsFormatter = ISO8601DateFormatter()
+        fractionalSecondsFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalSecondsFormatter.date(from: value) {
+            return date
+        }
+
+        let secondsFormatter = ISO8601DateFormatter()
+        secondsFormatter.formatOptions = [.withInternetDateTime]
+        return secondsFormatter.date(from: value)
     }
 }
