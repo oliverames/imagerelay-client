@@ -1,5 +1,13 @@
 # Worklog
 
+## 2026-04-30 - Developer ID release workflow fixed for Beta 2
+
+**What changed**: Built and verified a clean Developer ID release path outside the repo's iCloud-synced tree. Added `scripts/ensure-developer-id-profiles.py` to create or reuse the explicit App Store Connect bundle IDs for `com.oliverames.imagerelay-client` and `com.oliverames.imagerelay-client.fileprovider`, create `MAC_APP_DIRECT` Developer ID provisioning profiles for both targets, and install those profiles locally. Added `scripts/build-developer-id-release.sh` to run `xcodegen`, archive to `/tmp`, manually export with the correct Developer ID certificate and profile names, notarize and staple the app zip, create a DMG from the stapled app, notarize and staple the DMG, and run `codesign --verify --deep --strict`, `spctl`, and `stapler validate` checks. The script also supports `--smoke-install`, which replaces `/Applications/ImageRelayClient.app` from the notarized DMG and verifies both the host app process and embedded `FileProviderExtension` process launch.
+
+**Verification**: Manual export using the new `MAC_APP_DIRECT` profiles succeeded from `/tmp`, with both the app and File Provider extension signed by `Developer ID Application: Oliver Ames (PV3W52NDZ3)` and embedding the new explicit Developer ID provisioning profiles rather than the previous Xcode-managed `Mac Team Provisioning Profile: *`. The exported app passed `codesign --verify --deep --strict`. The app zip notarization was accepted and stapled, then the DMG notarization was accepted and stapled. The installed `/Applications/ImageRelayClient.app` now passes `spctl -a -vv` as `Notarized Developer ID`, and launching it starts both `/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient` and `/Applications/ImageRelayClient.app/Contents/PlugIns/FileProviderExtension.appex/Contents/MacOS/FileProviderExtension`. The active config remains restricted to selected folder ID `2907644`, which maps to `Oliver's Stuff`.
+
+**Repo hygiene**: Added `.gitignore` entries for `build/` and `.codex-backups/` so future release artifacts and local backups stay out of source control. The repo-local `build/release-1.0.0-beta.1/AuthKey.p8` copy and related beta artifact trees were deleted after explicit approval, while the 1Password-managed system key remains untouched. The App Store Connect API key should still be treated as exposed and revoked/reissued, and the git history now needs to be rewritten so the old committed copies disappear from every ref.
+
 ## 2026-04-29 - Beta continuation after 1.0.0 BETA 1
 
 **What changed**: Added `BETA_TESTING.md` with the practical tester checklist for first launch, credentials, selected-folder sync, remote discovery, upload, download-on-open, pause/resume, quit/relaunch, domain reset, file operations, bad API key, network failure, and diagnostics export. Fixed the Finder placeholder date bug by parsing Image Relay `updated_on` metadata into `RemoteFile`/`RemoteFolder`, persisting it on `TrackedItem`, migrating the sync database to `v4`, and returning it through `FileProviderItem.contentModificationDate`. Added focused model/database tests for date parsing and persistence. Added Advanced settings "Export Diagnostics", which writes sanitized config, recent activity, sync progress, File Provider domain status, and recent ImageRelayClient subsystem logs to a user-chosen folder without exporting API keys.
@@ -10,7 +18,7 @@
 
 **Left off at**: Live smoke testing against Image Relay did not proceed because the released DMG cannot launch its File Provider extension. No File Provider domain reset was attempted and no Image Relay folder content was touched. When the release packaging is fixed, restrict all live Finder/Image Relay smoke activity to the selected `Oliver's Stuff` folder only.
 
-**Open questions**: Need a source-controlled release/export workflow that produces Developer ID signed/notarized DMGs without embedding development provisioning profiles or FinderInfo xattrs. Still open: delete temporary local notarization key copy at `build/release-1.0.0-beta.1/AuthKey.p8` after explicit confirmation.
+**Open questions**: Need a source-controlled release/export workflow that produces Developer ID signed/notarized DMGs without embedding development provisioning profiles or FinderInfo xattrs.
 
 ---
 

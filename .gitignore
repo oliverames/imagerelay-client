@@ -2,6 +2,10 @@
 .env
 .worktrees/
 .superpowers/
+.codex-backups/
+build/
+__pycache__/
+*.pyc
 ImageRelayClient.xcodeproj/xcuserdata/
 *.xcuserstate
 DerivedData/
