@@ -80,10 +80,39 @@ struct ConfigurationTests {
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "legacy-secret")
         #expect(loaded.remoteRootFolderID == 99)
+        #expect(KeychainStore.load(account: account, accessGroup: nil) == "legacy-secret")
 
         // After migration, api_key must be gone from JSON on disk.
         let rewritten = try String(contentsOf: url, encoding: .utf8)
         #expect(!rewritten.contains("legacy-secret"))
+        #expect(!rewritten.contains("api_key"))
+    }
+
+    @Test("Legacy api_key is scrubbed when Keychain already has a value")
+    func legacyAPIKeyScrubbedWhenKeychainAlreadyConfigured() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        KeychainStore.save("stored-secret", account: account, accessGroup: nil)
+        let legacyJSON = """
+        {"api_key":"stale-plaintext-secret","remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"test","selected_folder_ids":[2907644]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.apiKey == "stored-secret")
+        #expect(loaded.remoteRootFolderID == 99)
+        #expect(loaded.selectedFolderIDs == [2907644])
+        #expect(KeychainStore.load(account: account, accessGroup: nil) == "stored-secret")
+
+        let rewritten = try String(contentsOf: url, encoding: .utf8)
+        #expect(!rewritten.contains("stale-plaintext-secret"))
+        #expect(!rewritten.contains("stored-secret"))
         #expect(!rewritten.contains("api_key"))
     }
 

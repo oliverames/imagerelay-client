@@ -154,7 +154,7 @@ struct MenuBarView: View {
     }
 
     private var statusIcon: String {
-        if !domainManager.isDomainActive { return "cloud.slash.fill" }
+        if !domainManager.isDomainActive { return "icloud.slash.fill" }
         switch domainManager.syncProgress.state {
         case .syncing: return "arrow.triangle.2.circlepath.circle.fill"
         case .paused: return "pause.circle.fill"

@@ -88,18 +88,24 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     private func fetchItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
         let folderID = try await resolveContainerFolderID()
         let folders = try await childFolders(of: folderID)
+        let isFilteredRoot = isRootLikeContainer && !config.selectedFolderIDs.isEmpty
         var visibleFolderIDs: Set<Int>?
 
         // Apply folder selection filter at the root level only.
         // Empty selectedFolderIDs means all folders are included.
-        if isRootLikeContainer && !config.selectedFolderIDs.isEmpty {
+        if isFilteredRoot {
             visibleFolderIDs = Set(config.selectedFolderIDs)
         }
 
-        let files: [RemoteFile] = try await api.getAllPages(
-            "/folders/\(folderID)/files.json",
-            query: ["recursive": "false"]
-        )
+        let files: [RemoteFile]
+        if isFilteredRoot {
+            files = []
+        } else {
+            files = try await api.getAllPages(
+                "/folders/\(folderID)/files.json",
+                query: ["recursive": "false"]
+            )
+        }
 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
@@ -168,11 +174,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
             }
 
-            if remoteIdentifiers.contains(tracked.identifier) {
+            if isFilteredRoot || remoteIdentifiers.contains(tracked.identifier) {
                 for identifier in localSubtree {
                     try db.deleteItem(identifier)
                 }
-                logger.info("Folder hidden by selection filter: \(tracked.name) (\(tracked.identifier))")
+                logger.info("Item hidden by selection filter: \(tracked.name) (\(tracked.identifier))")
             } else {
                 for identifier in localSubtree {
                     try db.deleteItem(identifier)
@@ -194,8 +200,12 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
     private func childFolders(of folderID: Int) async throws -> [RemoteFolder] {
         if isRootLikeContainer {
-            let folders: [RemoteFolder] = try await api.getAllPages("/folders.json")
-            return folders
+            if !config.selectedFolderIDs.isEmpty {
+                return try await selectedRootFolders(parentID: folderID)
+            }
+
+            let discovered = try await discoverFoldersUnder(folderID)
+            return discovered
                 .filter { $0.parentID == folderID }
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
@@ -204,6 +214,21 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return discovered
             .filter { $0.parentID == folderID }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    private func selectedRootFolders(parentID: Int) async throws -> [RemoteFolder] {
+        var folders: [RemoteFolder] = []
+        for selectedFolderID in config.selectedFolderIDs {
+            do {
+                let folder: RemoteFolder = try await api.get("/folders/\(selectedFolderID).json")
+                if folder.parentID == parentID {
+                    folders.append(folder)
+                }
+            } catch APIError.notFound {
+                logger.warning("Selected folder no longer exists: \(selectedFolderID)")
+            }
+        }
+        return folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private func discoverFoldersUnder(_ rootFolderID: Int) async throws -> [RemoteFolder] {

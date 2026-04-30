@@ -98,8 +98,9 @@ public struct AppConfiguration: Codable, Sendable {
     }
 
     /// Loads config from `url`. The API key is always read from Keychain.
-    /// If Keychain is empty but the JSON still contains the legacy `api_key` field,
-    /// the key is migrated to Keychain and the JSON is rewritten without it.
+    /// If the JSON still contains the legacy `api_key` field, the plaintext value
+    /// is scrubbed from disk. When Keychain is empty, a non-empty legacy key is
+    /// migrated before the JSON is rewritten.
     public static func load(from url: URL) throws -> AppConfiguration {
         try load(
             from: url,
@@ -114,23 +115,35 @@ public struct AppConfiguration: Codable, Sendable {
         }
         let data = try Data(contentsOf: url)
         var config = try JSONDecoder.imageRelay.decode(AppConfiguration.self, from: data)
+        let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let containsLegacyAPIKey = raw?.keys.contains("api_key") ?? false
+        let legacyKey = raw?["api_key"] as? String
 
         // Primary path: API key already in Keychain.
         if let stored = KeychainStore.load(account: keychainAccount, accessGroup: keychainAccessGroup), !stored.isEmpty {
             config.apiKey = stored
+            if containsLegacyAPIKey {
+                try? rewriteJSONWithoutAPIKey(config, to: url)
+            }
             return config
         }
 
         // Migration path: key still in legacy JSON under "api_key".
-        if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let legacyKey = raw["api_key"] as? String, !legacyKey.isEmpty {
+        if let legacyKey, !legacyKey.isEmpty {
             config.apiKey = legacyKey
             KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
-            // Rewrite JSON without the plaintext key.
-            try? config.save(to: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
+        }
+
+        if containsLegacyAPIKey {
+            try? rewriteJSONWithoutAPIKey(config, to: url)
         }
 
         return config
+    }
+
+    private static func rewriteJSONWithoutAPIKey(_ config: AppConfiguration, to url: URL) throws {
+        let data = try JSONEncoder.imageRelay.encode(config)
+        try data.write(to: url, options: .atomic)
     }
 
     public static func fileURL(in container: URL) -> URL {
