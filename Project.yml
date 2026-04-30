@@ -42,13 +42,15 @@ targets:
           - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
     settings:
       base:
+        PRODUCT_NAME: "Image Relay"
         PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleShortVersionString: $(MARKETING_VERSION)
         INFOPLIST_KEY_CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         INFOPLIST_KEY_LSUIElement: true
-        INFOPLIST_KEY_CFBundleDisplayName: "ImageRelay Client"
+        INFOPLIST_KEY_CFBundleDisplayName: "Image Relay"
+        INFOPLIST_KEY_CFBundleName: "Image Relay"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   FileProviderExtension:

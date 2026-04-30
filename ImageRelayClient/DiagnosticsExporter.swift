@@ -122,7 +122,7 @@ enum DiagnosticsExporter {
             let errorText = String(data: errorData, encoding: .utf8) ?? ""
 
             if process.terminationStatus == 0 {
-                return outputText.isEmpty ? "No ImageRelayClient logs found in the last hour.\n" : outputText
+                return outputText.isEmpty ? "No Image Relay logs found in the last hour.\n" : outputText
             }
 
             return """
@@ -149,7 +149,7 @@ enum DiagnosticsExporter {
     private static func directoryName() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "ImageRelayClient-Diagnostics-\(formatter.string(from: Date()))"
+        return "ImageRelay-Diagnostics-\(formatter.string(from: Date()))"
     }
 }
 

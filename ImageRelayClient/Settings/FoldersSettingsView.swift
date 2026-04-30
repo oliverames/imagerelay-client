@@ -18,7 +18,7 @@ struct FoldersSettingsView: View {
                 ContentUnavailableView(
                     "No Folders Synced Yet",
                     systemImage: "folder",
-                    description: Text("Folders will appear here once Image Relay Client connects and enumerates your library.")
+                    description: Text("Folders will appear here once Image Relay connects and enumerates your library.")
                 )
             } else {
                 VStack(alignment: .leading, spacing: 0) {
