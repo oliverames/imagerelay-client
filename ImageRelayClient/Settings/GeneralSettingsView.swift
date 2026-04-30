@@ -43,7 +43,7 @@ struct GeneralSettingsView: View {
                             .font(.title2)
                             .foregroundStyle(Color.accentColor)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Welcome to Image Relay Client")
+                            Text("Welcome to Image Relay")
                                 .font(.headline)
                             Text("Enter your API key below to start syncing files to Finder.")
                                 .font(.caption)

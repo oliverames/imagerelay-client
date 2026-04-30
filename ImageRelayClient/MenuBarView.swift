@@ -86,7 +86,7 @@ struct MenuBarView: View {
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                Label("Quit ImageRelay Client", systemImage: "xmark.circle")
+                Label("Quit Image Relay", systemImage: "xmark.circle")
             }
         }
         .onAppear { startPolling() }

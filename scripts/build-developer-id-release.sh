@@ -11,6 +11,9 @@ APPEX_BUNDLE_ID="com.oliverames.imagerelay-client.fileprovider"
 DMG_SIGNING_ID="com.oliverames.imagerelay-client.dmg"
 APP_PROFILE_NAME="ImageRelayClient Developer ID"
 APPEX_PROFILE_NAME="ImageRelayClient FileProviderExtension Developer ID"
+APP_BUNDLE_NAME="Image Relay.app"
+LEGACY_APP_BUNDLE_NAME="ImageRelayClient.app"
+APP_EXECUTABLE_NAME="Image Relay"
 
 VERSION=""
 OUTPUT_DIR=""
@@ -20,9 +23,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/build-developer-id-release.sh --version <version> [--output-dir <dir>] [--smoke-install]
 
-Build a Developer ID signed ImageRelayClient release outside the repo's iCloud tree,
+Build a Developer ID signed Image Relay release outside the repo's iCloud tree,
 ensure the required Developer ID provisioning profiles exist, notarize the app and DMG,
-and run strict verification checks. Use --smoke-install to replace /Applications/ImageRelayClient.app
+and run strict verification checks. Use --smoke-install to replace /Applications/Image Relay.app
 with the notarized DMG payload, launch it, and verify the File Provider extension process starts.
 EOF
 }
@@ -86,10 +89,34 @@ mkdir -p "$ARTIFACT_DIR"
 
 STAGE_DIR="$(mktemp -d "/tmp/imagerelay-release.$(sanitize_name "$VERSION").XXXXXX")"
 KEY_PATH="$STAGE_DIR/AuthKey.p8"
+SMOKE_MOUNT_POINT=""
 cleanup() {
+  if [[ -n "${SMOKE_MOUNT_POINT:-}" ]]; then
+    hdiutil detach "$SMOKE_MOUNT_POINT" >/dev/null 2>&1 || true
+  fi
   rm -f "$KEY_PATH"
 }
 trap cleanup EXIT
+
+readonly_dmg_mount_point() {
+  local dmg_path="$1"
+  local attach_plist
+  attach_plist="$(hdiutil attach -nobrowse -readonly -plist "$dmg_path")"
+  ATTACH_PLIST="$attach_plist" python3 - <<'PY'
+import os
+import plistlib
+import sys
+
+data = plistlib.loads(os.environ["ATTACH_PLIST"].encode("utf-8"))
+for entity in data.get("system-entities", []):
+    mount_point = entity.get("mount-point")
+    if mount_point:
+        print(mount_point)
+        sys.exit(0)
+
+sys.exit("hdiutil attach did not return a mounted volume")
+PY
+}
 
 echo "Fetching App Store Connect key from 1Password..."
 op document get --vault Development 'App Store Connect AuthKey (.p8)' --out-file "$KEY_PATH" >/dev/null
@@ -120,7 +147,7 @@ ARCHIVE_PATH="$STAGE_DIR/ImageRelayClient.xcarchive"
 DERIVED_DATA_PATH="$STAGE_DIR/DerivedData"
 EXPORT_DIR="$STAGE_DIR/export"
 EXPORT_OPTIONS_PLIST="$STAGE_DIR/ExportOptions.plist"
-APP_PATH="$EXPORT_DIR/ImageRelayClient.app"
+APP_PATH="$EXPORT_DIR/$APP_BUNDLE_NAME"
 APP_ZIP_PATH="$ARTIFACT_DIR/ImageRelayClient-$VERSION.app.zip"
 DMG_ROOT="$STAGE_DIR/dmgroot"
 DMG_PATH="$ARTIFACT_DIR/ImageRelayClient-$VERSION.dmg"
@@ -185,13 +212,13 @@ spctl -a -vv "$APP_PATH" 2>&1 | tee "$ARTIFACT_DIR/spctl-app.log"
 
 echo "Preparing DMG..."
 mkdir -p "$DMG_ROOT"
-ditto "$APP_PATH" "$DMG_ROOT/ImageRelayClient.app"
+ditto "$APP_PATH" "$DMG_ROOT/$APP_BUNDLE_NAME"
 ln -s /Applications "$DMG_ROOT/Applications"
-if ! codesign --verify --deep --strict --verbose=4 "$DMG_ROOT/ImageRelayClient.app" >/dev/null 2>&1; then
-  xattr -cr "$DMG_ROOT/ImageRelayClient.app"
+if ! codesign --verify --deep --strict --verbose=4 "$DMG_ROOT/$APP_BUNDLE_NAME" >/dev/null 2>&1; then
+  xattr -cr "$DMG_ROOT/$APP_BUNDLE_NAME"
 fi
-codesign --verify --deep --strict --verbose=4 "$DMG_ROOT/ImageRelayClient.app" 2>&1 | tee "$ARTIFACT_DIR/codesign-dmgroot-app.log"
-hdiutil create -volname 'ImageRelayClient' -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_PATH" | tee "$ARTIFACT_DIR/hdiutil.log"
+codesign --verify --deep --strict --verbose=4 "$DMG_ROOT/$APP_BUNDLE_NAME" 2>&1 | tee "$ARTIFACT_DIR/codesign-dmgroot-app.log"
+hdiutil create -volname 'Image Relay' -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_PATH" | tee "$ARTIFACT_DIR/hdiutil.log"
 codesign --sign "$DEVELOPER_ID_APPLICATION_IDENTITY" \
   --timestamp \
   -i "$DMG_SIGNING_ID" \
@@ -213,10 +240,15 @@ shasum -a 256 "$DMG_PATH" | tee "$CHECKSUM_PATH"
 
 if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   echo "Running smoke install from notarized DMG..."
-  if pgrep -f '/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient' >/dev/null 2>&1; then
+  INSTALLED_APP_PATH="/Applications/$APP_BUNDLE_NAME"
+  LEGACY_INSTALLED_APP_PATH="/Applications/$LEGACY_APP_BUNDLE_NAME"
+  APP_PROCESS_PATTERN="$INSTALLED_APP_PATH/Contents/MacOS/$APP_EXECUTABLE_NAME"
+  LEGACY_APP_PROCESS_PATTERN='/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient'
+
+  if pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1 || pgrep -f "$LEGACY_APP_PROCESS_PATTERN" >/dev/null 2>&1; then
     osascript -e 'tell application id "com.oliverames.imagerelay-client" to quit' >/dev/null 2>&1 || true
     for _ in {1..10}; do
-      if ! pgrep -f '/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient' >/dev/null 2>&1; then
+      if ! pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1 && ! pgrep -f "$LEGACY_APP_PROCESS_PATTERN" >/dev/null 2>&1; then
         break
       fi
       sleep 1
@@ -225,27 +257,33 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
 
   BACKUP_ROOT="$HOME/Applications/Codex Backups"
   mkdir -p "$BACKUP_ROOT"
-  BACKUP_PATH=""
-  MOUNT_OUTPUT="$(hdiutil attach -nobrowse -readonly "$DMG_PATH")"
-  MOUNT_POINT="$(printf '%s\n' "$MOUNT_OUTPUT" | awk '/\/Volumes\// {print $NF; exit}')"
-  if [[ -e /Applications/ImageRelayClient.app ]]; then
-    BACKUP_PATH="$BACKUP_ROOT/ImageRelayClient.app.$VERSION.smoke-$TIMESTAMP"
-    mv /Applications/ImageRelayClient.app "$BACKUP_PATH"
+  BACKUP_PATHS=()
+  MOUNT_POINT="$(readonly_dmg_mount_point "$DMG_PATH")"
+  SMOKE_MOUNT_POINT="$MOUNT_POINT"
+  if [[ -e "$INSTALLED_APP_PATH" ]]; then
+    BACKUP_PATH="$BACKUP_ROOT/$APP_BUNDLE_NAME.$VERSION.smoke-$TIMESTAMP"
+    mv "$INSTALLED_APP_PATH" "$BACKUP_PATH"
+    BACKUP_PATHS+=("$BACKUP_PATH")
   fi
-  ditto "$MOUNT_POINT/ImageRelayClient.app" /Applications/ImageRelayClient.app
+  if [[ -e "$LEGACY_INSTALLED_APP_PATH" ]]; then
+    BACKUP_PATH="$BACKUP_ROOT/$LEGACY_APP_BUNDLE_NAME.$VERSION.smoke-$TIMESTAMP"
+    mv "$LEGACY_INSTALLED_APP_PATH" "$BACKUP_PATH"
+    BACKUP_PATHS+=("$BACKUP_PATH")
+  fi
+  ditto "$MOUNT_POINT/$APP_BUNDLE_NAME" "$INSTALLED_APP_PATH"
   hdiutil detach "$MOUNT_POINT" >/dev/null
+  SMOKE_MOUNT_POINT=""
 
-  APP_PROCESS_PATTERN='/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient'
-  APPEX_PROCESS_PATTERN='/Applications/ImageRelayClient.app/Contents/PlugIns/FileProviderExtension.appex/Contents/MacOS/FileProviderExtension'
+  APPEX_PROCESS_PATTERN="$INSTALLED_APP_PATH/Contents/PlugIns/FileProviderExtension.appex/Contents/MacOS/FileProviderExtension"
   LSREGISTER='/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister'
 
-  codesign --verify --deep --strict --verbose=4 /Applications/ImageRelayClient.app 2>&1 | tee "$ARTIFACT_DIR/codesign-installed-app.log"
-  spctl -a -vv /Applications/ImageRelayClient.app 2>&1 | tee "$ARTIFACT_DIR/spctl-installed-app.log"
+  codesign --verify --deep --strict --verbose=4 "$INSTALLED_APP_PATH" 2>&1 | tee "$ARTIFACT_DIR/codesign-installed-app.log"
+  spctl -a -vv "$INSTALLED_APP_PATH" 2>&1 | tee "$ARTIFACT_DIR/spctl-installed-app.log"
 
   wait_for_installed_extension_registration() {
     local pluginkit_output
     for _ in {1..15}; do
-      "$LSREGISTER" -f -R -trusted /Applications/ImageRelayClient.app >/dev/null 2>&1 || true
+      "$LSREGISTER" -f -R -trusted "$INSTALLED_APP_PATH" >/dev/null 2>&1 || true
       pluginkit_output="$(pluginkit -mvv -i "$APPEX_BUNDLE_ID" || true)"
       printf '%s\n' "$pluginkit_output" > "$ARTIFACT_DIR/pluginkit-installed-extension.log"
       if grep -q "$APPEX_BUNDLE_ID" <<<"$pluginkit_output"; then
@@ -284,7 +322,7 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   }
 
   SMOKE_LOG_START="$(date '+%Y-%m-%d %H:%M:%S')"
-  open -a /Applications/ImageRelayClient.app
+  open -b "$APP_BUNDLE_ID"
 
   if ! wait_for_app_process; then
     echo "Smoke install failed: app process did not launch." >&2
@@ -308,10 +346,10 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
       sleep 1
     done
 
-    open -a /Applications/ImageRelayClient.app --args --reset-file-provider-domain
+    open -b "$APP_BUNDLE_ID" --args --reset-file-provider-domain
     sleep 5
 
-    DOMAIN_ROOT="$(find "$HOME/Library/CloudStorage" -maxdepth 1 -type d -name 'ImageRelayClient-*' -print -quit 2>/dev/null || true)"
+    DOMAIN_ROOT="$(find "$HOME/Library/CloudStorage" -maxdepth 1 -type d \( -name 'ImageRelayClient-*' -o -name 'Image Relay-*' \) -print -quit 2>/dev/null || true)"
     if [[ -n "$DOMAIN_ROOT" ]]; then
       ls -la "$DOMAIN_ROOT" >/dev/null 2>&1 || true
     fi
@@ -330,7 +368,7 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   fi
 
   if ! pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1; then
-    open -a /Applications/ImageRelayClient.app
+    open -b "$APP_BUNDLE_ID"
     if ! wait_for_app_process; then
       echo "Smoke install failed: app process did not relaunch after File Provider smoke." >&2
       exit 1
@@ -342,8 +380,8 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
     >"$ARTIFACT_DIR/smoke-install.log"
 
   echo "Smoke install completed."
-  if [[ -n "$BACKUP_PATH" ]]; then
-    echo "Previous /Applications build backed up to: $BACKUP_PATH"
+  if ((${#BACKUP_PATHS[@]} > 0)); then
+    printf 'Previous /Applications build backed up to: %s\n' "${BACKUP_PATHS[@]}"
   fi
 fi
 

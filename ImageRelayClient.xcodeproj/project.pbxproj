@@ -379,7 +379,8 @@
 				CODE_SIGN_ENTITLEMENTS = ImageRelayClient/ImageRelayClient.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "ImageRelay Client";
+				INFOPLIST_KEY_CFBundleDisplayName = "Image Relay";
+				INFOPLIST_KEY_CFBundleName = "Image Relay";
 				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
 				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -389,6 +390,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				PRODUCT_NAME = "Image Relay";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -476,7 +478,8 @@
 				CODE_SIGN_ENTITLEMENTS = ImageRelayClient/ImageRelayClient.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "ImageRelay Client";
+				INFOPLIST_KEY_CFBundleDisplayName = "Image Relay";
+				INFOPLIST_KEY_CFBundleName = "Image Relay";
 				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
 				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -486,6 +489,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				PRODUCT_NAME = "Image Relay";
 				SDKROOT = macosx;
 			};
 			name = Release;
