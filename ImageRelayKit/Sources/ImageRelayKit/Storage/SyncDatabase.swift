@@ -178,8 +178,7 @@ public final class SyncDatabase: Sendable {
     public func recentActivity(limit: Int = 20) throws -> [ActivityEntry] {
         try writer.read { db in
             try ActivityEntry
-                .order(Column("timestamp").desc)
-                .order(Column("id").desc)
+                .order(Column("timestamp").desc, Column("id").desc)
                 .limit(limit)
                 .fetchAll(db)
         }
@@ -256,7 +255,9 @@ public final class SyncDatabase: Sendable {
     /// Records that a folder move is in progress, so a crash recovery check on the next
     /// extension init can detect and warn about a potentially orphaned folder.
     public func recordFolderMoveInProgress(originalID: Int, newID: Int) throws {
-        let payload = "{\"originalID\":\(originalID),\"newID\":\(newID),\"startedAt\":\(Date().timeIntervalSince1970)}"
+        let payload = FolderMovePayload(originalID: originalID, newID: newID, startedAt: Date())
+        let data = try Self.folderMoveEncoder.encode(payload)
+        let json = String(decoding: data, as: UTF8.self)
         try writer.write { db in
             try db.execute(
                 sql: """
@@ -264,7 +265,7 @@ public final class SyncDatabase: Sendable {
                 VALUES ('folder_move_in_progress', ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
-                arguments: [payload]
+                arguments: [json]
             )
         }
     }
@@ -280,13 +281,45 @@ public final class SyncDatabase: Sendable {
 
     /// Returns the in-progress move payload if one was left behind (e.g. after a crash),
     /// or nil if no move was in progress. Callers should log a warning if non-nil.
-    public func staleFolderMovePayload() throws -> String? {
-        try writer.read { db in
+    public func staleFolderMovePayload() throws -> FolderMovePayload? {
+        let json: String? = try writer.read { db in
             try Row.fetchOne(
                 db,
                 sql: "SELECT value FROM settings WHERE key = 'folder_move_in_progress'",
                 arguments: []
             )?["value"]
         }
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        return try? Self.folderMoveDecoder.decode(FolderMovePayload.self, from: data)
+    }
+
+    // The encoder/decoder use `.secondsSince1970` so payloads remain wire-compatible
+    // with the previous hand-rolled JSON ({"startedAt": <unix epoch seconds>}).
+    private static let folderMoveEncoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .secondsSince1970
+        return e
+    }()
+
+    private static let folderMoveDecoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .secondsSince1970
+        return d
+    }()
+}
+
+public struct FolderMovePayload: Codable, Sendable, CustomStringConvertible {
+    public let originalID: Int
+    public let newID: Int
+    public let startedAt: Date
+
+    public init(originalID: Int, newID: Int, startedAt: Date) {
+        self.originalID = originalID
+        self.newID = newID
+        self.startedAt = startedAt
+    }
+
+    public var description: String {
+        "FolderMovePayload(originalID: \(originalID), newID: \(newID), startedAt: \(startedAt))"
     }
 }

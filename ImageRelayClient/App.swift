@@ -9,7 +9,7 @@ struct ImageRelayClientApp: App {
     init() {
         guard CommandLine.arguments.contains("--reset-file-provider-domain") else { return }
         Task { @MainActor in
-            let manager = DomainManager()
+            let manager = DomainManager(autoBootstrap: false)
             await manager.resetDomain()
             NSApplication.shared.terminate(nil)
         }

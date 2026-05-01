@@ -38,6 +38,39 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
         self.metadataVersion = metadataVersion
         self.contentModifiedAt = contentModifiedAt
     }
+
+    /// Builds a `TrackedItem` from a discovered remote folder. Use only for read paths
+    /// (enumeration); upload/create paths set their own version strings and should
+    /// construct `TrackedItem` directly.
+    public static func makeFolder(from folder: RemoteFolder, parent: String) -> TrackedItem {
+        TrackedItem(
+            identifier: ItemIdentifier.folder(folder.id).rawValue,
+            parentIdentifier: parent,
+            remoteID: folder.id,
+            itemType: .folder,
+            name: folder.name,
+            size: 0,
+            contentVersion: folder.updatedOn ?? "0",
+            metadataVersion: folder.updatedOn ?? "0",
+            contentModifiedAt: folder.contentModifiedAt
+        )
+    }
+
+    /// Builds a `TrackedItem` from a discovered remote file. See `makeFolder(from:parent:)`
+    /// for the same scoping caveat.
+    public static func makeFile(from file: RemoteFile, parent: String) -> TrackedItem {
+        TrackedItem(
+            identifier: ItemIdentifier.file(file.id).rawValue,
+            parentIdentifier: parent,
+            remoteID: file.id,
+            itemType: .file,
+            name: file.name,
+            size: Int64(file.size),
+            contentVersion: file.updatedOn ?? "0",
+            metadataVersion: file.updatedOn ?? "0",
+            contentModifiedAt: file.contentModifiedAt
+        )
+    }
 }
 
 public struct ActivityEntry: Codable, Sendable, FetchableRecord, PersistableRecord {

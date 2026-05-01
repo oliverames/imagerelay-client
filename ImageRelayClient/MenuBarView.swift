@@ -50,10 +50,10 @@ struct MenuBarView: View {
                 }
             } else {
                 Menu {
-                    pauseButton("For 30 Minutes", choice: "30m", systemImage: "clock")
-                    pauseButton("For 1 Hour", choice: "1h", systemImage: "hourglass")
-                    pauseButton("Until Tomorrow 9 AM", choice: "tomorrow", systemImage: "sun.max")
-                    pauseButton("Until I Resume", choice: "indefinite", systemImage: "pause.circle")
+                    pauseButton("For 30 Minutes", choice: .thirtyMinutes, systemImage: "clock")
+                    pauseButton("For 1 Hour", choice: .oneHour, systemImage: "hourglass")
+                    pauseButton("Until Tomorrow 9 AM", choice: .untilTomorrow9AM, systemImage: "sun.max")
+                    pauseButton("Until I Resume", choice: .indefinite, systemImage: "pause.circle")
                 } label: {
                     Label("Pause Sync", systemImage: "pause")
                 }
@@ -134,11 +134,11 @@ struct MenuBarView: View {
         }
 
         if let nextPoll = domainManager.syncProgress.nextRemotePollAt {
-            return "Next check \(RelativeDateTimeFormatter().localizedString(for: nextPoll, relativeTo: Date()))"
+            return "Next check \(Self.relativeFormatter.localizedString(for: nextPoll, relativeTo: Date()))"
         }
 
         if let lastPoll = domainManager.syncProgress.lastRemotePollAt {
-            return "Last checked \(RelativeDateTimeFormatter().localizedString(for: lastPoll, relativeTo: Date()))"
+            return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: Date()))"
         }
 
         return nil
@@ -163,7 +163,7 @@ struct MenuBarView: View {
         }
     }
 
-    private func pauseButton(_ title: String, choice: String, systemImage: String) -> some View {
+    private func pauseButton(_ title: String, choice: PauseDuration, systemImage: String) -> some View {
         Button {
             domainManager.setPause(choice: choice)
         } label: {
@@ -200,11 +200,16 @@ struct MenuBarView: View {
         timer = nil
     }
 
+    private static let relativeFormatter = RelativeDateTimeFormatter()
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f
+    }()
+
     private func activityLabel(for entry: ActivityEntry) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return "\(actionLabel(for: entry.action)): \(entry.itemName) • \(formatter.string(from: entry.timestamp))"
+        "\(actionLabel(for: entry.action)): \(entry.itemName) • \(Self.timeFormatter.string(from: entry.timestamp))"
     }
 
     private func actionLabel(for action: SyncAction) -> String {

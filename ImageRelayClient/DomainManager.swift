@@ -6,7 +6,7 @@ import os.log
 @Observable @MainActor
 final class DomainManager {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "DomainManager")
-    static let appGroupIdentifier = "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
+    static let appGroupIdentifier = AppConfiguration.appGroupIdentifier
     static let domainIdentifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.domain")
     static let domainDisplayName = "Image Relay"
 
@@ -16,20 +16,30 @@ final class DomainManager {
     var syncProgress: SyncProgressState = .idle
     var pauseState: SyncPauseState = .default
     var recentActivity: [ActivityEntry] = []
+    private var db: SyncDatabase?
     private var remotePollingTask: Task<Void, Never>?
 
-    init() {
+    init(autoBootstrap: Bool = true) {
+        guard autoBootstrap else { return }
         Task { @MainActor in
             await bootstrap()
         }
     }
 
-    private func openDatabase() -> SyncDatabase? {
+    private var domain: NSFileProviderDomain {
+        NSFileProviderDomain(identifier: Self.domainIdentifier, displayName: Self.domainDisplayName)
+    }
+
+    /// Returns the cached `SyncDatabase`, opening it on first use. The connection
+    /// is held for the lifetime of `DomainManager` so the menu-bar polling timer
+    /// doesn't open a fresh GRDB pool every two seconds.
+    private func ensureDatabase() -> SyncDatabase? {
+        if let db { return db }
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
         ) else { return nil }
-        let dbURL = SyncDatabase.databaseURL(in: container)
-        return try? SyncDatabase(url: dbURL)
+        db = try? SyncDatabase(url: SyncDatabase.databaseURL(in: container))
+        return db
     }
 
     private func loadConfiguration() -> AppConfiguration {
@@ -51,14 +61,14 @@ final class DomainManager {
     }
 
     func refreshStatus() {
-        guard let db = openDatabase() else { return }
+        guard let db = ensureDatabase() else { return }
         syncProgress = (try? db.getProgress()) ?? .idle
         pauseState = (try? db.getPauseState()) ?? .default
         recentActivity = (try? db.recentActivity(limit: 5)) ?? []
     }
 
-    func setPause(choice: String?) {
-        guard let db = openDatabase() else { return }
+    func setPause(choice: PauseDuration?) {
+        guard let db = ensureDatabase() else { return }
         if let choice {
             var state = SyncPauseState.default
             state.paused = true
@@ -72,11 +82,6 @@ final class DomainManager {
     }
 
     func setupDomain() async {
-        let domain = NSFileProviderDomain(
-            identifier: Self.domainIdentifier,
-            displayName: Self.domainDisplayName
-        )
-
         do {
             try await NSFileProviderManager.add(domain)
             isDomainActive = true
@@ -93,10 +98,6 @@ final class DomainManager {
     }
 
     func removeDomain() async {
-        let domain = NSFileProviderDomain(
-            identifier: Self.domainIdentifier,
-            displayName: Self.domainDisplayName
-        )
         do {
             try await NSFileProviderManager.remove(domain)
             isDomainActive = false
@@ -124,10 +125,6 @@ final class DomainManager {
     }
 
     private func signalEnumerators(config: AppConfiguration) async throws {
-        let domain = NSFileProviderDomain(
-            identifier: Self.domainIdentifier,
-            displayName: Self.domainDisplayName
-        )
         guard let manager = NSFileProviderManager(for: domain) else { return }
         try await manager.signalEnumerator(for: .workingSet)
         try await manager.signalEnumerator(for: .rootContainer)
@@ -142,7 +139,7 @@ final class DomainManager {
         if !config.selectedFolderIDs.isEmpty {
             return config.selectedFolderIDs
         }
-        return (try? openDatabase()?.folders().map(\.remoteID)) ?? []
+        return (try? ensureDatabase()?.folders().map(\.remoteID)) ?? []
     }
 
     private func startRemotePolling() {
@@ -175,7 +172,7 @@ final class DomainManager {
     }
 
     private func markRemotePollSucceeded(config: AppConfiguration) {
-        guard let db = openDatabase() else { return }
+        guard let db = ensureDatabase() else { return }
         var progress = (try? db.getProgress()) ?? .idle
         if progress.state == .error {
             progress.state = .idle
@@ -188,7 +185,7 @@ final class DomainManager {
     }
 
     private func markRemotePollFailed(_ error: any Error) {
-        guard let db = openDatabase() else { return }
+        guard let db = ensureDatabase() else { return }
         var progress = (try? db.getProgress()) ?? .idle
         progress.state = .error
         progress.lastError = "Remote change polling failed: \(error.localizedDescription)"
@@ -197,31 +194,13 @@ final class DomainManager {
     }
 
     func openInFinder() {
-        let domain = NSFileProviderDomain(
-            identifier: Self.domainIdentifier,
-            displayName: Self.domainDisplayName
-        )
-        guard let manager = NSFileProviderManager(for: domain) else { return }
-        manager.getUserVisibleURL(for: .rootContainer) { url, error in
-            if let error {
-                self.logger.error("Failed to resolve user-visible File Provider URL: \(error.localizedDescription)")
-                return
-            }
-
-            guard let url else {
-                self.logger.error("File Provider manager returned no user-visible URL")
-                return
-            }
-
-            DispatchQueue.main.async {
-                let didStartAccessing = url.startAccessingSecurityScopedResource()
-                defer {
-                    if didStartAccessing {
-                        url.stopAccessingSecurityScopedResource()
-                    }
-                }
-
+        Task { @MainActor in
+            guard let manager = NSFileProviderManager(for: domain) else { return }
+            do {
+                let url = try await manager.getUserVisibleURL(for: .rootContainer)
                 NSWorkspace.shared.activateFileViewerSelecting([url])
+            } catch {
+                logger.error("Failed to open in Finder: \(error.localizedDescription)")
             }
         }
     }

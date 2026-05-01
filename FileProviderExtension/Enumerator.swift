@@ -36,7 +36,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 observer.finishEnumerating(upTo: nil)
             } catch {
                 self.logger.error("Enumeration failed: \(error.localizedDescription)")
-                observer.finishEnumeratingWithError(self.mapToFileProviderError(error))
+                observer.finishEnumeratingWithError(error.asFileProviderError)
             }
         }
     }
@@ -63,7 +63,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 observer.finishEnumeratingChanges(upTo: providerAnchor, moreComing: false)
             } catch {
                 self.logger.error("Change enumeration failed: \(error.localizedDescription)")
-                observer.finishEnumeratingWithError(self.mapToFileProviderError(error))
+                observer.finishEnumeratingWithError(error.asFileProviderError)
             }
         }
     }
@@ -87,25 +87,16 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     /// Returns (current items, identifiers of items no longer on the remote).
     private func fetchItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
         let folderID = try await resolveContainerFolderID()
-        let folders = try await childFolders(of: folderID)
         let isFilteredRoot = isRootLikeContainer && !config.selectedFolderIDs.isEmpty
-        var visibleFolderIDs: Set<Int>?
+        let visibleFolderIDs: Set<Int>? = isFilteredRoot ? Set(config.selectedFolderIDs) : nil
 
-        // Apply folder selection filter at the root level only.
-        // Empty selectedFolderIDs means all folders are included.
-        if isFilteredRoot {
-            visibleFolderIDs = Set(config.selectedFolderIDs)
-        }
-
-        let files: [RemoteFile]
-        if isFilteredRoot {
-            files = []
-        } else {
-            files = try await api.getAllPages(
-                "/folders/\(folderID)/files.json",
-                query: ["recursive": "false"]
-            )
-        }
+        // Folders and files at this container don't depend on each other — fetch in parallel.
+        async let foldersTask = childFolders(of: folderID)
+        async let filesTask: [RemoteFile] = isFilteredRoot
+            ? []
+            : api.getAllPages("/folders/\(folderID)/files.json", query: ["recursive": "false"])
+        let folders = try await foldersTask
+        let files = try await filesTask
 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
@@ -122,18 +113,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 items.append(item)
             }
 
-            let tracked = TrackedItem(
-                identifier: identifier,
-                parentIdentifier: containerIdentifier.rawValue,
-                remoteID: folder.id,
-                itemType: .folder,
-                name: folder.name,
-                size: 0,
-                contentVersion: folder.updatedOn ?? "0",
-                metadataVersion: folder.updatedOn ?? "0",
-                contentModifiedAt: folder.contentModifiedAt
-            )
-            try db.upsertItem(tracked)
+            try db.upsertItem(.makeFolder(from: folder, parent: containerIdentifier.rawValue))
             if existingItem == nil {
                 try? db.logActivity(action: .discovered, itemName: folder.name, itemType: .folder)
             }
@@ -148,18 +128,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             let item = FileProviderItem(file: file, parentItemIdentifier: containerIdentifier)
             items.append(item)
 
-            let tracked = TrackedItem(
-                identifier: identifier,
-                parentIdentifier: containerIdentifier.rawValue,
-                remoteID: file.id,
-                itemType: .file,
-                name: file.name,
-                size: Int64(file.size),
-                contentVersion: file.updatedOn ?? "0",
-                metadataVersion: file.updatedOn ?? "0",
-                contentModifiedAt: file.contentModifiedAt
-            )
-            try db.upsertItem(tracked)
+            try db.upsertItem(.makeFile(from: file, parent: containerIdentifier.rawValue))
             if existingItem == nil {
                 try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
             }
@@ -172,17 +141,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
+                try db.deleteItem(identifier)
             }
-
             if isFilteredRoot || remoteIdentifiers.contains(tracked.identifier) {
-                for identifier in localSubtree {
-                    try db.deleteItem(identifier)
-                }
                 logger.info("Item hidden by selection filter: \(tracked.name) (\(tracked.identifier))")
             } else {
-                for identifier in localSubtree {
-                    try db.deleteItem(identifier)
-                }
                 logger.info("Remote deletion detected: \(tracked.name) (\(tracked.identifier))")
             }
         }
@@ -199,17 +162,9 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     }
 
     private func childFolders(of folderID: Int) async throws -> [RemoteFolder] {
-        if isRootLikeContainer {
-            if !config.selectedFolderIDs.isEmpty {
-                return try await selectedRootFolders(parentID: folderID)
-            }
-
-            let discovered = try await discoverFoldersUnder(folderID)
-            return discovered
-                .filter { $0.parentID == folderID }
-                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if isRootLikeContainer && !config.selectedFolderIDs.isEmpty {
+            return try await selectedRootFolders(parentID: folderID)
         }
-
         let discovered = try await discoverFoldersUnder(folderID)
         return discovered
             .filter { $0.parentID == folderID }
@@ -275,17 +230,4 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         containerIdentifier == .rootContainer || containerIdentifier == .workingSet
     }
 
-    private func mapToFileProviderError(_ error: Error) -> Error {
-        guard let apiError = error as? APIError else { return error }
-        switch apiError {
-        case .notAuthenticated:
-            return NSFileProviderError(.notAuthenticated)
-        case .notFound:
-            return NSFileProviderError(.noSuchItem)
-        case .rateLimited, .serverError, .networkError:
-            return NSFileProviderError(.serverUnreachable)
-        case .forbidden, .decodingError, .invalidResponse, .invalidURL:
-            return NSFileProviderError(.cannotSynchronize)
-        }
-    }
 }

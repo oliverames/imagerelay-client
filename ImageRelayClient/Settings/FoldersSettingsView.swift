@@ -6,11 +6,7 @@ struct FoldersSettingsView: View {
     @State private var selectedFolderIDs: Set<Int> = []
     @State private var loadError: String?
 
-    private var container: URL? {
-        FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
-        )
-    }
+    private var container: URL? { AppConfiguration.containerURL() }
 
     var body: some View {
         Group {

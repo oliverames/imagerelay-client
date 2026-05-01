@@ -10,11 +10,7 @@ struct GeneralSettingsView: View {
     @State private var saveError: String?
     @State private var containerAvailable = true
 
-    private var container: URL? {
-        FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
-        )
-    }
+    private var container: URL? { AppConfiguration.containerURL() }
 
     // Folder IDs must be positive integers. Empty is allowed for defaultFileTypeID.
     private var rootFolderIDValid: Bool {

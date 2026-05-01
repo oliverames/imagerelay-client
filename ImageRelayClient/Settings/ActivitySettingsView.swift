@@ -5,9 +5,7 @@ struct ActivitySettingsView: View {
     @State private var entries: [ActivityEntry] = []
     @State private var loadError: String?
 
-    private let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
-    )
+    private let container = AppConfiguration.containerURL()
 
     var body: some View {
         Group {
