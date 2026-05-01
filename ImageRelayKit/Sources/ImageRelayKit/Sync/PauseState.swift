@@ -27,15 +27,21 @@ public struct SyncPauseState: Codable, Sendable {
         return "Paused until \(formatter.string(from: until))"
     }
 
-    public static func deadline(for choice: String) -> Date? {
+    public static func deadline(for choice: PauseDuration) -> Date? {
         switch choice {
-        case "30m": return Date().addingTimeInterval(30 * 60)
-        case "1h": return Date().addingTimeInterval(60 * 60)
-        case "tomorrow":
+        case .thirtyMinutes: return Date().addingTimeInterval(30 * 60)
+        case .oneHour: return Date().addingTimeInterval(60 * 60)
+        case .untilTomorrow9AM:
             let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
             return Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow)
-        case "indefinite": return nil
-        default: return nil
+        case .indefinite: return nil
         }
     }
+}
+
+public enum PauseDuration: Sendable {
+    case thirtyMinutes
+    case oneHour
+    case untilTomorrow9AM
+    case indefinite
 }

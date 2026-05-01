@@ -15,7 +15,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         self.domain = domain
 
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
+            forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier
         ) else {
             // App group container unavailable — surface a clear error rather than crashing.
             // The extension will be in a degraded state; every entry point checks db/api
@@ -158,7 +158,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handler.value(nil, nil, self.mapToFileProviderError(error))
+                handler.value(nil, nil, error.asFileProviderError)
             }
         }
 
@@ -289,7 +289,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handler.value(nil, [], false, self.mapToFileProviderError(error))
+                handler.value(nil, [], false, error.asFileProviderError)
             }
         }
         return Progress()
@@ -470,7 +470,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handler.value(nil, [], false, self.mapToFileProviderError(error))
+                handler.value(nil, [], false, error.asFileProviderError)
             }
         }
         return Progress()
@@ -520,7 +520,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
-                handler.value(self.mapToFileProviderError(error))
+                handler.value(error.asFileProviderError)
             }
         }
         return Progress()
@@ -663,21 +663,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         try? db.setProgress(progress)
     }
 
-    private func mapToFileProviderError(_ error: Error) -> Error {
-        guard let apiError = error as? APIError else { return error }
-        switch apiError {
-        case .notAuthenticated:
-            return NSFileProviderError(.notAuthenticated)
-        case .notFound:
-            return NSFileProviderError(.noSuchItem)
-        case .rateLimited, .serverError:
-            return NSFileProviderError(.serverUnreachable)
-        case .networkError:
-            return NSFileProviderError(.serverUnreachable)
-        case .forbidden, .decodingError, .invalidResponse, .invalidURL:
-            return NSFileProviderError(.cannotSynchronize)
-        }
-    }
 }
 
 // MARK: - Request Body Types

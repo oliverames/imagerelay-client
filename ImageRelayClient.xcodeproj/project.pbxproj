@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
 		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
@@ -64,6 +65,7 @@
 		8DC1E00B04FE23A41E220AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtension.entitlements; sourceTree = "<group>"; };
 		B2FE83D474ABB6C82A35F22A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorMapping.swift; sourceTree = "<group>"; };
 		D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClient.entitlements; sourceTree = "<group>"; };
 		D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsExporter.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 		1337FB025DB622C6D770D76F /* FileProviderExtension */ = {
 			isa = PBXGroup;
 			children = (
+				C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */,
 				5214AA13DEAEE7F7687D4000 /* Enumerator.swift */,
 				1907D94A32A3AE0968238BFE /* Extension.swift */,
 				B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */,
@@ -256,6 +259,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */,
 				DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */,
 				960B40F8B168A16893E05254 /* Extension.swift in Sources */,
 				2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */,

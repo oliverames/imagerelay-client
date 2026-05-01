@@ -9,9 +9,7 @@ enum DiagnosticsExporter {
         let exportDirectory = destinationDirectory.appendingPathComponent(directoryName(), isDirectory: true)
         try FileManager.default.createDirectory(at: exportDirectory, withIntermediateDirectories: true)
 
-        let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
-        )
+        let container = AppConfiguration.containerURL()
 
         try writeManifest(to: exportDirectory, container: container, domainManager: domainManager)
         try writeConfiguration(to: exportDirectory, container: container)
@@ -146,10 +144,14 @@ enum DiagnosticsExporter {
         try text.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 
+    private static let directoryNameFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        return f
+    }()
+
     private static func directoryName() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "ImageRelay-Diagnostics-\(formatter.string(from: Date()))"
+        "ImageRelay-Diagnostics-\(directoryNameFormatter.string(from: Date()))"
     }
 }
 

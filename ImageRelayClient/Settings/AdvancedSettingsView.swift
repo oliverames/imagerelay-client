@@ -13,11 +13,7 @@ struct AdvancedSettingsView: View {
     @State private var isExportingDiagnostics = false
     @State private var diagnosticsMessage: String?
 
-    private var container: URL? {
-        FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: DomainManager.appGroupIdentifier
-        )
-    }
+    private var container: URL? { AppConfiguration.containerURL() }
 
     var body: some View {
         Form {

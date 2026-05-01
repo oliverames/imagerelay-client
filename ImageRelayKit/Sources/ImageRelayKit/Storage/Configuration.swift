@@ -150,6 +150,16 @@ public struct AppConfiguration: Codable, Sendable {
         container.appendingPathComponent("config.json")
     }
 
+    // MARK: - App Group
+
+    /// Shared app group identifier used by both the host app and File Provider extension.
+    public static let appGroupIdentifier = "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
+
+    /// Resolves the shared container URL for the app group, or nil if the entitlement is missing.
+    public static func containerURL() -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
+    }
+
     // MARK: - Keychain
 
     public static let keychainAccount = "api-key"
