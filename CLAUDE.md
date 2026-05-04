@@ -68,7 +68,7 @@ Task { completionHandler(...) }
 
 - **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). Keep future release testing constrained to that folder unless explicitly asked otherwise.
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version> --smoke-install` for Developer ID signed, notarized DMGs and installed-app smoke verification.
-- **Open release risk**: The App Store Connect API key used for notarization should still be rotated when convenient because an earlier repo-local copy was treated as exposed.
+- **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 
 ## macOS 26 SDK Gotchas
 
