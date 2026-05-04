@@ -73,10 +73,6 @@ for tool in op python3 xcodegen xcodebuild xcrun hdiutil codesign spctl ditto sh
   require_command "$tool"
 done
 
-python3 - <<'PY' >/dev/null
-import jwt
-PY
-
 sanitize_name() {
   printf '%s' "$1" | tr -c '[:alnum:]._-/' '_'
 }
@@ -89,6 +85,7 @@ mkdir -p "$ARTIFACT_DIR"
 
 STAGE_DIR="$(mktemp -d "/tmp/imagerelay-release.$(sanitize_name "$VERSION").XXXXXX")"
 KEY_PATH="$STAGE_DIR/AuthKey.p8"
+PYTHON_DEPS_DIR="$STAGE_DIR/python-deps"
 SMOKE_MOUNT_POINT=""
 cleanup() {
   if [[ -n "${SMOKE_MOUNT_POINT:-}" ]]; then
@@ -97,6 +94,25 @@ cleanup() {
   rm -f "$KEY_PATH"
 }
 trap cleanup EXIT
+
+ensure_pyjwt() {
+  if python3 - <<'PY' >/dev/null 2>&1
+import jwt
+PY
+  then
+    return 0
+  fi
+
+  echo "PyJWT not found for python3; installing it into temporary release staging..."
+  python3 -m pip install --quiet --target "$PYTHON_DEPS_DIR" PyJWT
+  export PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}"
+
+  python3 - <<'PY' >/dev/null
+import jwt
+PY
+}
+
+ensure_pyjwt
 
 readonly_dmg_mount_point() {
   local dmg_path="$1"
