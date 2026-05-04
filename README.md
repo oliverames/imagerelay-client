@@ -1,6 +1,30 @@
-# Image Relay Client
+<p align="center">
+  <img src="Image Relay Icon.svg" width="80" height="80" alt="Image Relay">
+</p>
+
+<h1 align="center">Image Relay Client</h1>
+
+<p align="center">
+  <strong>Native macOS File Provider that surfaces your Image Relay DAM directly in Finder</strong>
+</p>
+
+<p align="center">
+  <code>macOS 26+</code> &bull;
+  <code>File Provider API</code> &bull;
+  <code>no manual sync</code>
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/oliverames"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee"></a>
+</p>
+
+---
 
 A native macOS app that surfaces an Image Relay DAM account directly in Finder via the File Provider API. Files appear as a native Finder location alongside iCloud Drive -- no manual sync or separate folder to manage.
+
+## Why This Exists
+
+Image Relay has no native macOS client. Getting to assets means opening a browser, navigating the web app, downloading files manually, and keeping track of versions yourself. This client fixes that by mounting your DAM as a proper Finder location through Apple's File Provider API — the same mechanism that powers iCloud Drive — so every app that opens files sees your Image Relay library natively. No separate sync folder, no browser required.
 
 ## Architecture
 
@@ -77,3 +101,20 @@ open ImageRelayClient.xcodeproj
 - File renames are not supported -- the Image Relay API does not expose a rename endpoint for files.
 - Remote change detection is polling-based -- the API does not expose a webhook or cursor-based push feed.
 - Multi-folder (synced file) assets download as a single file; the client does not create additional remote synced-file memberships.
+
+---
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/oliverames">
+    <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    Built by <a href="https://ames.consulting">Oliver Ames</a> in Vermont
+    &bull; <a href="https://github.com/oliverames">GitHub</a>
+    &bull; <a href="https://linkedin.com/in/oliverames">LinkedIn</a>
+    &bull; <a href="https://bsky.app/profile/oliverames.bsky.social">Bluesky</a>
+  </sub>
+</p>
