@@ -10,97 +10,131 @@
 
 <p align="center">
   <code>macOS 26+</code> &bull;
+  <code>Swift 6</code> &bull;
   <code>File Provider API</code> &bull;
-  <code>no manual sync</code>
+  <code>no browser required</code>
 </p>
 
 <p align="center">
-  <a href="https://www.buymeacoffee.com/oliverames"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee"></a>
+  <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
+    <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
+  </a>
+  <a href="https://www.buymeacoffee.com/oliverames">
+    <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
+  </a>
 </p>
 
 ---
 
-A native macOS app that surfaces an Image Relay DAM account directly in Finder via the File Provider API. Files appear as a native Finder location alongside iCloud Drive -- no manual sync or separate folder to manage.
+A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
 ## Why This Exists
 
-Image Relay has no native macOS client. Getting to assets means opening a browser, navigating the web app, downloading files manually, and keeping track of versions yourself. This client fixes that by mounting your DAM as a proper Finder location through Apple's File Provider API — the same mechanism that powers iCloud Drive — so every app that opens files sees your Image Relay library natively. No separate sync folder, no browser required.
+Image Relay has no native macOS desktop client. Getting to assets means opening a browser, navigating the web app, downloading files by hand, and keeping track of versions yourself. Every design tool, script, and app that needs those assets has to work around that gap.
 
-## Architecture
+This client fixes that by mounting your DAM through Apple's [File Provider API](https://developer.apple.com/documentation/fileprovider) — the same mechanism that powers iCloud Drive — so every app on the Mac sees your Image Relay library as a native Finder location. Drag a file into Figma from Finder, open a video in QuickTime, attach a campaign asset to an email — without opening a browser.
 
-The project has three targets that share state through an App Group container:
+## Download
 
-```
-ImageRelayKit/          Swift Package -- shared library
-  APIClient             Async HTTP client (rate limiting, chunked upload, quick links)
-  SyncDatabase          GRDB-backed SQLite (tracked items, progress, activity log, pause state)
-  AppConfiguration      JSON config stored in the App Group container
-  Models                RemoteFolder, RemoteFile, TrackedItem, SyncProgressState, etc.
+**macOS 26 (Tahoe) required.** The app uses File Provider APIs introduced in macOS 26.
 
-ImageRelayClient/       macOS menu bar app (SwiftUI, @main)
-  DomainManager         Registers / removes the File Provider domain; reads shared DB for status
-  MenuBarView           Live status, recent activity, pause controls, Open in Finder
-  Settings/             Four-tab settings window (General, Folders, Activity, Advanced)
+1. Download the DMG from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
+2. Open the DMG and drag **Image Relay** to Applications
+3. Launch Image Relay — the menu bar icon appears
+4. Open Settings, enter your Image Relay API key and root folder ID
 
-FileProviderExtension/  NSFileProviderReplicatedExtension
-  Extension             Handles all CRUD operations called by the OS
-  Enumerator            Lists remote folders and files; drives initial and incremental sync
-  RemoteChangePoller    Background actor; signals the enumerator on a configurable interval
-  FileProviderItem      Adapts TrackedItem to NSFileProviderItem
-```
+Your API key is in Image Relay under **Account Settings → API**.
 
-The OS manages the extension lifecycle. There is no custom daemon.
+## Features
+
+- **Finder-native** — files and folders appear as a real Finder location alongside iCloud Drive
+- **Download on open** — files are dataless placeholders until you open them; only what you touch is fetched
+- **Upload on save** — drop a file into the Finder location and it uploads automatically in 5 MB chunks
+- **Selective sync** — choose which top-level folders appear in Finder; unselected folders stay invisible
+- **Conflict preservation** — if a file changes remotely while you're editing locally, your version is uploaded as a conflict copy and the remote version takes the canonical slot; nothing is silently discarded
+- **Pause controls** — pause sync for 30 minutes, 1 hour, until tomorrow, or indefinitely from the menu bar
+- **Live status** — menu bar shows sync state, recent activity, and the next scheduled remote check
+- **Diagnostics export** — export a sanitized bundle (config, activity log, domain status, recent logs) from Settings → Advanced for support or debugging
 
 ## How Sync Works
 
-**Downloads** -- When the user opens a file in Finder, the OS calls `fetchContents`. The extension creates a temporary quick link, downloads the file, cleans up the link, and hands the local file back to the system.
+**Downloads** -- When you open a file in Finder, the OS delegates to the extension. It creates a temporary quick link, downloads the file, and hands the local copy back so it opens in the expected app with no manual steps.
 
-**Uploads** -- When the user saves a new file into the Finder location, the OS calls `createItem`. The extension creates an upload job, sends the file in 5 MB chunks, polls for job completion, and stores the resulting asset ID.
+**Uploads** -- When you save a new file into the synced Finder location, the extension creates an upload job, sends the file in 5 MB chunks, polls for job completion, and stores the resulting asset ID.
 
-**New versions** -- When the user modifies an existing file, the OS calls `modifyItem`. The extension requests a version UUID, uploads the new content in chunks, and finalizes the version.
+**New versions** -- When you modify an existing file, the extension requests a version UUID from Image Relay, uploads the new content in chunks, and finalizes the version.
 
-**Rename / move** -- Folder renames call `PUT /folders/{id}.json`. File moves call `POST /files/{id}/move.json`. File renames are not yet supported by the Image Relay API.
+**Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API.
 
-**Remote changes** -- `RemoteChangePoller` wakes on a configurable interval and calls `NSFileProviderManager.signalEnumerator`, which prompts the OS to re-enumerate. The `Enumerator` then fetches the current remote folder and file listings and diffs them against the local database.
+**Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current folder and file listings concurrently, diffs them against the local database, and surfaces additions, changes, and deletions to Finder. The host app runs a separate 5-minute watchdog signal as a safety net after system sleep or extension restarts.
 
-**Conflict detection** -- On `modifyItem`, the extension compares the base content version the OS provides against the version in the database. If they differ, the remote version wins and the OS is told to re-fetch.
+**Conflict detection** -- On every modify, the extension compares the content version the OS provides against the version in the local database. If they differ, the local edit is uploaded as a conflict copy and the remote version is fetched.
 
 ## Configuration
 
-All settings are stored in the shared App Group container (`group.com.oliverames.imagerelay-client`) as a JSON file alongside the SQLite database. This lets the extension and the menu bar app read the same configuration without XPC.
+Settings are stored as JSON in a shared App Group container, readable by both the menu bar app and the File Provider extension without XPC.
 
 | Setting | Description |
 |---|---|
 | API Key | Image Relay API key (Account Settings → API) |
 | Root Folder ID | Numeric folder ID to use as the Finder root |
-| Default File Type ID | Metadata template applied to all new uploads |
-| Sync Upload | Allow local changes to be pushed to Image Relay |
-| Sync Download | Allow remote changes to appear in Finder |
+| Default File Type ID | Metadata template applied to new uploads |
+| Sync Upload | Push local changes to Image Relay |
+| Sync Download | Pull remote changes into Finder |
 | Poll Interval | How often to check for remote changes (seconds) |
 
-## Requirements
+## Known Limitations
 
-- macOS 26 (Tahoe) or later
-- An Image Relay account with API access
-- Xcode 26 (build from source via `Project.yml` / XcodeGen)
+- **File renames** are not supported — the Image Relay API does not expose a rename endpoint for files.
+- **Remote change detection** is polling-based — the API does not expose a webhook or cursor-based push feed.
+- **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 
-## Building
+## Architecture
 
-The Xcode project is generated from `Project.yml` using [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+Three targets share state through an App Group container (`group.com.oliverames.imagerelay-client`):
+
+```
+ImageRelayKit/          Swift Package — shared library
+  APIClient             Async HTTP client (rate limiting, chunked upload, quick links)
+  SyncDatabase          GRDB-backed SQLite (tracked items, progress, activity log, pause state)
+  AppConfiguration      JSON config in the App Group container
+  Models                RemoteFolder, RemoteFile, TrackedItem, SyncProgressState, etc.
+
+ImageRelayClient/       Menu bar app (SwiftUI, LSUIElement)
+  DomainManager         Registers/removes the File Provider domain; 5-minute watchdog signal
+  MenuBarView           Live status, recent activity, pause controls, Open in Finder
+  Settings/             General, Folders, Activity, Advanced
+
+FileProviderExtension/  NSFileProviderReplicatedExtension
+  Extension             All CRUD operations delegated by the OS
+  Enumerator            Concurrent folder discovery; drives initial and incremental sync
+  RemoteChangePoller    Background actor; signals enumerators on a configurable interval
+  FileProviderItem      Adapts TrackedItem to NSFileProviderItem
+```
+
+The OS manages the extension lifecycle. There is no custom daemon.
+
+## Building from Source
+
+**Requirements**: macOS 26, Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 brew install xcodegen
+git clone https://github.com/oliverames/imagerelay-client.git
+cd imagerelay-client
 xcodegen generate
 open ImageRelayClient.xcodeproj
 ```
 
-`ImageRelayKit` is a local Swift Package; Xcode resolves its dependencies (GRDB) automatically.
+`ImageRelayKit` is a local Swift Package; Xcode resolves GRDB automatically.
 
-## Known Limitations
+```sh
+# Run the unit test suite
+swift test --package-path ImageRelayKit
 
-- File renames are not supported -- the Image Relay API does not expose a rename endpoint for files.
-- Remote change detection is polling-based -- the API does not expose a webhook or cursor-based push feed.
-- Multi-folder (synced file) assets download as a single file; the client does not create additional remote synced-file memberships.
+# Build a notarized Developer ID release DMG
+scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install
+```
 
 ---
 
