@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 import ImageRelayKit
 
@@ -7,7 +8,28 @@ struct ImageRelayClientApp: App {
     @State private var domainManager = DomainManager()
 
     init() {
-        guard CommandLine.arguments.contains("--reset-file-provider-domain") else { return }
+        let arguments = CommandLine.arguments
+
+        if let exportIndex = arguments.firstIndex(of: "--export-diagnostics"),
+           arguments.indices.contains(exportIndex + 1) {
+            let destination = URL(fileURLWithPath: arguments[exportIndex + 1], isDirectory: true)
+            Task { @MainActor in
+                let manager = DomainManager(autoBootstrap: false)
+                manager.refreshStatus()
+                do {
+                    let exportURL = try await DiagnosticsExporter.export(to: destination, domainManager: manager)
+                    print(exportURL.path)
+                    fflush(stdout)
+                    Darwin.exit(0)
+                } catch {
+                    fputs("Diagnostics export failed: \(error.localizedDescription)\n", stderr)
+                    Darwin.exit(1)
+                }
+            }
+            return
+        }
+
+        guard arguments.contains("--reset-file-provider-domain") else { return }
         Task { @MainActor in
             let manager = DomainManager(autoBootstrap: false)
             await manager.resetDomain()
