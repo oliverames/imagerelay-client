@@ -80,6 +80,7 @@ sanitize_name() {
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 DEFAULT_OUTPUT_DIR="$ROOT_DIR/build/releases/$VERSION"
 ARTIFACT_DIR="${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}"
+mkdir -p "$(dirname "$ARTIFACT_DIR")"
 ARTIFACT_DIR="$(cd "$(dirname "$ARTIFACT_DIR")" && pwd)/$(basename "$ARTIFACT_DIR")"
 mkdir -p "$ARTIFACT_DIR"
 
