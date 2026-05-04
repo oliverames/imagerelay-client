@@ -142,6 +142,12 @@ final class DomainManager {
         return (try? ensureDatabase()?.folders().map(\.remoteID)) ?? []
     }
 
+    // Safety net: nudge the extension's enumerators every 5 minutes in case the
+    // extension's own RemoteChangePoller misses a wake after system sleep or
+    // an extension lifecycle restart. DB state and failure tracking are owned
+    // by RemoteChangePoller; this loop only signals.
+    private static let watchdogInterval = Duration.seconds(5 * 60)
+
     private func startRemotePolling() {
         guard remotePollingTask == nil else { return }
         remotePollingTask = Task { @MainActor [weak self] in
@@ -151,22 +157,21 @@ final class DomainManager {
 
     private func remotePollLoop() async {
         while !Task.isCancelled {
-            let config = loadConfiguration()
             do {
-                try await Task.sleep(for: .seconds(config.pollIntervalSeconds))
+                try await Task.sleep(for: Self.watchdogInterval)
             } catch {
                 return
             }
 
             refreshStatus()
+            let config = loadConfiguration()
             guard isDomainActive, config.syncDownload, !pauseState.isActive else { continue }
 
             do {
                 try await signalEnumerators(config: config)
-                markRemotePollSucceeded(config: config)
+                logger.debug("Watchdog signaled enumerators")
             } catch {
-                logger.error("Remote poll signal failed: \(error.localizedDescription)")
-                markRemotePollFailed(error)
+                logger.warning("Watchdog signal failed: \(error.localizedDescription)")
             }
         }
     }

@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-05-04 - Beta 5: watchdog poll loop, parallel folder discovery
+
+**What changed**: Two pre-release fixes ahead of the Beta 5 build.
+
+(1) Converted `DomainManager.remotePollLoop` from a variable-interval duplicate of the extension's `RemoteChangePoller` into a fixed 5-minute watchdog. The old loop ran at `pollIntervalSeconds` (same as the extension), causing enumerators to be signaled twice as often as configured and writing duplicate DB timestamps. The new watchdog fires every 5 minutes, only signals enumerators, and stays silent on failure — DB state and failure tracking remain owned by `RemoteChangePoller` with its consecutive-failure threshold logic.
+
+(2) Parallelized `Enumerator.discoverFoldersUnder` using a wave-based `withThrowingTaskGroup`. The previous implementation fetched each folder sequentially (one `GET /folders/{id}.json` at a time). The new version collects all pending folder IDs into a `Set<Int>`, fires all fetches concurrently in a wave, then queues any newly discovered parent IDs into the next wave. `APIClient`'s 5 req/s token-bucket rate limiter naturally gates throughput, so no explicit concurrency bound is needed. Most accounts will finish in a single wave since the initial recursive file listing yields the full folder ID set.
+
+**Verification**: `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeded with no new warnings. `swift test --package-path ImageRelayKit` ran 45/45 tests passing across 9 suites.
+
+**Decisions made**: Watchdog is hardcoded at 5 minutes and not user-configurable. The extension's `RemoteChangePoller` is the real poll mechanism; the watchdog is an implementation-detail safety net, not a setting. App Store Connect API key previously flagged as potentially exposed was confirmed to never have been leaked — removed from open items.
+
+**Left off at**: Ready to run `scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install` for Beta 5.
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-01 - Simplify pass: crash fix, persistent DB, shared helpers
 
 **What changed**: Major /simplify refactor sweep across the host app, File Provider extension, and ImageRelayKit. Headline fix: the "Open in Finder" menu action was crashing the host app silently (no crash dialog, no `.ips` report). Root cause was a Swift 6 main-actor isolation violation in the Objective-C completion handler for `NSFileProviderManager.getUserVisibleURL`, which fatal-errored without going through the normal crash reporter. Rewrote `DomainManager.openInFinder()` to use `async/await` inside `Task { @MainActor in }` so the entire flow stays on the main actor, and removed the misleading `startAccessingSecurityScopedResource()` calls that don't apply to File Provider URLs.
