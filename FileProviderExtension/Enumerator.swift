@@ -192,19 +192,37 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             query: ["recursive": "true"]
         )
 
-        var pending = Array(Set(recursiveFiles.flatMap(\.folderIDs))).filter { $0 != rootFolderID }
+        // Seed the first wave with every folder ID referenced by any file,
+        // excluding the root. Use a Set so duplicate IDs collapse for free.
+        var pending: Set<Int> = Set(recursiveFiles.flatMap(\.folderIDs)).subtracting([rootFolderID])
         var foldersByID: [Int: RemoteFolder] = [:]
 
-        while let folderID = pending.popLast() {
-            guard foldersByID[folderID] == nil else { continue }
+        // Each wave fetches all pending IDs concurrently. APIClient's rate limiter
+        // caps throughput, so unbounded TaskGroup concurrency is safe. Newly
+        // discovered parents (folders whose parent isn't in the result set) queue
+        // into the next wave; most accounts finish in a single wave.
+        while !pending.isEmpty {
+            let wave = Array(pending)
+            pending = []
 
-            let folder: RemoteFolder = try await api.get("/folders/\(folderID).json")
-            foldersByID[folder.id] = folder
+            let fetched = try await withThrowingTaskGroup(of: RemoteFolder.self) { group in
+                for folderID in wave {
+                    group.addTask { try await self.api.get("/folders/\(folderID).json") }
+                }
+                var results: [RemoteFolder] = []
+                for try await folder in group {
+                    results.append(folder)
+                }
+                return results
+            }
 
-            if let parentID = folder.parentID,
-               parentID != rootFolderID,
-               foldersByID[parentID] == nil {
-                pending.append(parentID)
+            for folder in fetched {
+                foldersByID[folder.id] = folder
+                if let parentID = folder.parentID,
+                   parentID != rootFolderID,
+                   foldersByID[parentID] == nil {
+                    pending.insert(parentID)
+                }
             }
         }
 
