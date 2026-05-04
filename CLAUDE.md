@@ -24,7 +24,7 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run ImageRelayKit unit tests (30 tests)
+# Run ImageRelayKit unit tests (45 tests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -66,8 +66,9 @@ Task { completionHandler(...) }
 
 ## Known State
 
-- **Live credentials never tested**: API key has not been entered; File Provider domain not yet registered with the system. No real sync run against a live Image Relay account.
-- **GitHub push blocked**: `feature/native-macos-rebuild` branch has a 226 MB pack file in history (from an accidentally committed `ImageRelayKit/.build/`). GitHub rejects it. Must run `git filter-repo --path ImageRelayKit/.build/ --invert-paths` to scrub history before pushing.
+- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). Keep future release testing constrained to that folder unless explicitly asked otherwise.
+- **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version> --smoke-install` for Developer ID signed, notarized DMGs and installed-app smoke verification.
+- **Open release risk**: The App Store Connect API key used for notarization should still be rotated when convenient because an earlier repo-local copy was treated as exposed.
 
 ## macOS 26 SDK Gotchas
 
