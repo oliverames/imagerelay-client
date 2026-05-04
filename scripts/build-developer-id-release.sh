@@ -95,24 +95,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
-ensure_pyjwt() {
+ensure_python_deps() {
   if python3 - <<'PY' >/dev/null 2>&1
+import certifi
 import jwt
 PY
   then
-    return 0
+    :
+  else
+    echo "Python release dependencies not found; installing them into temporary release staging..."
+    python3 -m pip install --quiet --target "$PYTHON_DEPS_DIR" PyJWT certifi
+    export PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}"
   fi
 
-  echo "PyJWT not found for python3; installing it into temporary release staging..."
-  python3 -m pip install --quiet --target "$PYTHON_DEPS_DIR" PyJWT
-  export PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}"
-
-  python3 - <<'PY' >/dev/null
-import jwt
+  SSL_CERT_FILE="$(python3 - <<'PY'
+import certifi
+print(certifi.where())
 PY
+)"
+  export SSL_CERT_FILE
 }
 
-ensure_pyjwt
+ensure_python_deps
 
 readonly_dmg_mount_point() {
   local dmg_path="$1"
