@@ -8,11 +8,13 @@
 
 (2) Parallelized `Enumerator.discoverFoldersUnder` using a wave-based `withThrowingTaskGroup`. The previous implementation fetched each folder sequentially (one `GET /folders/{id}.json` at a time). The new version collects all pending folder IDs into a `Set<Int>`, fires all fetches concurrently in a wave, then queues any newly discovered parent IDs into the next wave. `APIClient`'s 5 req/s token-bucket rate limiter naturally gates throughput, so no explicit concurrency bound is needed. Most accounts will finish in a single wave since the initial recursive file listing yields the full folder ID set.
 
-**Verification**: `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeded with no new warnings. `swift test --package-path ImageRelayKit` ran 45/45 tests passing across 9 suites.
+**Verification**: `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeded with no new warnings. `swift test --package-path ImageRelayKit` ran 45/45 tests passing across 9 suites. `scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install` succeeded: archived, notarized (accepted), stapled, `spctl` accepted, File Provider extension validated via `pluginkit`, smoke install passed. Beta 5 published to GitHub as `v1.0.0-beta.5` with DMG SHA-256 `308cd28f8448e884fed521d431dc78bfb558cd4dea5b651e25eac94c22541098`.
 
-**Decisions made**: Watchdog is hardcoded at 5 minutes and not user-configurable. The extension's `RemoteChangePoller` is the real poll mechanism; the watchdog is an implementation-detail safety net, not a setting. App Store Connect API key previously flagged as potentially exposed was confirmed to never have been leaked — removed from open items.
+**Decisions made**: Watchdog is hardcoded at 5 minutes and not user-configurable. The extension's `RemoteChangePoller` is the real poll mechanism; the watchdog is an implementation-detail safety net, not a setting. App Store Connect API key previously flagged as potentially exposed was confirmed to never have been leaked — removed from open items and stale CLAUDE.md note updated.
 
-**Left off at**: Ready to run `scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install` for Beta 5.
+**Also this session**: Fixed a release script bug (`mkdir -p` before `cd` for the artifact directory -- failed on clean clone where `build/releases/` didn't exist). Rewrote `README.md` as a proper public-facing product page: added Download section, Features list, GitHub release badge, beta status badge, expanded config table with defaults, maintenance CLI flags (`--reset-file-provider-domain`, `--export-diagnostics`), Contributing section. Screenshots deferred -- requires running app pointed at a real account.
+
+**Left off at**: Beta 5 shipped. Next step when ready: take screenshots of the menu bar, Finder sidebar, and Settings window for the README.
 
 **Open questions**: None carried.
 
