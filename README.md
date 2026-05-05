@@ -42,7 +42,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **macOS 26 (Tahoe) required.** The app uses File Provider APIs introduced in macOS 26.
 
-1. Download `ImageRelayClient-1.0.0.dmg` from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
+1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
 2. Open the DMG and drag **Image Relay** to Applications
 3. Launch Image Relay — the menu bar icon appears
 4. Open Settings → General and enter your API key and root folder ID
@@ -73,7 +73,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API.
 
-**Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current folder and file listings concurrently, diffs them against the local database, and surfaces additions, changes, and deletions to Finder. The host app also runs a fixed 5-minute watchdog signal as a safety net after system sleep or extension restarts.
+**Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current selected subtree, diffs it against the local database, and surfaces additions, changes, and deletions to Finder. The host app can also signal enumerators on the configured interval as a safety net after system sleep or extension restarts.
 
 **Conflict detection** -- On every modify, the extension compares the content version the OS provides against the version in the local database. If they differ, the local edit is uploaded as a conflict copy and the remote version is fetched.
 
@@ -116,7 +116,7 @@ ImageRelayKit/          Swift Package — shared library
   Models                RemoteFolder, RemoteFile, TrackedItem, SyncProgressState, etc.
 
 ImageRelayClient/       Menu bar app (SwiftUI, LSUIElement)
-  DomainManager         Registers/removes the File Provider domain; 5-minute watchdog signal
+  DomainManager         Registers/removes the File Provider domain; remote sync signaling
   MenuBarView           Live status, recent activity, pause controls, Open in Finder
   Settings/             General, Folders, Activity, Advanced
 
@@ -144,11 +144,11 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB automatically.
 
 ```sh
-# Run the unit test suite (45 tests across 9 suites)
+# Run the unit test suite (48 tests across 9 suites)
 swift test --package-path ImageRelayKit
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install
+scripts/build-developer-id-release.sh --version 1.0.0-beta.11 --smoke-install
 ```
 
 ## Known Limitations
