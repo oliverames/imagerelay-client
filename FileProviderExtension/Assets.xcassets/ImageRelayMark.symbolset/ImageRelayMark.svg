@@ -3,8 +3,10 @@
  <!--
    Custom SF Symbol: ImageRelayMark
    Built from Image Relay Icon.svg (vertical stem + diamond mark).
-   Three weight variants at S size; system synthesizes M/L sizes and missing
-   weights via interpolation against Capline/Baseline guides.
+   Three weight variants at S size; system synthesizes other weights via
+   interpolation. Glyphs scaled 0.45x and centered on the midline between
+   Capline and Baseline so the visual height (~118 template units) matches
+   typical sidebar SF Symbols (cloud.fill, globe, folder.fill).
  -->
  <style>
 .monochrome-0 {fill:#FFFFFF;opacity:0.0;-sfsymbols-clear-behind:true}
@@ -34,24 +36,24 @@
  </g>
  <g id="Symbols">
   <g id="Black-S" transform="matrix(1 0 0 1 2873.15 696)">
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 9.86 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 9.86 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -24.35 -116.455)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -24.35 -116.455)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
   </g>
   <g id="Regular-S" transform="matrix(1 0 0 1 1394.4 696)">
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
   </g>
   <g id="Regular-M" transform="matrix(1 0 0 1 1394.4 1126)">
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
   </g>
   <g id="Regular-L" transform="matrix(1 0 0 1 1394.4 1556)">
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -29.15 -116.455)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
   </g>
   <g id="Ultralight-S" transform="matrix(1 0 0 1 507.128 696)">
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 2.195 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
-   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 2.195 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -32.015 -116.455)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.45 0 0 0.45 -32.015 -116.455)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
   </g>
  </g>
 </svg>

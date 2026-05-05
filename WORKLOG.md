@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-05 - Beta 9: scale up the sidebar SF Symbol
+
+**What changed**: Beta 8 successfully showed the IR mark in the Finder sidebar but it rendered visibly smaller than the surrounding system icons (iCloud's cloud, Source's diamond, S3's cylinder, etc.). Cause: the original symbol paths were scaled to exactly the cap height (70.46 template units, 0.268× source), while typical system sidebar SF Symbols extend roughly 1.5–1.8× cap height. Bumped the inner path transform from `scale(0.268)` to `scale(0.45)` (≈118 template units, 1.68× cap height) and recentered the glyph on the cap-baseline midline so it extends symmetrically above the capline and below the baseline. Recomputed translation x for each weight margin (Ultralight 105.17, Regular 110.89, Black 120.5) so the glyph stays horizontally centered in each region.
+
+**Verification**: `xcodebuild build` clean. Beta 9 release pipeline: app + DMG notarization Accepted, stapled, `spctl` Notarized Developer ID, smoke install, File Provider extension registered. `killall Finder` invoked after install to flush the icon cache.
+
+**Decisions made**: Picked 0.45× rather than 0.5× to leave a small margin around the glyph at sidebar render size — overshooting risks the mark feeling cramped against the row's edges. The Apple template's cap height (70.459 units) is fixed by Apple and shouldn't move; the right way to make a symbol "bigger" is to scale the paths inside each weight-size group, not adjust the guide lines.
+
+**Left off at**: Beta 9 shipped locally. Awaiting visual confirmation that the resized glyph feels at home with the other Locations icons.
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-05 - Beta 8: corrected sidebar-icon Info.plist nesting
 
 **What changed**: Beta 7 shipped with `CFBundleSymbolName: ImageRelayMark` as a top-level key in the File Provider extension's Info.plist. Finder still rendered the generic folder icon. Per Apple's [Setting the Finder Sidebar Icon](https://developer.apple.com/documentation/fileprovider/setting-the-finder-sidebar-icon) doc, the symbol name has to be nested two levels deep — `CFBundleIcons` → `CFBundlePrimaryIcon` → `CFBundleSymbolName`. The custom symbol in `Assets.car` was correct all along; macOS just couldn't find the pointer to it. Beta 8 fixes the nesting.
