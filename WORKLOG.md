@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-05 - Beta 8: corrected sidebar-icon Info.plist nesting
+
+**What changed**: Beta 7 shipped with `CFBundleSymbolName: ImageRelayMark` as a top-level key in the File Provider extension's Info.plist. Finder still rendered the generic folder icon. Per Apple's [Setting the Finder Sidebar Icon](https://developer.apple.com/documentation/fileprovider/setting-the-finder-sidebar-icon) doc, the symbol name has to be nested two levels deep — `CFBundleIcons` → `CFBundlePrimaryIcon` → `CFBundleSymbolName`. The custom symbol in `Assets.car` was correct all along; macOS just couldn't find the pointer to it. Beta 8 fixes the nesting.
+
+**Verification**: `xcodegen generate` then `PlistBuddy -c "Print :CFBundleIcons"` confirms the regenerated plist now reads `CFBundlePrimaryIcon { CFBundleSymbolName = ImageRelayMark }`. Beta 8 release pipeline ran clean: Developer ID export, app + DMG notarization Accepted, stapled, `spctl` Notarized Developer ID, smoke install over `/Applications/Image Relay.app`, File Provider extension registered via `pluginkit`.
+
+**Decisions made**: Bumped to Beta 8 (rather than rebuild Beta 7 in place) to keep clear version provenance — Beta 7 binaries already exist locally with a different SHA, and overwriting would erase the trail of what was tried. The custom SF Symbol's own structure (Capline/Baseline guides, three weight variants, Regular-S/M/L size variants) was unchanged from Beta 7.
+
+**Left off at**: Beta 8 shipped locally. Sidebar icon needs visual verification in Finder (may require `killall Finder` to clear the icon cache).
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-05 - Beta 7: custom SF Symbol sidebar icon, error-message UX
 
 **What changed**: Two follow-ups to the Beta 6 release.
