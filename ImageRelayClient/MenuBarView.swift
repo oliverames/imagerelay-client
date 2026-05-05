@@ -38,7 +38,7 @@ struct MenuBarView: View {
             } label: {
                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
             }
-            .disabled(!domainManager.isDomainActive)
+            .disabled(!domainManager.isDomainActive || !domainManager.syncDownloadEnabled || domainManager.pauseState.isActive)
 
             Divider()
 
@@ -103,6 +103,10 @@ struct MenuBarView: View {
             return "Image Relay Not Connected"
         }
 
+        if domainManager.pauseState.isActive {
+            return "Syncing Paused"
+        }
+
         switch domainManager.syncProgress.state {
         case .syncing:
             return "Syncing Now"
@@ -120,6 +124,10 @@ struct MenuBarView: View {
             return domainManager.pauseState.description
         }
 
+        if !domainManager.syncDownloadEnabled {
+            return "Remote downloads are disabled in Settings"
+        }
+
         if domainManager.syncProgress.state == .error,
            let lastError = domainManager.syncProgress.lastError,
            !lastError.isEmpty {
@@ -133,12 +141,20 @@ struct MenuBarView: View {
             return domainManager.syncProgress.phase
         }
 
-        if let nextPoll = domainManager.syncProgress.nextRemotePollAt {
-            return "Next check \(Self.relativeFormatter.localizedString(for: nextPoll, relativeTo: Date()))"
+        let now = Date()
+        if let nextPoll = domainManager.syncProgress.nextRemotePollAt, nextPoll > now {
+            return "Next check \(Self.relativeFormatter.localizedString(for: nextPoll, relativeTo: now))"
+        }
+
+        if let nextPoll = domainManager.syncProgress.nextRemotePollAt, nextPoll <= now {
+            if let lastPoll = domainManager.syncProgress.lastRemotePollAt {
+                return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: now)); next check overdue"
+            }
+            return "Next check overdue"
         }
 
         if let lastPoll = domainManager.syncProgress.lastRemotePollAt {
-            return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: Date()))"
+            return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: now))"
         }
 
         return nil
@@ -155,6 +171,7 @@ struct MenuBarView: View {
 
     private var statusIcon: String {
         if !domainManager.isDomainActive { return "icloud.slash.fill" }
+        if domainManager.pauseState.isActive { return "pause.circle.fill" }
         switch domainManager.syncProgress.state {
         case .syncing: return "arrow.triangle.2.circlepath.circle.fill"
         case .paused: return "pause.circle.fill"

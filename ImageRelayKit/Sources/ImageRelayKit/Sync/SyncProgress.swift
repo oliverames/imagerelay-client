@@ -43,4 +43,23 @@ public struct SyncProgressState: Codable, Sendable {
         self.nextRemotePollAt = nextRemotePollAt
         self.updatedAt = updatedAt
     }
+
+    public mutating func markRemotePollSucceeded(intervalSeconds: Int, now: Date = Date()) {
+        state = .idle
+        phase = "Idle"
+        completedSteps = 0
+        totalSteps = 0
+        etaSeconds = nil
+        currentItem = nil
+        lastError = nil
+        lastRemotePollAt = now
+        nextRemotePollAt = now.addingTimeInterval(Double(intervalSeconds))
+    }
+
+    public mutating func markRemotePollFailed(_ message: String) {
+        state = .error
+        phase = "Error"
+        currentItem = nil
+        lastError = message
+    }
 }

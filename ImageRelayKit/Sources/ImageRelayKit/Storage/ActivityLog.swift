@@ -51,7 +51,11 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
             name: folder.name,
             size: 0,
             contentVersion: folder.updatedOn ?? "0",
-            metadataVersion: folder.updatedOn ?? "0",
+            metadataVersion: folderMetadataVersion(
+                updatedOn: folder.updatedOn,
+                parentIdentifier: parent,
+                childCount: folder.childCount
+            ),
             contentModifiedAt: folder.contentModifiedAt
         )
     }
@@ -67,9 +71,21 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
             name: file.name,
             size: Int64(file.size),
             contentVersion: file.updatedOn ?? "0",
-            metadataVersion: file.updatedOn ?? "0",
+            metadataVersion: fileMetadataVersion(updatedOn: file.updatedOn, parentIdentifier: parent),
             contentModifiedAt: file.contentModifiedAt
         )
+    }
+
+    public static func folderMetadataVersion(
+        updatedOn: String?,
+        parentIdentifier: String,
+        childCount: Int = 0
+    ) -> String {
+        "\(updatedOn ?? "0")|parent:\(parentIdentifier)|children:\(childCount)"
+    }
+
+    public static func fileMetadataVersion(updatedOn: String?, parentIdentifier: String) -> String {
+        "\(updatedOn ?? "0")|parent:\(parentIdentifier)"
     }
 }
 

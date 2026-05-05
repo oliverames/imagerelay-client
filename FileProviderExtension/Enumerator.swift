@@ -30,12 +30,20 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     ) {
         Task {
             do {
-                let (items, _) = try await fetchItems()
-                self.logger.info("Enumerated \(items.count) items for \(self.containerIdentifier.rawValue)")
+                let (items, deletedIdentifiers) = try await fetchItems()
+                self.logger.info("Enumerated \(items.count) items for \(self.containerIdentifier.rawValue, privacy: .public)")
                 observer.didEnumerate(items)
+
+                if !deletedIdentifiers.isEmpty {
+                    self.logger.info("Cleaning \(deletedIdentifiers.count, privacy: .public) stale tracked items after full enumeration for \(self.containerIdentifier.rawValue, privacy: .public)")
+                    for identifier in deletedIdentifiers {
+                        try? self.db.deleteItem(identifier.rawValue)
+                    }
+                }
+
                 observer.finishEnumerating(upTo: nil)
             } catch {
-                self.logger.error("Enumeration failed: \(error.localizedDescription)")
+                self.logger.error("Enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")
                 observer.finishEnumeratingWithError(error.asFileProviderError)
             }
         }
@@ -49,7 +57,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             do {
                 let currentAnchor = SyncAnchor(data: syncAnchor.rawValue)
                 let (items, deletedIdentifiers) = try await fetchItems()
-                self.logger.info("Enumerated \(items.count) changes and \(deletedIdentifiers.count) deletions for \(self.containerIdentifier.rawValue)")
+                self.logger.info("Enumerated \(items.count) changes and \(deletedIdentifiers.count) deletions for \(self.containerIdentifier.rawValue, privacy: .public)")
 
                 if !deletedIdentifiers.isEmpty {
                     observer.didDeleteItems(withIdentifiers: deletedIdentifiers)
@@ -65,7 +73,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
                 observer.finishEnumeratingChanges(upTo: providerAnchor, moreComing: false)
             } catch {
-                self.logger.error("Change enumeration failed: \(error.localizedDescription)")
+                self.logger.error("Change enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")
                 observer.finishEnumeratingWithError(error.asFileProviderError)
             }
         }
@@ -89,9 +97,19 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     /// Fetches current remote items and detects deletions against the database.
     /// Returns (current items, identifiers of items no longer on the remote).
     private func fetchItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
+        if containerIdentifier == .trashContainer {
+            logger.info("Enumerating empty File Provider trash container")
+            return ([], [])
+        }
+
+        if containerIdentifier == .workingSet {
+            return try await fetchWorkingSetItems()
+        }
+
         let folderID = try await resolveContainerFolderID()
-        let isFilteredRoot = isRootLikeContainer && !config.selectedFolderIDs.isEmpty
+        let isFilteredRoot = containerIdentifier == .rootContainer && !config.selectedFolderIDs.isEmpty
         let visibleFolderIDs: Set<Int>? = isFilteredRoot ? Set(config.selectedFolderIDs) : nil
+        logger.info("Fetching container \(self.containerIdentifier.rawValue, privacy: .public) as folder \(folderID, privacy: .public), filteredRoot=\(isFilteredRoot, privacy: .public)")
 
         // Folders and files at this container don't depend on each other — fetch in parallel.
         async let foldersTask = childFolders(of: folderID)
@@ -100,6 +118,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             : api.getAllPages("/folders/\(folderID)/files.json", query: ["recursive": "false"])
         let folders = try await foldersTask
         let files = try await filesTask
+        logger.info("Fetched \(folders.count, privacy: .public) folders and \(files.count, privacy: .public) files for \(self.containerIdentifier.rawValue, privacy: .public)")
 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
@@ -149,13 +168,94 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
             }
             if isFilteredRoot || remoteIdentifiers.contains(tracked.identifier) {
-                logger.info("Item hidden by selection filter: \(tracked.name) (\(tracked.identifier))")
+                logger.info("Item hidden by selection filter: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
             } else {
-                logger.info("Remote deletion detected: \(tracked.name) (\(tracked.identifier))")
+                logger.info("Remote deletion detected: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
             }
         }
 
         return (items, deletedIdentifiers)
+    }
+
+    /// The replicated File Provider pipeline uses the working set as the global
+    /// remote-change feed. Include the full selected subtree here so additions and
+    /// deletions inside already-visible folders propagate into Finder.
+    private func fetchWorkingSetItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
+        let rootFolderID = try await resolveRootFolderID()
+        let rootFolders = try await workingSetRootFolders(parentID: rootFolderID)
+        logger.info("Fetching working set from \(rootFolders.count, privacy: .public) root folders")
+
+        var items: [NSFileProviderItem] = []
+        var visibleIdentifiers = Set<String>()
+
+        for folder in rootFolders {
+            try await appendFolderTree(
+                folder,
+                parentIdentifier: .rootContainer,
+                items: &items,
+                visibleIdentifiers: &visibleIdentifiers
+            )
+        }
+
+        logger.info("Fetched \(items.count, privacy: .public) working-set items")
+
+        var deletedIdentifiers: [NSFileProviderItemIdentifier] = []
+        var queuedDeletions = Set<String>()
+        for tracked in try db.allItems() where !visibleIdentifiers.contains(tracked.identifier) {
+            let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
+            for identifier in localSubtree where queuedDeletions.insert(identifier).inserted {
+                deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
+            }
+            logger.info("Working-set remote deletion detected: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+        }
+
+        return (items, deletedIdentifiers)
+    }
+
+    private func appendFolderTree(
+        _ folder: RemoteFolder,
+        parentIdentifier: NSFileProviderItemIdentifier,
+        items: inout [NSFileProviderItem],
+        visibleIdentifiers: inout Set<String>
+    ) async throws {
+        let identifier = ItemIdentifier.folder(folder.id).rawValue
+        let existingItem = try db.item(for: identifier)
+        visibleIdentifiers.insert(identifier)
+        items.append(FileProviderItem(folder: folder, parentItemIdentifier: parentIdentifier))
+
+        try db.upsertItem(.makeFolder(from: folder, parent: parentIdentifier.rawValue))
+        if existingItem == nil {
+            try? db.logActivity(action: .discovered, itemName: folder.name, itemType: .folder)
+        }
+
+        async let foldersTask = listChildFolders(parentID: folder.id)
+        async let filesTask: [RemoteFile] = api.getAllPages(
+            "/folders/\(folder.id)/files.json",
+            query: ["recursive": "false"]
+        )
+        let childFolders = try await foldersTask
+        let files = try await filesTask
+
+        for file in files where !file.isDeleted {
+            let fileIdentifier = ItemIdentifier.file(file.id).rawValue
+            let existingFile = try db.item(for: fileIdentifier)
+            visibleIdentifiers.insert(fileIdentifier)
+            items.append(FileProviderItem(file: file, parentItemIdentifier: NSFileProviderItemIdentifier(identifier)))
+
+            try db.upsertItem(.makeFile(from: file, parent: identifier))
+            if existingFile == nil {
+                try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
+            }
+        }
+
+        for childFolder in childFolders {
+            try await appendFolderTree(
+                childFolder,
+                parentIdentifier: NSFileProviderItemIdentifier(identifier),
+                items: &items,
+                visibleIdentifiers: &visibleIdentifiers
+            )
+        }
     }
 
     private func localSubtreeIdentifiers(rootedAt identifier: String) throws -> [String] {
@@ -167,13 +267,17 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     }
 
     private func childFolders(of folderID: Int) async throws -> [RemoteFolder] {
-        if isRootLikeContainer && !config.selectedFolderIDs.isEmpty {
+        if containerIdentifier == .rootContainer && !config.selectedFolderIDs.isEmpty {
             return try await selectedRootFolders(parentID: folderID)
         }
-        let discovered = try await discoverFoldersUnder(folderID)
-        return discovered
-            .filter { $0.parentID == folderID }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return try await listChildFolders(parentID: folderID)
+    }
+
+    private func workingSetRootFolders(parentID: Int) async throws -> [RemoteFolder] {
+        if !config.selectedFolderIDs.isEmpty {
+            return try await selectedRootFolders(parentID: parentID)
+        }
+        return try await listChildFolders(parentID: parentID)
     }
 
     private func selectedRootFolders(parentID: Int) async throws -> [RemoteFolder] {
@@ -185,62 +289,27 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                     folders.append(folder)
                 }
             } catch APIError.notFound {
-                logger.warning("Selected folder no longer exists: \(selectedFolderID)")
+                logger.warning("Selected folder no longer exists: \(selectedFolderID, privacy: .public)")
             }
         }
         return folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    private func discoverFoldersUnder(_ rootFolderID: Int) async throws -> [RemoteFolder] {
-        let recursiveFiles: [RemoteFile] = try await api.getAllPages(
-            "/folders/\(rootFolderID)/files.json",
-            query: ["recursive": "true"]
+    private func listChildFolders(parentID: Int) async throws -> [RemoteFolder] {
+        let folders: [RemoteFolder] = try await api.getAllPages(
+            "/folders.json",
+            query: ["parent_id": "\(parentID)"]
         )
-
-        // Seed the first wave with every folder ID referenced by any file,
-        // excluding the root. Use a Set so duplicate IDs collapse for free.
-        var pending: Set<Int> = Set(recursiveFiles.flatMap(\.folderIDs)).subtracting([rootFolderID])
-        var foldersByID: [Int: RemoteFolder] = [:]
-
-        // Each wave fetches all pending IDs concurrently. APIClient's rate limiter
-        // caps throughput, so unbounded TaskGroup concurrency is safe. Newly
-        // discovered parents (folders whose parent isn't in the result set) queue
-        // into the next wave; most accounts finish in a single wave.
-        while !pending.isEmpty {
-            let wave = Array(pending)
-            pending = []
-
-            let fetched = try await withThrowingTaskGroup(of: RemoteFolder.self) { group in
-                for folderID in wave {
-                    group.addTask { try await self.api.get("/folders/\(folderID).json") }
-                }
-                var results: [RemoteFolder] = []
-                for try await folder in group {
-                    results.append(folder)
-                }
-                return results
-            }
-
-            for folder in fetched {
-                foldersByID[folder.id] = folder
-                if let parentID = folder.parentID,
-                   parentID != rootFolderID,
-                   foldersByID[parentID] == nil {
-                    pending.insert(parentID)
-                }
-            }
-        }
-
-        return Array(foldersByID.values)
+        // Image Relay currently accepts the parent_id query but may still return
+        // sibling folders. Trust the payload parent field before exposing items.
+        return folders
+            .filter { $0.parentID == parentID }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private func resolveContainerFolderID() async throws -> Int {
-        if isRootLikeContainer {
-            if let remoteRootFolderID = config.remoteRootFolderID {
-                return remoteRootFolderID
-            }
-            let root: RemoteFolder = try await api.get("/folders/root.json")
-            return root.id
+        if containerIdentifier == .rootContainer || containerIdentifier == .workingSet {
+            return try await resolveRootFolderID()
         }
         guard let itemID = ItemIdentifier(rawValue: containerIdentifier.rawValue),
               let numericID = itemID.numericID else {
@@ -249,8 +318,36 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return numericID
     }
 
-    private var isRootLikeContainer: Bool {
-        containerIdentifier == .rootContainer || containerIdentifier == .workingSet
+    private func resolveRootFolderID() async throws -> Int {
+        if let remoteRootFolderID = config.remoteRootFolderID {
+            return remoteRootFolderID
+        }
+        let root: RemoteFolder = try await api.get("/folders/root.json")
+        return root.id
     }
 
+}
+
+private func describeError(_ error: any Error) -> String {
+    if let apiError = error as? APIError {
+        switch apiError {
+        case .serverError(let statusCode, let message):
+            return "Image Relay server error \(statusCode): \(message ?? "no response body")"
+        case .networkError(let underlying):
+            return "Image Relay network error: \(underlying.localizedDescription)"
+        case .decodingError(let underlying):
+            return "Image Relay decoding error: \(underlying)"
+        case .invalidURL(let path):
+            return "Invalid Image Relay URL path: \(path)"
+        default:
+            return apiError.userMessage
+        }
+    }
+
+    let nsError = error as NSError
+    if nsError.domain == NSCocoaErrorDomain || nsError.domain == NSPOSIXErrorDomain {
+        return "\(nsError.domain) \(nsError.code): \(nsError.localizedDescription)"
+    }
+
+    return error.localizedDescription
 }

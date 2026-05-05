@@ -5,10 +5,14 @@ import ImageRelayKit
 
 @main
 struct ImageRelayClientApp: App {
-    @State private var domainManager = DomainManager()
+    @State private var domainManager: DomainManager
 
     init() {
         let arguments = CommandLine.arguments
+        let isUtilityInvocation = arguments.contains("--export-diagnostics")
+            || arguments.contains("--reset-file-provider-domain")
+
+        _domainManager = State(initialValue: DomainManager(autoBootstrap: !isUtilityInvocation))
 
         if let exportIndex = arguments.firstIndex(of: "--export-diagnostics"),
            arguments.indices.contains(exportIndex + 1) {
