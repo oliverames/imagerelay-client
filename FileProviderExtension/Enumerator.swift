@@ -53,6 +53,9 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
                 if !deletedIdentifiers.isEmpty {
                     observer.didDeleteItems(withIdentifiers: deletedIdentifiers)
+                    for identifier in deletedIdentifiers {
+                        try? self.db.deleteItem(identifier.rawValue)
+                    }
                 }
                 observer.didUpdate(items)
 
@@ -135,13 +138,15 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         // Detect deletions: anything tracked for this container that's no longer remote.
+        // NOTE: DB cleanup is intentionally deferred to enumerateChanges, which is the
+        // only caller that reports deletions to File Provider. Cleaning up here would
+        // silently consume the event before the framework is told about it.
         var deletedIdentifiers: [NSFileProviderItemIdentifier] = []
         let trackedChildren = try db.children(of: containerIdentifier.rawValue)
         for tracked in trackedChildren where !visibleIdentifiers.contains(tracked.identifier) {
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
-                try db.deleteItem(identifier)
             }
             if isFilteredRoot || remoteIdentifiers.contains(tracked.identifier) {
                 logger.info("Item hidden by selection filter: \(tracked.name) (\(tracked.identifier))")

@@ -94,10 +94,6 @@ actor RemoteChangePoller {
     }
 
     private func folderIDsToSignal() -> [Int] {
-        if !config.selectedFolderIDs.isEmpty {
-            return config.selectedFolderIDs
-        }
-
         guard let db else { return [] }
         return (try? db.folders().map(\.remoteID)) ?? []
     }
