@@ -76,6 +76,9 @@ Task { completionHandler(...) }
 - Settings tabs: use `Tab("Title", systemImage:) { }` -- NOT `.tabItem {}` (creates duplicate tabs)
 - Settings window for `LSUIElement` apps needs `NSApp.activate(ignoringOtherApps: true)` to come to front
 - `NSFileProviderItemProtocol`: `itemIdentifier`/`parentItemIdentifier` (not `identifier`/`parentIdentifier`)
+- **`Settings` scene needs its own `.environment(...)` injection.** SwiftUI scenes (`MenuBarExtra`, `Settings`, etc.) at the App-level are siblings, not nested. An `.environment` on `MenuBarExtra` does not reach `Settings`. Apply `.environment(domainManager)` to every scene whose body reads it. Symptom: `Fatal error: No Observable object of type X found` when opening Settings.
+- **Finder sidebar icon Info.plist nesting.** Per Apple's *Setting the Finder Sidebar Icon* doc, `CFBundleSymbolName` for File Provider extensions must live nested at `CFBundleIcons.CFBundlePrimaryIcon.CFBundleSymbolName`, NOT at the top level. A top-level `CFBundleSymbolName` is silently ignored and Finder falls back to the generic folder. The symbol can be a built-in SF Symbol or a custom `.symbolset` in the extension's own asset catalog.
+- **Custom SF Symbols require multi-size variants.** Xcode 26's asset compiler rejects a `.symbolset` SVG that only declares `Regular-S`; it errors `Symbol image file ... must have a glyph for Regular weight Medium size`. Include `Regular-S`, `Regular-M`, `Regular-L` (and at least Ultralight-S + Black-S for weight interpolation) using Apple's standard Capline/Baseline guide y-coordinates (S: 625.541/696, M: 1055.54/1126, L: 1485.54/1556). Glyph paths inside should typically extend to ~1.5–1.7× cap height to match system sidebar symbols.
 
 ## Image Relay API Notes
 
