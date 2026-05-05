@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-05 - Beta 10: Settings crash on open
+
+**What changed**: Clicking Settings… in the menu bar trapped with `Fatal error: No Observable object of type DomainManager found. A View.environmentObject(_:) for DomainManager may be missing as an ancestor of this view.` Cause: `App.swift` injected `domainManager` only into the `MenuBarExtra` scene, not the `Settings` scene. As soon as any Settings tab read `@Environment(DomainManager.self)` (`AdvancedSettingsView`, `GeneralSettingsView`, etc.) the lookup failed and SwiftUI traps. SwiftUI scenes don't share environment values — each scene at the App level needs its own `.environment` modifier. Added `.environment(domainManager)` to the `Settings { TabView { … } }` block.
+
+**Verification**: `xcodebuild build` clean. Beta 10 release pipeline ran clean: app + DMG notarization Accepted, stapled, `spctl` Notarized Developer ID, smoke install, File Provider extension registered. The Keychain still holds a valid API key (verified via `security` and a direct `curl` against `/folders/2907644.json` returns 200), but the existing entry's access group may not match the current build's signing — Settings → General re-save will overwrite with the correct group.
+
+**Decisions made**: Did not attempt to migrate the Keychain entry programmatically. The `KeychainStore.save` call from Settings → General will replace the entry with one written by the current code-signed binary, which is the cleanest recovery path. If this proves recurrent across rebuilds we should look at whether `kSecAttrAccessGroup` should be omitted on read so any entry under the team prefix is acceptable.
+
+**Left off at**: Beta 10 shipped locally. User re-enters API key in Settings → General to restore sync. All commits 0d44fc9..HEAD push to origin and Beta 10 publishes as `v1.0.0-beta.10` on GitHub.
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-05 - Beta 9: scale up the sidebar SF Symbol
 
 **What changed**: Beta 8 successfully showed the IR mark in the Finder sidebar but it rendered visibly smaller than the surrounding system icons (iCloud's cloud, Source's diamond, S3's cylinder, etc.). Cause: the original symbol paths were scaled to exactly the cap height (70.46 template units, 0.268× source), while typical system sidebar SF Symbols extend roughly 1.5–1.8× cap height. Bumped the inner path transform from `scale(0.268)` to `scale(0.45)` (≈118 template units, 1.68× cap height) and recentered the glyph on the cap-baseline midline so it extends symmetrically above the capline and below the baseline. Recomputed translation x for each weight margin (Ultralight 105.17, Regular 110.89, Black 120.5) so the glyph stays horizontally centered in each region.
