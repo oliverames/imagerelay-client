@@ -93,6 +93,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     handler.value(FileProviderItem(containerIdentifier: .rootContainer, filename: "Image Relay"), nil)
                 } else if identifier == .workingSet {
                     handler.value(FileProviderItem(containerIdentifier: .workingSet, filename: "Image Relay"), nil)
+                } else if identifier == .trashContainer {
+                    handler.value(FileProviderItem(containerIdentifier: .trashContainer, filename: "Trash"), nil)
                 } else if let tracked = try db.item(for: identifier.rawValue) {
                     handler.value(FileProviderItem(trackedItem: tracked), nil)
                 } else {
@@ -223,7 +225,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: folder.id, itemType: .folder, name: folder.name,
                         size: 0, contentVersion: folder.updatedOn ?? "0",
-                        metadataVersion: folder.updatedOn ?? "0",
+                        metadataVersion: TrackedItem.folderMetadataVersion(
+                            updatedOn: folder.updatedOn,
+                            parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
+                            childCount: folder.childCount
+                        ),
                         contentModifiedAt: folder.contentModifiedAt
                     )
                     try db.upsertItem(tracked)
@@ -274,7 +280,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: fileID, itemType: .file, name: itemTemplate.filename,
                         size: Int64(fileData.count), contentVersion: "1",
-                        metadataVersion: "1",
+                        metadataVersion: TrackedItem.fileMetadataVersion(
+                            updatedOn: "1",
+                            parentIdentifier: itemTemplate.parentItemIdentifier.rawValue
+                        ),
                         contentModifiedAt: Date()
                     )
                     try db.upsertItem(tracked)
@@ -314,17 +323,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
         Task {
             do {
-                // Block content uploads when sync upload is disabled
-                if !config.syncUpload && changedFields.contains(.contents) {
-                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
-                    return
-                }
+                let mutatesRemote = changedFields.contains(.contents)
+                    || changedFields.contains(.filename)
+                    || changedFields.contains(.parentItemIdentifier)
 
-                // Block content uploads when sync is paused
-                if changedFields.contains(.contents),
-                   let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
-                    return
+                if mutatesRemote {
+                    if !config.syncUpload {
+                        handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                        return
+                    }
+
+                    if let pauseState = try? db.getPauseState(), pauseState.isActive {
+                        handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                        return
+                    }
                 }
 
                 guard let tracked = try db.item(for: item.itemIdentifier.rawValue),
@@ -403,7 +415,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         parentIdentifier: item.parentItemIdentifier.rawValue,
                         remoteID: newFolder.id, itemType: .folder, name: newFolder.name,
                         size: 0, contentVersion: newFolder.updatedOn ?? "0",
-                        metadataVersion: newFolder.updatedOn ?? "0",
+                        metadataVersion: TrackedItem.folderMetadataVersion(
+                            updatedOn: newFolder.updatedOn,
+                            parentIdentifier: item.parentItemIdentifier.rawValue,
+                            childCount: newFolder.childCount
+                        ),
                         contentModifiedAt: newFolder.contentModifiedAt
                     )
                     try db.upsertItem(newTracked)
@@ -436,6 +452,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                     updated.size = Int64(fileData.count)
                     updated.contentVersion = UUID().uuidString
+                    updated.metadataVersion = TrackedItem.fileMetadataVersion(
+                        updatedOn: updated.contentVersion,
+                        parentIdentifier: updated.parentIdentifier
+                    )
                     updated.contentModifiedAt = Date()
                     try? db.logActivity(action: .uploaded, itemName: tracked.name, itemType: .file)
                 }
@@ -450,6 +470,15 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         )
                     }
                     updated.name = item.filename
+                    updated.metadataVersion = itemID.isFile
+                        ? TrackedItem.fileMetadataVersion(
+                            updatedOn: updated.contentVersion,
+                            parentIdentifier: updated.parentIdentifier
+                        )
+                        : TrackedItem.folderMetadataVersion(
+                            updatedOn: updated.contentVersion,
+                            parentIdentifier: updated.parentIdentifier
+                        )
                     try? db.logActivity(action: .renamed, itemName: item.filename, itemType: tracked.itemType)
                 }
 
@@ -460,6 +489,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         body: MoveRequest(folder_ids: [String(newParentID)])
                     )
                     updated.parentIdentifier = item.parentItemIdentifier.rawValue
+                    updated.metadataVersion = TrackedItem.fileMetadataVersion(
+                        updatedOn: updated.contentVersion,
+                        parentIdentifier: item.parentItemIdentifier.rawValue
+                    )
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .file)
                 }
 
@@ -487,6 +520,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     ) -> Progress {
         let db = self.db
         let api = self.api
+        let config = self.config
         let logger = self.logger
         let handler = UncheckedBox(value: completionHandler)
 
@@ -500,17 +534,39 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let tracked = try db.item(for: identifier.rawValue)
 
+                if !config.syncUpload {
+                    handler.value(NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
+                if let pauseState = try? db.getPauseState(), pauseState.isActive {
+                    handler.value(NSFileProviderError(.notAuthenticated))
+                    return
+                }
+
                 self.beginOperation()
                 defer { self.incrementProgress() }
                 self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
 
-                if itemID.isFile {
-                    try await api.delete("/files/\(remoteID).json")
-                } else {
-                    try await api.delete("/folders/\(remoteID).json")
+                do {
+                    if itemID.isFile {
+                        try await api.delete("/files/\(remoteID).json")
+                    } else {
+                        try await api.delete("/folders/\(remoteID).json")
+                    }
+                } catch let apiError as APIError {
+                    if case .notFound = apiError {
+                        logger.info("Remote item already deleted: \(identifier.rawValue, privacy: .public)")
+                    } else {
+                        throw apiError
+                    }
                 }
 
-                try db.deleteItem(identifier.rawValue)
+                if itemID.isFile {
+                    try db.deleteItem(identifier.rawValue)
+                } else {
+                    try db.deleteSubtree(rootedAt: identifier.rawValue)
+                }
                 if let tracked {
                     try? db.logActivity(action: .deleted, itemName: tracked.name, itemType: tracked.itemType)
                 }
@@ -616,7 +672,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     name: createdFolder.name,
                     size: 0,
                     contentVersion: createdFolder.updatedOn ?? "0",
-                    metadataVersion: createdFolder.updatedOn ?? "0",
+                    metadataVersion: TrackedItem.folderMetadataVersion(
+                        updatedOn: createdFolder.updatedOn,
+                        parentIdentifier: ItemIdentifier.folder(newFolderID).rawValue,
+                        childCount: createdFolder.childCount
+                    ),
                     contentModifiedAt: createdFolder.contentModifiedAt
                 )
                 try db.upsertItem(newSubfolder)

@@ -66,7 +66,13 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         self.documentSize = nil
         self.itemVersion = NSFileProviderItemVersion(
             contentVersion: Data((folder.updatedOn ?? "0").utf8),
-            metadataVersion: Data((folder.updatedOn ?? "0").utf8)
+            metadataVersion: Data(
+                TrackedItem.folderMetadataVersion(
+                    updatedOn: folder.updatedOn,
+                    parentIdentifier: parentItemIdentifier.rawValue,
+                    childCount: folder.childCount
+                ).utf8
+            )
         )
         self.contentModificationDate = folder.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
@@ -84,7 +90,12 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         self.documentSize = NSNumber(value: file.size)
         self.itemVersion = NSFileProviderItemVersion(
             contentVersion: Data((file.updatedOn ?? "0").utf8),
-            metadataVersion: Data((file.updatedOn ?? "0").utf8)
+            metadataVersion: Data(
+                TrackedItem.fileMetadataVersion(
+                    updatedOn: file.updatedOn,
+                    parentIdentifier: parentItemIdentifier.rawValue
+                ).utf8
+            )
         )
         self.contentModificationDate = file.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting,

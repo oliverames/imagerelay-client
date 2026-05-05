@@ -116,7 +116,33 @@ public final class SyncDatabase: Sendable {
 
     public func deleteItem(_ identifier: String) throws {
         try writer.write { db in
-            try TrackedItem.deleteOne(db, key: identifier)
+            _ = try TrackedItem.deleteOne(db, key: identifier)
+        }
+    }
+
+    public func deleteSubtree(rootedAt identifier: String) throws {
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                WITH RECURSIVE subtree(identifier) AS (
+                    VALUES (?)
+                    UNION ALL
+                    SELECT tracked_items.identifier
+                    FROM tracked_items
+                    JOIN subtree ON tracked_items.parentIdentifier = subtree.identifier
+                )
+                DELETE FROM tracked_items
+                WHERE identifier IN (SELECT identifier FROM subtree)
+                """,
+                arguments: [identifier]
+            )
+        }
+    }
+
+    public func resetTrackedState() throws {
+        try writer.write { db in
+            try db.execute(sql: "DELETE FROM sync_anchors")
+            try db.execute(sql: "DELETE FROM tracked_items")
         }
     }
 
@@ -163,7 +189,7 @@ public final class SyncDatabase: Sendable {
 
     public func logActivity(action: SyncAction, itemName: String, itemType: TrackedItemType) throws {
         try writer.write { db in
-            var entry = ActivityEntry(action: action, itemName: itemName, itemType: itemType)
+            let entry = ActivityEntry(action: action, itemName: itemName, itemType: itemType)
             try entry.insert(db)
             // Prune after insert so the table never grows beyond the retention window.
             try db.execute(sql: """

@@ -59,34 +59,36 @@ actor RemoteChangePoller {
                 guard let manager = NSFileProviderManager(for: domain) else { continue }
                 try await manager.signalEnumerator(for: .workingSet)
                 try await manager.signalEnumerator(for: .rootContainer)
-                for folderID in folderIDsToSignal() {
-                    try await manager.signalEnumerator(
-                        for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
-                    )
+                let folderIDs = folderIDsToSignal()
+                var folderSignalFailures = 0
+                for folderID in folderIDs {
+                    do {
+                        try await manager.signalEnumerator(
+                            for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
+                        )
+                    } catch {
+                        folderSignalFailures += 1
+                        logger.debug("Folder enumerator signal failed: \(error.localizedDescription, privacy: .public)")
+                    }
                 }
-                logger.debug("Signaled enumerator for remote change check")
+                logger.info("Remote poll signaled enumerators (folders: \(folderIDs.count, privacy: .public), folder failures: \(folderSignalFailures, privacy: .public))")
 
                 consecutiveFailures = 0
 
                 if let db {
                     var progress = (try? db.getProgress()) ?? .idle
-                    // Clear a persistent poll error if we succeed after failures.
-                    if progress.state == .error {
-                        progress.state = .idle
-                        progress.lastError = nil
-                    }
-                    progress.lastRemotePollAt = Date()
-                    progress.nextRemotePollAt = Date().addingTimeInterval(Double(config.pollIntervalSeconds))
+                    progress.markRemotePollSucceeded(intervalSeconds: config.pollIntervalSeconds)
                     try? db.setProgress(progress)
                 }
             } catch {
                 consecutiveFailures += 1
-                logger.error("Failed to signal enumerator (\(self.consecutiveFailures) consecutive): \(error.localizedDescription)")
+                logger.error("Failed to signal enumerator (\(self.consecutiveFailures, privacy: .public) consecutive): \(error.localizedDescription, privacy: .public)")
 
                 if consecutiveFailures >= Self.failureThreshold, let db {
                     var progress = (try? db.getProgress()) ?? .idle
-                    progress.state = .error
-                    progress.lastError = "Remote change polling failed \(consecutiveFailures) times: \(error.localizedDescription)"
+                    progress.markRemotePollFailed(
+                        "Remote change polling failed \(consecutiveFailures) times: \(error.localizedDescription)"
+                    )
                     try? db.setProgress(progress)
                 }
             }
@@ -94,7 +96,10 @@ actor RemoteChangePoller {
     }
 
     private func folderIDsToSignal() -> [Int] {
-        guard let db else { return [] }
-        return (try? db.folders().map(\.remoteID)) ?? []
+        var folderIDs = Set(config.selectedFolderIDs)
+        if let db {
+            folderIDs.formUnion((try? db.folders().map(\.remoteID)) ?? [])
+        }
+        return folderIDs.sorted()
     }
 }

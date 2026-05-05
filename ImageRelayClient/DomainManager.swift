@@ -9,12 +9,16 @@ final class DomainManager {
     static let appGroupIdentifier = AppConfiguration.appGroupIdentifier
     static let domainIdentifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.domain")
     static let domainDisplayName = "Image Relay"
+    private static let fileProviderDomainSchemaVersion = 2
+    private static let domainSchemaVersionFilename = "file-provider-domain-schema-version"
 
     var isDomainActive = false
     var lastError: String?
 
     var syncProgress: SyncProgressState = .idle
     var pauseState: SyncPauseState = .default
+    var syncUploadEnabled = true
+    var syncDownloadEnabled = true
     var recentActivity: [ActivityEntry] = []
     private var db: SyncDatabase?
     private var remotePollingTask: Task<Void, Never>?
@@ -55,12 +59,26 @@ final class DomainManager {
         let config = loadConfiguration()
         guard config.isConfigured else { return }
 
-        await setupDomain()
+        if shouldResetDomainForSchemaMigration() {
+            logger.info("Resetting File Provider domain for schema migration")
+            await resetDomain(clearTrackedState: true)
+            if isDomainActive {
+                markDomainSchemaMigrationComplete()
+            }
+        } else {
+            await setupDomain()
+            await signalSync()
+        }
+
         startRemotePolling()
         refreshStatus()
     }
 
     func refreshStatus() {
+        let config = loadConfiguration()
+        syncUploadEnabled = config.syncUpload
+        syncDownloadEnabled = config.syncDownload
+
         guard let db = ensureDatabase() else { return }
         syncProgress = (try? db.getProgress()) ?? .idle
         pauseState = (try? db.getPauseState()) ?? .default
@@ -106,7 +124,16 @@ final class DomainManager {
         }
     }
 
-    func resetDomain() async {
+    func resetDomain(clearTrackedState: Bool = true) async {
+        if clearTrackedState {
+            do {
+                try ensureDatabase()?.resetTrackedState()
+                logger.info("Cleared tracked File Provider state before domain reset")
+            } catch {
+                logger.warning("Failed to clear tracked File Provider state: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
         await removeDomain()
         try? await Task.sleep(for: .seconds(1))
         await setupDomain()
@@ -115,11 +142,28 @@ final class DomainManager {
 
     func signalSync() async {
         let config = loadConfiguration()
+        refreshStatus()
+
+        guard isDomainActive else {
+            logger.info("Sync signal skipped because the File Provider domain is inactive")
+            return
+        }
+
+        guard config.syncDownload else {
+            logger.info("Sync signal skipped because download sync is disabled")
+            return
+        }
+
+        guard !pauseState.isActive else {
+            logger.info("Sync signal skipped because sync is paused")
+            return
+        }
+
         do {
             try await signalEnumerators(config: config)
             markRemotePollSucceeded(config: config)
         } catch {
-            logger.error("Failed to signal sync: \(error.localizedDescription)")
+            logger.error("Failed to signal sync: \(error.localizedDescription, privacy: .public)")
             markRemotePollFailed(error)
         }
     }
@@ -128,25 +172,26 @@ final class DomainManager {
         guard let manager = NSFileProviderManager(for: domain) else { return }
         try await manager.signalEnumerator(for: .workingSet)
         try await manager.signalEnumerator(for: .rootContainer)
-        for folderID in folderIDsToSignal(config: config) {
-            try await manager.signalEnumerator(
-                for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
-            )
+        let folderIDs = folderIDsToSignal(config: config)
+        var folderSignalFailures = 0
+        for folderID in folderIDs {
+            do {
+                try await manager.signalEnumerator(
+                    for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
+                )
+            } catch {
+                folderSignalFailures += 1
+                logger.debug("Folder enumerator signal failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
+        logger.info("Signaled remote poll enumerators (folders: \(folderIDs.count, privacy: .public), folder failures: \(folderSignalFailures, privacy: .public))")
     }
 
     private func folderIDsToSignal(config: AppConfiguration) -> [Int] {
-        if !config.selectedFolderIDs.isEmpty {
-            return config.selectedFolderIDs
-        }
-        return (try? ensureDatabase()?.folders().map(\.remoteID)) ?? []
+        var folderIDs = Set(config.selectedFolderIDs)
+        folderIDs.formUnion((try? ensureDatabase()?.folders().map(\.remoteID)) ?? [])
+        return folderIDs.sorted()
     }
-
-    // Safety net: nudge the extension's enumerators every 5 minutes in case the
-    // extension's own RemoteChangePoller misses a wake after system sleep or
-    // an extension lifecycle restart. DB state and failure tracking are owned
-    // by RemoteChangePoller; this loop only signals.
-    private static let watchdogInterval = Duration.seconds(5 * 60)
 
     private func startRemotePolling() {
         guard remotePollingTask == nil else { return }
@@ -157,8 +202,9 @@ final class DomainManager {
 
     private func remotePollLoop() async {
         while !Task.isCancelled {
+            let sleepSeconds = max(loadConfiguration().pollIntervalSeconds, 15)
             do {
-                try await Task.sleep(for: Self.watchdogInterval)
+                try await Task.sleep(for: .seconds(sleepSeconds))
             } catch {
                 return
             }
@@ -169,9 +215,10 @@ final class DomainManager {
 
             do {
                 try await signalEnumerators(config: config)
-                logger.debug("Watchdog signaled enumerators")
+                markRemotePollSucceeded(config: config)
             } catch {
-                logger.warning("Watchdog signal failed: \(error.localizedDescription)")
+                logger.warning("Remote poll signal failed: \(error.localizedDescription, privacy: .public)")
+                markRemotePollFailed(error)
             }
         }
     }
@@ -179,12 +226,7 @@ final class DomainManager {
     private func markRemotePollSucceeded(config: AppConfiguration) {
         guard let db = ensureDatabase() else { return }
         var progress = (try? db.getProgress()) ?? .idle
-        if progress.state == .error {
-            progress.state = .idle
-            progress.lastError = nil
-        }
-        progress.lastRemotePollAt = Date()
-        progress.nextRemotePollAt = Date().addingTimeInterval(Double(config.pollIntervalSeconds))
+        progress.markRemotePollSucceeded(intervalSeconds: config.pollIntervalSeconds)
         try? db.setProgress(progress)
         refreshStatus()
     }
@@ -192,10 +234,34 @@ final class DomainManager {
     private func markRemotePollFailed(_ error: any Error) {
         guard let db = ensureDatabase() else { return }
         var progress = (try? db.getProgress()) ?? .idle
-        progress.state = .error
-        progress.lastError = "Remote change polling failed: \(error.localizedDescription)"
+        progress.markRemotePollFailed("Remote change polling failed: \(error.localizedDescription)")
         try? db.setProgress(progress)
         refreshStatus()
+    }
+
+    private func domainSchemaVersionURL() -> URL? {
+        FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier)?
+            .appendingPathComponent(Self.domainSchemaVersionFilename)
+    }
+
+    private func shouldResetDomainForSchemaMigration() -> Bool {
+        guard let url = domainSchemaVersionURL() else { return false }
+        guard let rawValue = try? String(contentsOf: url, encoding: .utf8),
+              let storedVersion = Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return true
+        }
+        return storedVersion < Self.fileProviderDomainSchemaVersion
+    }
+
+    private func markDomainSchemaMigrationComplete() {
+        guard let url = domainSchemaVersionURL() else { return }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try "\(Self.fileProviderDomainSchemaVersion)\n".write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            logger.warning("Failed to write File Provider schema version: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func openInFinder() {

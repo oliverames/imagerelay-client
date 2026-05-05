@@ -75,6 +75,39 @@ struct SyncDatabaseTests {
         #expect(retrieved == nil)
     }
 
+    @Test("Delete subtree removes descendants")
+    func deleteSubtree() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-1", parentIdentifier: "root",
+            remoteID: 1, itemType: .folder, name: "Parent",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-2", parentIdentifier: "folder-1",
+            remoteID: 2, itemType: .folder, name: "Child",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-3", parentIdentifier: "folder-2",
+            remoteID: 3, itemType: .file, name: "nested.txt",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-4", parentIdentifier: "root",
+            remoteID: 4, itemType: .file, name: "sibling.txt",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        try db.deleteSubtree(rootedAt: "folder-1")
+
+        #expect(try db.item(for: "folder-1") == nil)
+        #expect(try db.item(for: "folder-2") == nil)
+        #expect(try db.item(for: "file-3") == nil)
+        #expect(try db.item(for: "file-4") != nil)
+    }
+
     @Test("Save and load sync anchor")
     func syncAnchor() throws {
         let db = try makeDB()
@@ -82,6 +115,25 @@ struct SyncDatabaseTests {
         try db.setSyncAnchor(Data("anchor-1".utf8), for: "root")
         let loaded = try db.syncAnchor(for: "root")
         #expect(loaded == Data("anchor-1".utf8))
+    }
+
+    @Test("Reset tracked state clears items and anchors only")
+    func resetTrackedState() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "file-1", parentIdentifier: "folder-1",
+            remoteID: 1, itemType: .file, name: "stale.txt",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.setSyncAnchor(Data("anchor-1".utf8), for: "folder-1")
+        try db.logActivity(action: .discovered, itemName: "stale.txt", itemType: .file)
+
+        try db.resetTrackedState()
+
+        #expect(try db.item(for: "file-1") == nil)
+        #expect(try db.syncAnchor(for: "folder-1") == nil)
+        #expect(try db.recentActivity(limit: 10).count == 1)
     }
 
     @Test("Log and retrieve activity")
@@ -95,5 +147,29 @@ struct SyncDatabaseTests {
         #expect(entries.count == 2)
         #expect(entries[0].itemName == "doc.pdf")
         #expect(entries[1].itemName == "photo.jpg")
+    }
+
+    @Test("Remote poll success normalizes stale error progress")
+    func remotePollSuccessNormalizesProgress() {
+        let now = Date(timeIntervalSince1970: 1_777_777_000)
+        var progress = SyncProgressState(
+            state: .error,
+            phase: "Error",
+            completedSteps: 1,
+            totalSteps: 1,
+            currentItem: "old.txt",
+            lastError: "Poll failed"
+        )
+
+        progress.markRemotePollSucceeded(intervalSeconds: 60, now: now)
+
+        #expect(progress.state == .idle)
+        #expect(progress.phase == "Idle")
+        #expect(progress.completedSteps == 0)
+        #expect(progress.totalSteps == 0)
+        #expect(progress.currentItem == nil)
+        #expect(progress.lastError == nil)
+        #expect(progress.lastRemotePollAt == now)
+        #expect(progress.nextRemotePollAt == now.addingTimeInterval(60))
     }
 }
