@@ -1,6 +1,6 @@
 import Foundation
 
-public enum APIError: Error, Sendable {
+public enum APIError: Error, LocalizedError, Sendable {
     case notAuthenticated
     case forbidden
     case notFound(resource: String)
@@ -43,4 +43,6 @@ public enum APIError: Error, Sendable {
             return "Could not build a valid URL for path: \(path)"
         }
     }
+
+    public var errorDescription: String? { userMessage }
 }

@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-05-05 - Beta 7: custom SF Symbol sidebar icon, error-message UX
+
+**What changed**: Two follow-ups to the Beta 6 release.
+
+(1) Replaced the Beta 6 `SidebarIcon.imageset` (which Finder did not honor for File Provider sidebars) with a real custom SF Symbol, `ImageRelayMark.symbolset`, built from `Image Relay Icon.svg`. Modeled after Apple's reference template (`/Applications/SF Symbols.app/Contents/Resources/badge.checkmark.svg`): viewBox 3300×2200, three Capline/Baseline pairs (S/M/L) with cap height 70.46, weight margins per Apple's defaults. Symbols group contains `Regular-S/M/L` and `Ultralight-S`/`Black-S` so the system can interpolate the missing weights — Xcode 26's asset compiler explicitly rejected a Regular-S-only template with `must have a glyph for Regular weight Medium size`. The IR mark paths are scaled 0.268× and translated so the bounding box runs from cap top to baseline. Replaced `CFBundleIconName: SidebarIcon` with `CFBundleSymbolName: ImageRelayMark` in the extension's Info.plist.
+
+(2) `APIError` now conforms to `LocalizedError`, returning its existing `userMessage` getter as `errorDescription`. Without that conformance, `error.localizedDescription` was rendering as `"The operation couldn't be completed. (ImageRelayKit.APIError error 0.)"` — a fallback message NSError synthesizes for plain `Error` enums, with `0` being the index of the first case (`notAuthenticated`). The Sync Error in the menu bar dropdown now shows the friendly text (e.g. "Your API key is invalid or expired. Check Settings > General.") so a user can act on it without having to read code.
+
+**Verification**: `xcodebuild build` succeeded after the Regular-M/L glyph variants were added; first attempt with Regular-S only failed with the "Regular weight Medium size" error. Beta 7 release pipeline ran clean: Developer ID export, app zip notarization, app stapling, DMG creation, DMG notarization, DMG stapling, `spctl` Notarized Developer ID verification, smoke install over `/Applications/Image Relay.app`, File Provider extension registration confirmed via `pluginkit`. Old smoke-install backups under `~/Applications/Codex Backups/` removed at the user's request.
+
+**Decisions made**: Stuck with the template (monochrome) icon style rather than fall back to a full-color appiconset. The extra work (building a valid SF Symbol from scratch, including margin guides and three weight variants) is the price of the iCloud Drive-style template look that the user asked for. Used Apple's exact y-coordinates for Capline/Baseline guides (625.541/696/1055.54/1126/1485.54/1556) and standard margin x-coordinates so the symbol behaves like a system symbol if the system tries to align margins across variants.
+
+**Left off at**: Beta 7 shipped locally via `--smoke-install`. Sidebar icon and error-message UX both need real-world verification (open Finder, check sidebar; trigger an auth error to confirm friendly message). Push of `0d44fc9..HEAD` to origin/main and GitHub release publish are next when the user is ready.
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-04 - Beta 6: remote deletion propagation, sidebar icon
 
 **What changed**: Two fixes ahead of the Beta 6 build.

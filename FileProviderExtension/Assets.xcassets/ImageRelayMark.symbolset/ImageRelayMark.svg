@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="3300" height="2200" viewBox="0 0 3300 2200">
+ <!--
+   Custom SF Symbol: ImageRelayMark
+   Built from Image Relay Icon.svg (vertical stem + diamond mark).
+   Three weight variants at S size; system synthesizes M/L sizes and missing
+   weights via interpolation against Capline/Baseline guides.
+ -->
+ <style>
+.monochrome-0 {fill:#FFFFFF;opacity:0.0;-sfsymbols-clear-behind:true}
+.monochrome-1 {fill:#000000}
+.multicolor-0:tintColor {fill:#007AFF;opacity:0.0;-sfsymbols-clear-behind:true}
+.multicolor-1:systemBlueColor {fill:#007AFF}
+.hierarchical-0:primary {fill:#212121;opacity:0.0;-sfsymbols-clear-behind:true}
+.hierarchical-1:primary {fill:#212121}
+ </style>
+ <g id="Notes">
+  <text font-family="LucidaGrande" font-size="13" font-weight="bold" transform="matrix(1 0 0 1 263 322)">Custom Symbol: ImageRelayMark</text>
+  <text font-family="LucidaGrande" font-size="13" transform="matrix(1 0 0 1 263 340)">Generated from Image Relay Icon.svg</text>
+ </g>
+ <g id="Guides">
+  <line id="Capline-S" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="625.541" y2="625.541"/>
+  <line id="Baseline-S" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="696" y2="696"/>
+  <line id="Capline-M" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="1055.54" y2="1055.54"/>
+  <line id="Baseline-M" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="1126" y2="1126"/>
+  <line id="Capline-L" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="1485.54" y2="1485.54"/>
+  <line id="Baseline-L" style="fill:none;stroke:#27AAE1;stroke-width:0.5;" x1="263" x2="3036" y1="1556" y2="1556"/>
+  <line id="left-margin-Ultralight-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="507.128" x2="507.128" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Ultralight-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="612.295" x2="612.295" y1="600.785" y2="720.121"/>
+  <line id="left-margin-Regular-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="1394.4" x2="1394.4" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Regular-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="1505.29" x2="1505.29" y1="600.785" y2="720.121"/>
+  <line id="left-margin-Black-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="2873.15" x2="2873.15" y1="600.785" y2="720.121"/>
+  <line id="right-margin-Black-S" style="fill:none;stroke:#00AEEF;stroke-width:0.5;" x1="2993.65" x2="2993.65" y1="600.785" y2="720.121"/>
+ </g>
+ <g id="Symbols">
+  <g id="Black-S" transform="matrix(1 0 0 1 2873.15 696)">
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 9.86 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 9.86 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+  </g>
+  <g id="Regular-S" transform="matrix(1 0 0 1 1394.4 696)">
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+  </g>
+  <g id="Regular-M" transform="matrix(1 0 0 1 1394.4 1126)">
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+  </g>
+  <g id="Regular-L" transform="matrix(1 0 0 1 1394.4 1556)">
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 5.06 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+  </g>
+  <g id="Ultralight-S" transform="matrix(1 0 0 1 507.128 696)">
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 2.195 -83.6)" fill-rule="evenodd" d="M 101 312 L 156 312 L 156 49 L 101 49 Z"/>
+   <path class="monochrome-1 multicolor-1:systemBlueColor hierarchical-1:primary" transform="matrix(0.268 0 0 0.268 2.195 -83.6)" fill-rule="evenodd" d="M 170.458374 101.458374 L 223 154 L 275.441132 101.558868 L 222.89949 49.017242 Z"/>
+  </g>
+ </g>
+</svg>
