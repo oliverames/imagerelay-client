@@ -66,6 +66,7 @@ struct ImageRelayClientApp: App {
                 }
             }
             .frame(width: 520, height: 420)
+            .environment(domainManager)
         }
     }
 }
