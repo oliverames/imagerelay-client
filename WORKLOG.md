@@ -1,5 +1,23 @@
 # Worklog
 
+## 2026-05-04 - Beta 6: remote deletion propagation, sidebar icon
+
+**What changed**: Two fixes ahead of the Beta 6 build.
+
+(1) Fixed remote deletions not propagating to local Finder. The bug had two interacting causes. First, `Enumerator.fetchItems()` was calling `db.deleteItem(identifier)` inline during deletion detection, which ran on both the `enumerateItems` and `enumerateChanges` paths. Because `enumerateItems` discards the `deletedIdentifiers` return value (per the documented contract — only `enumerateChanges` may report deletions), a Finder background refresh would silently strip the deleted row from the DB before the poller's `enumerateChanges` could see it, so File Provider was never told to remove the file locally. The fix: keep `fetchItems()` purely diagnostic for deletions, and move the `db.deleteItem` call into the `enumerateChanges` block immediately after `observer.didDeleteItems(withIdentifiers:)`. Second, `RemoteChangePoller.folderIDsToSignal()` short-circuited to `config.selectedFolderIDs` when folder filtering was active, signaling only the top-level selected folders and never their subfolders. With the live test config restricted to `Oliver's Stuff` (folder 2907644), files deleted inside any subfolder of that selection were invisible to the poller. The fix: always use `db.folders().map(\.remoteID)`, which returns every folder the extension has ever discovered regardless of selection.
+
+(2) Added a custom Finder sidebar icon. The File Provider extension previously had `CFBundleSymbolName: cloud` but no asset catalog, so Finder fell back to a generic folder icon in the Locations sidebar. Created `FileProviderExtension/Assets.xcassets/SidebarIcon.imageset/` containing the existing `MenuBarIcon.svg` with `template-rendering-intent: template` and `preserves-vector-representation: true`, then replaced `CFBundleSymbolName` with `CFBundleIconName: SidebarIcon` in the extension's Info.plist. The sidebar now shows the brand mark template-tinted by the system, matching the visual pattern of iCloud Drive's cloud.
+
+**Verification**: `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeded with no new warnings after the changes. `xcodegen generate` was run after Project.yml edits so the regenerated `Info.plist` and `project.pbxproj` are committed alongside the source changes.
+
+**Decisions made**: Chose the imageset + `CFBundleIconName` route (template, monochrome) over an `.appiconset` with full-color PNGs. The user explicitly asked for the menu-bar icon style — system-tinted like iCloud Drive — rather than a Google Drive-style branded color icon. The existing menu-bar SVG is already designed as a template at this scale, so it works directly without additional rasterization. If macOS does not pick up an imageset via `CFBundleIconName` for the File Provider sidebar, fallback would be an `.appiconset` referencing the existing `icon_*.png` files from the host app and `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon` in the extension's build settings.
+
+**Left off at**: Beta 6 prep complete, ready for `scripts/build-developer-id-release.sh --version 1.0.0-beta.6 --smoke-install`.
+
+**Open questions**: None carried.
+
+---
+
 ## 2026-05-04 - Beta 5: watchdog poll loop, parallel folder discovery
 
 **What changed**: Two pre-release fixes ahead of the Beta 5 build.
