@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-05 - Beta 11: two-way delete sync and stale File Provider cache recovery
+
+**What changed**: Fixed the sync failures found while testing Beta 10 against the live Image Relay account. The File Provider working-set enumerator now walks the full selected subtree under `Oliver's Stuff` instead of only exposing the selected top-level folder, which lets remote additions and deletions propagate through Finder. Local deletes now call the Image Relay delete endpoint, handle already-deleted remote objects idempotently, and clear folder subtrees from the tracking database. Remote deletes now flow through working-set deletion detection and remove the local placeholder. Metadata versions now include parent identity so Finder notices parent/path changes even when Image Relay timestamps do not change. Added a one-time File Provider domain schema migration that clears stale tracked state and re-registers the domain for existing Beta installs, which fixes the stale nested `Image Relay/Oliver's Stuff` cache from Beta 10. The menu now shows overdue remote checks honestly instead of strings like `Next check 7 minutes ago`.
+
+**Verification**: Live testing stayed isolated to `Oliver's Stuff` (`2907644`). Local test file `Codex-Beta11-LocalDelete-20260505-150557.md` uploaded, then a Finder delete removed Image Relay file `206039019`. Remote test file `Codex-Beta11-RemoteDelete-20260505-150836.md` uploaded as Image Relay file `206041798`, then an Image Relay delete removed the local Finder placeholder. `fileproviderctl check -P -a /Users/oliverames/Library/CloudStorage/ImageRelay-ImageRelay` passed. `swift test --package-path ImageRelayKit` passed 48 tests. `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` succeeded. The Developer ID DMG was notarized, smoke-installed, accepted by Gatekeeper, and published as GitHub prerelease `v1.0.0-beta.11` with SHA-256 `96bf38c424eaa4128e549073cac6c60263e531abc96423ebf64945ed27206fbd`.
+
+**Decisions made**: Chose a domain schema marker plus tracked-state reset for Beta 11 rather than attempting to migrate stale File Provider cache rows in place. The cache had already exposed wrong parentage to Finder, so a clean re-enumeration is safer and easier to reason about than preserving stale identifiers. Kept testing constrained to the selected top-level `Oliver's Stuff` folder per project policy.
+
+**Left off at**: Beta 11 is committed, tagged, pushed, and published. Installed `/Applications/Image Relay.app` is build `11`, and Finder currently shows only the baseline live file in `Oliver's Stuff`.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient if it is still considered exposed. NEW: before leaving beta, do one final polish pass focused on rename/move edge cases, pause/download-disabled behavior, first-launch settings, and Finder refresh behavior immediately after a domain reset.
+
+---
+
 ## 2026-05-05 - Beta 10: Settings crash on open
 
 **What changed**: Clicking Settings… in the menu bar trapped with `Fatal error: No Observable object of type DomainManager found. A View.environmentObject(_:) for DomainManager may be missing as an ancestor of this view.` Cause: `App.swift` injected `domainManager` only into the `MenuBarExtra` scene, not the `Settings` scene. As soon as any Settings tab read `@Environment(DomainManager.self)` (`AdvancedSettingsView`, `GeneralSettingsView`, etc.) the lookup failed and SwiftUI traps. SwiftUI scenes don't share environment values — each scene at the App level needs its own `.environment` modifier. Added `.environment(domainManager)` to the `Settings { TabView { … } }` block.
