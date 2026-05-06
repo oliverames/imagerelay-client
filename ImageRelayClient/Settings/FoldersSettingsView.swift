@@ -1,7 +1,9 @@
+@preconcurrency import FileProvider
 import SwiftUI
 import ImageRelayKit
 
 struct FoldersSettingsView: View {
+    @Environment(DomainManager.self) private var domainManager
     @State private var folders: [TrackedItem] = []
     @State private var selectedFolderIDs: Set<Int> = []
     @State private var loadError: String?
@@ -60,9 +62,11 @@ struct FoldersSettingsView: View {
         guard let container else { return }
         do {
             let db = try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
-            folders = try db.folders()
+            folders = try db.folders(parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue)
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
             selectedFolderIDs = Set(config.selectedFolderIDs)
+            loadError = nil
         } catch {
             loadError = error.localizedDescription
         }
@@ -70,9 +74,15 @@ struct FoldersSettingsView: View {
 
     private func saveSelection() {
         guard let container else { return }
-        var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-        config.selectedFolderIDs = Array(selectedFolderIDs).sorted()
-        try? config.save(to: AppConfiguration.fileURL(in: container))
+        do {
+            var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+            config.selectedFolderIDs = Array(selectedFolderIDs).sorted()
+            try config.save(to: AppConfiguration.fileURL(in: container))
+            loadError = nil
+            Task { await domainManager.signalSync() }
+        } catch {
+            loadError = error.localizedDescription
+        }
     }
 
     private func selectionBinding(for folder: TrackedItem) -> Binding<Bool> {
