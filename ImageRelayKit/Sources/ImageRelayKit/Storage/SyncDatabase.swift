@@ -152,11 +152,14 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    public func folders() throws -> [TrackedItem] {
+    public func folders(parentIdentifier: String? = nil) throws -> [TrackedItem] {
         try writer.read { db in
-            try TrackedItem
+            var request = TrackedItem
                 .filter(Column("itemType") == TrackedItemType.folder.rawValue)
-                .fetchAll(db)
+            if let parentIdentifier {
+                request = request.filter(Column("parentIdentifier") == parentIdentifier)
+            }
+            return try request.fetchAll(db)
         }
     }
 

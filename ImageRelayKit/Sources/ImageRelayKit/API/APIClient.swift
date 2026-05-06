@@ -120,6 +120,11 @@ public actor APIClient {
         pathBuilder: @Sendable (Int) -> String,
         chunkSize: Int = 5 * 1024 * 1024
     ) async throws -> Int {
+        guard !fileData.isEmpty else {
+            try await upload(data: Data(), to: pathBuilder(1))
+            return 1
+        }
+
         var chunkNumber = 0
         var offset = 0
 
@@ -142,6 +147,11 @@ public actor APIClient {
         chunkSize: Int = 5 * 1024 * 1024,
         responseType: T.Type
     ) async throws -> (chunkCount: Int, lastResponse: T?) {
+        guard !fileData.isEmpty else {
+            let response: T = try await upload(data: Data(), to: pathBuilder(1))
+            return (1, response)
+        }
+
         var chunkNumber = 0
         var offset = 0
         var lastResponse: T?

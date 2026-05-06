@@ -25,6 +25,10 @@ final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+private struct ChunkAck: Decodable, Sendable {
+    let ok: Bool
+}
+
 @Suite("APIClient", .serialized)
 struct APIClientTests {
     let baseURL = URL(string: "https://api.test.imagerelay.com/api/v2")!
@@ -55,6 +59,31 @@ struct APIClientTests {
 
         let client = makeClient()
         let _: [RemoteFolder] = try await client.get("/folders.json")
+    }
+
+    @Test("Chunked upload sends one empty chunk for zero-byte files")
+    func uploadChunkedZeroByteFile() async throws {
+        var requestedPaths: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            requestedPaths.append(request.url?.path ?? "")
+            #expect(request.httpBody?.isEmpty ?? true)
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, #"{"ok":true}"#.data(using: .utf8)!)
+        }
+
+        let client = makeClient()
+        let result = try await client.uploadChunked(
+            fileData: Data(),
+            pathBuilder: { "/upload_jobs/1/files/2/chunks/\($0)" },
+            responseType: ChunkAck.self
+        )
+
+        #expect(result.chunkCount == 1)
+        #expect(result.lastResponse?.ok == true)
+        #expect(requestedPaths == ["/api/v2/upload_jobs/1/files/2/chunks/1"])
     }
 
     @Test("Follows Link header pagination")

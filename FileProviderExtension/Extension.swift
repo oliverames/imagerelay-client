@@ -207,7 +207,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                let parentFolderID = self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
+                let parentFolderID = try self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
                 self.beginOperation()
                 defer { self.incrementProgress() }
@@ -361,24 +361,25 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         // Upload local edits as a conflict copy so neither version is lost.
                         // If the upload fails, surface the error — do NOT tell the OS the
                         // operation succeeded while silently discarding the user's edits.
-                        if let fileTypeID = config.defaultFileTypeID {
-                            let parentFolderID = self.resolveParentFolderID(item.parentItemIdentifier)
-                            let fileData = try Data(contentsOf: contentURL)
-                            let jobRequest = UploadJobRequest(
-                                folder_id: parentFolderID,
-                                file_type_id: fileTypeID,
-                                files: [.init(name: conflictName, size: fileData.count)]
-                            )
-                            let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
-                            guard let uploadFileID = job.files?.first?.id else {
-                                throw ExtensionError.uploadJobMissingFileID
-                            }
-                            try await api.uploadChunked(
-                                fileData: fileData,
-                                pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
-                                chunkSize: 5 * 1024 * 1024
-                            )
+                        guard let fileTypeID = config.defaultFileTypeID else {
+                            throw ExtensionError.missingDefaultFileTypeID
                         }
+                        let parentFolderID = try self.resolveParentFolderID(item.parentItemIdentifier)
+                        let fileData = try Data(contentsOf: contentURL)
+                        let jobRequest = UploadJobRequest(
+                            folder_id: parentFolderID,
+                            file_type_id: fileTypeID,
+                            files: [.init(name: conflictName, size: fileData.count)]
+                        )
+                        let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
+                        guard let uploadFileID = job.files?.first?.id else {
+                            throw ExtensionError.uploadJobMissingFileID
+                        }
+                        try await api.uploadChunked(
+                            fileData: fileData,
+                            pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
+                            chunkSize: 5 * 1024 * 1024
+                        )
 
                         // Tell the OS to re-fetch the remote canonical version.
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
@@ -390,7 +391,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 // Folder move across parents: emulated as create → move children → delete original.
                 // We record the in-progress state so a crash can be detected on next init.
                 if changedFields.contains(.parentItemIdentifier) && !itemID.isFile {
-                    let newParentID = self.resolveParentFolderID(item.parentItemIdentifier)
+                    let newParentID = try self.resolveParentFolderID(item.parentItemIdentifier)
                     self.updateProgress(state: .syncing, phase: "Moving folder", currentItem: tracked.name)
 
                     let createRequest = CreateFolderRequest(name: tracked.name, parent_id: newParentID)
@@ -483,7 +484,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if changedFields.contains(.parentItemIdentifier), itemID.isFile {
-                    let newParentID = self.resolveParentFolderID(item.parentItemIdentifier)
+                    let newParentID = try self.resolveParentFolderID(item.parentItemIdentifier)
                     try await api.post(
                         "/files/\(remoteID)/move.json",
                         body: MoveRequest(folder_ids: [String(newParentID)])
@@ -642,7 +643,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                   let childRemoteID = childItemID.numericID else { continue }
 
             if child.itemType == .file {
-                try? await api.post(
+                try await api.post(
                     "/files/\(childRemoteID)/move.json",
                     body: MoveRequest(folder_ids: [String(newFolderID)])
                 )
@@ -661,7 +662,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     api: api
                 )
 
-                try? await api.delete("/folders/\(childRemoteID).json")
+                try await api.delete("/folders/\(childRemoteID).json")
                 try db.deleteItem(child.identifier)
 
                 let newSubfolder = TrackedItem(
@@ -684,11 +685,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         }
     }
 
-    private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) -> Int {
+    private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) throws -> Int {
         if identifier == .rootContainer || identifier == .workingSet {
-            return config.remoteRootFolderID ?? 0
+            guard let remoteRootFolderID = config.remoteRootFolderID else {
+                throw ExtensionError.missingRootFolderID
+            }
+            return remoteRootFolderID
         }
-        return ItemIdentifier(rawValue: identifier.rawValue)?.numericID ?? 0
+        guard let folderID = ItemIdentifier(rawValue: identifier.rawValue)?.numericID else {
+            throw ExtensionError.invalidParentIdentifier(identifier.rawValue)
+        }
+        return folderID
     }
 
     private func updateProgress(
@@ -765,6 +772,8 @@ private struct MoveRequest: Encodable, Sendable {
 
 private enum ExtensionError: LocalizedError {
     case missingDefaultFileTypeID
+    case missingRootFolderID
+    case invalidParentIdentifier(String)
     case uploadJobMissingFileID
     case fileRenameUnsupported
 
@@ -772,6 +781,10 @@ private enum ExtensionError: LocalizedError {
         switch self {
         case .missingDefaultFileTypeID:
             return "Set a Default File Type ID in Settings before uploading new files."
+        case .missingRootFolderID:
+            return "Set a Root Folder ID in Settings before changing files."
+        case .invalidParentIdentifier(let identifier):
+            return "Could not resolve the Image Relay folder for parent identifier \(identifier)."
         case .uploadJobMissingFileID:
             return "Image Relay did not return an upload file ID for the new file."
         case .fileRenameUnsupported:

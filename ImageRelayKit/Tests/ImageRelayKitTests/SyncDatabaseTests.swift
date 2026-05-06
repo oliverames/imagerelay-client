@@ -60,6 +60,28 @@ struct SyncDatabaseTests {
         #expect(children.count == 2)
     }
 
+    @Test("List folders can be limited to one parent")
+    func listFoldersForParent() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-10", parentIdentifier: "root",
+            remoteID: 10, itemType: .folder, name: "Top Level",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-11", parentIdentifier: "folder-10",
+            remoteID: 11, itemType: .folder, name: "Nested",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        let rootFolders = try db.folders(parentIdentifier: "root")
+        #expect(rootFolders.map(\.remoteID) == [10])
+
+        let allFolders = try db.folders()
+        #expect(Set(allFolders.map(\.remoteID)) == [10, 11])
+    }
+
     @Test("Delete item by identifier")
     func deleteItem() throws {
         let db = try makeDB()

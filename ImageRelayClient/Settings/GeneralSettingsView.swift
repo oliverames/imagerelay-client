@@ -3,6 +3,7 @@ import ServiceManagement
 import ImageRelayKit
 
 struct GeneralSettingsView: View {
+    @Environment(DomainManager.self) private var domainManager
     @State private var apiKey = ""
     @State private var remoteRootFolderID = ""
     @State private var defaultFileTypeID = ""
@@ -124,6 +125,10 @@ struct GeneralSettingsView: View {
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
             saveError = nil
+            domainManager.refreshStatus()
+            if config.isConfigured {
+                Task { await domainManager.bootstrap() }
+            }
         } catch {
             saveError = error.localizedDescription
         }
