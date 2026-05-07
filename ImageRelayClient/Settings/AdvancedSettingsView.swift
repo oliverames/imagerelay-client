@@ -84,7 +84,7 @@ struct AdvancedSettingsView: View {
             } header: {
                 Text("Diagnostics")
             } footer: {
-                Text("Exports sanitized configuration, recent activity, sync state, domain status, and recent Image Relay logs without API keys.")
+                Text("Exports sanitized configuration, app and system info, recent activity, sync state, domain status, crash-report summaries, and recent Image Relay logs without API keys.")
                     .font(.caption)
             }
 

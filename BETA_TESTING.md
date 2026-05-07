@@ -9,6 +9,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Launch ImageRelay Client from Applications.
 - Confirm the menu bar icon appears.
 - Open the menu bar item and confirm Settings opens.
+- Confirm Check for Updates is present in the menu bar item.
 - Confirm the Advanced tab shows Reset Finder Sync and Export Diagnostics.
 
 ## Credential Entry
@@ -49,6 +50,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - In Finder, create or copy a small test file into the selected synced folder.
 - Confirm the menu bar activity records an upload.
 - Confirm the file appears in Image Relay in the expected folder.
+- Repeat with an empty text file and confirm it appears remotely as 0 bytes.
 - Rename or remove the test file in Image Relay after testing if it is only a probe.
 
 ## Pause And Resume
@@ -81,7 +83,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Rename a local folder and confirm the folder rename reaches Image Relay.
 - Attempt to rename a local file and confirm the app reports or handles the unsupported operation cleanly.
 - Move a local file between synced folders and confirm Image Relay reflects the move.
-- Move a local folder only with expendable test data and confirm children remain intact.
+- Attempt to move a local folder and confirm Finder reports the unsupported operation without creating, deleting, or moving remote folders.
 
 ## Bad API Key
 
@@ -103,5 +105,12 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 - Open Settings > Advanced.
 - Click Export Diagnostics and choose a local folder.
-- Confirm the exported folder contains `manifest.json`, `config.json`, `activity.json`, `sync-progress.json`, `domain-status.json`, and `logs.txt`.
+- Confirm the exported folder contains `manifest.json`, `system.json`, `config.json`, `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt`.
 - Confirm `config.json` contains only sanitized configuration and never includes the API key value.
+
+## Release Automation
+
+- Run `scripts/run-release-candidate-checks.sh 1.0.0-beta.14` on a macOS 26 machine with Xcode 26.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14`.
+- Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

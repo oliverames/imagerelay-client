@@ -4,6 +4,7 @@ import ImageRelayKit
 
 struct MenuBarView: View {
     @Environment(DomainManager.self) private var domainManager
+    @Environment(UpdateController.self) private var updateController
     @Environment(\.openSettings) private var openSettings
     @State private var timer: Timer?
 
@@ -39,6 +40,13 @@ struct MenuBarView: View {
                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(!domainManager.isDomainActive || !domainManager.syncDownloadEnabled || domainManager.pauseState.isActive)
+
+            Button {
+                updateController.checkForUpdates()
+            } label: {
+                Label("Check for Updates...", systemImage: "arrow.down.circle")
+            }
+            .disabled(!updateController.canCheckForUpdates)
 
             Divider()
 

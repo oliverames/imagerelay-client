@@ -170,6 +170,20 @@ Other changes: replaced `DomainManager.openDatabase()` (which opened a fresh GRD
 
 ## 2026-04-30 - Developer ID release workflow fixed for Beta 2
 
+## 2026-05-07 - Beta 14 public-release hardening
+
+**What changed**: Added Sparkle update integration with a menu-bar Check for Updates action, GitHub release appcast URL, app public EdDSA key, and sandbox settings required for Sparkle's installer service. The release script now generates `appcast.xml` beside the notarized DMG and reads the Sparkle private key from 1Password. Added repeatable release-candidate and live-sync scripts: `scripts/run-release-candidate-checks.sh` and `scripts/run-live-sync-matrix.sh`.
+
+**Sync safety**: Disabled Finder folder moves for the public beta because Image Relay has no atomic folder-move endpoint. File moves and folder renames remain enabled. Removed the old recursive folder move emulation path from the extension so an interrupted create/copy/delete sequence can no longer damage remote folder contents. The host app's remote signal loop is now a 5-minute watchdog; the extension poller remains the source of truth for the configured poll interval and remote-poll status.
+
+**Upload edge cases**: Added a zero-byte file create workaround after live API testing showed `POST /upload_jobs.json` returns an empty `files` array when the requested file size is 0. The extension now creates an empty file as a one-byte placeholder, immediately replaces it with a zero-byte version, and cleans up the placeholder if the replacement fails. Multi-chunk upload decoding now tolerates intermediate `204` empty responses and keeps the completed upload job from the final chunk.
+
+**Diagnostics and polish**: Diagnostics export now includes `system.json` and `crash-reports.txt`, and `manifest.json` records app version/build and update-feed presence without exposing secrets. General settings now includes a Save and Connect action plus a warning when uploads are enabled but no Default File Type ID is configured.
+
+**Verification target**: Run the full RC script, live matrix against selected folder `2907644` only, signed Developer ID packaging, smoke install, and GitHub prerelease publishing for final Beta 14.
+
+---
+
 **What changed**: Built and verified a clean Developer ID release path outside the repo's iCloud-synced tree. Added `scripts/ensure-developer-id-profiles.py` to create or reuse the explicit App Store Connect bundle IDs for `com.oliverames.imagerelay-client` and `com.oliverames.imagerelay-client.fileprovider`, create `MAC_APP_DIRECT` Developer ID provisioning profiles for both targets, and install those profiles locally. Added `scripts/build-developer-id-release.sh` to run `xcodegen`, archive to `/tmp`, manually export with the correct Developer ID certificate and profile names, notarize and staple the app zip, create a DMG from the stapled app, notarize and staple the DMG, and run `codesign --verify --deep --strict`, `spctl`, and `stapler validate` checks. The script also supports `--smoke-install`, which replaces `/Applications/ImageRelayClient.app` from the notarized DMG and verifies both the host app process and embedded `FileProviderExtension` process launch.
 
 **Verification**: Manual export using the new `MAC_APP_DIRECT` profiles succeeded from `/tmp`, with both the app and File Provider extension signed by `Developer ID Application: Oliver Ames (PV3W52NDZ3)` and embedding the new explicit Developer ID provisioning profiles rather than the previous Xcode-managed `Mac Team Provisioning Profile: *`. The exported app passed `codesign --verify --deep --strict`. The app zip notarization was accepted and stapled, then the DMG notarization was accepted and stapled. The installed `/Applications/ImageRelayClient.app` now passes `spctl -a -vv` as `Notarized Developer ID`, and launching it starts both `/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient` and `/Applications/ImageRelayClient.app/Contents/PlugIns/FileProviderExtension.appex/Contents/MacOS/FileProviderExtension`. The active config remains restricted to selected folder ID `2907644`, which maps to `Oliver's Stuff`.

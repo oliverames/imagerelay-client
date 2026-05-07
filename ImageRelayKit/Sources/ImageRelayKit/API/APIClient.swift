@@ -113,6 +113,23 @@ public actor APIClient {
         return try await execute(request)
     }
 
+    public func uploadIfPresent<T: Decodable & Sendable>(
+        data: Data,
+        to path: String,
+        contentType: String = "application/octet-stream"
+    ) async throws -> T? {
+        var request = try buildRequest(method: "POST", path: path)
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+        let (responseData, _) = try await executeRaw(request)
+        guard !responseData.isEmpty else { return nil }
+        do {
+            return try JSONDecoder.imageRelay.decode(T.self, from: responseData)
+        } catch {
+            throw APIError.decodingError(underlying: error)
+        }
+    }
+
     /// Upload data in chunks, returning the number of chunks uploaded.
     @discardableResult
     public func uploadChunked(
@@ -148,7 +165,7 @@ public actor APIClient {
         responseType: T.Type
     ) async throws -> (chunkCount: Int, lastResponse: T?) {
         guard !fileData.isEmpty else {
-            let response: T = try await upload(data: Data(), to: pathBuilder(1))
+            let response: T? = try await uploadIfPresent(data: Data(), to: pathBuilder(1))
             return (1, response)
         }
 
@@ -160,7 +177,9 @@ public actor APIClient {
             chunkNumber += 1
             let end = min(offset + chunkSize, fileData.count)
             let chunk = fileData[offset..<end]
-            lastResponse = try await upload(data: Data(chunk), to: pathBuilder(chunkNumber))
+            if let response: T = try await uploadIfPresent(data: Data(chunk), to: pathBuilder(chunkNumber)) {
+                lastResponse = response
+            }
             offset = end
         }
 

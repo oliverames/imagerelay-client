@@ -9,6 +9,9 @@ options:
 packages:
   ImageRelayKit:
     path: ImageRelayKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.9.1"
 
 settings:
   base:
@@ -16,7 +19,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     DEVELOPMENT_TEAM: PV3W52NDZ3
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "13"
+    CURRENT_PROJECT_VERSION: "14"
     ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
@@ -41,6 +44,8 @@ targets:
       - path: ImageRelayClient
     dependencies:
       - package: ImageRelayKit
+      - package: Sparkle
+        product: Sparkle
       - target: FileProviderExtension
         embed: true
         codeSign: false
@@ -50,6 +55,9 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-write: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         com.apple.security.application-groups:
           - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
         keychain-access-groups:
@@ -58,13 +66,8 @@ targets:
       base:
         PRODUCT_NAME: "Image Relay"
         PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleShortVersionString: $(MARKETING_VERSION)
-        INFOPLIST_KEY_CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
-        INFOPLIST_KEY_LSUIElement: true
-        INFOPLIST_KEY_CFBundleDisplayName: "Image Relay"
-        INFOPLIST_KEY_CFBundleName: "Image Relay"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ImageRelayClient/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Release:

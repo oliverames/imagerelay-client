@@ -4,6 +4,13 @@ import Foundation
 import ImageRelayKit
 
 enum DiagnosticsExporter {
+    static func defaultCommandLineDestination() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ImageRelayDiagnostics", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
     @MainActor
     static func export(to destinationDirectory: URL, domainManager: DomainManager) async throws -> URL {
         let exportDirectory = destinationDirectory.appendingPathComponent(directoryName(), isDirectory: true)
@@ -12,9 +19,11 @@ enum DiagnosticsExporter {
         let container = AppConfiguration.containerURL()
 
         try writeManifest(to: exportDirectory, container: container, domainManager: domainManager)
+        try writeSystemInfo(to: exportDirectory)
         try writeConfiguration(to: exportDirectory, container: container)
         try writeDatabaseState(to: exportDirectory, container: container)
         try writeDomainStatus(to: exportDirectory, domainManager: domainManager)
+        try writeCrashReportSummary(to: exportDirectory)
         try await writeRecentLogs(to: exportDirectory)
 
         return exportDirectory
@@ -29,9 +38,25 @@ enum DiagnosticsExporter {
             domainDisplayName: DomainManager.domainDisplayName,
             appContainerPath: container?.path,
             isDomainActive: domainManager.isDomainActive,
-            lastError: domainManager.lastError
+            lastError: domainManager.lastError,
+            appVersion: bundleString("CFBundleShortVersionString"),
+            buildVersion: bundleString("CFBundleVersion"),
+            updateFeedURL: bundleString("SUFeedURL"),
+            hasSparklePublicKey: bundleString("SUPublicEDKey")?.isEmpty == false
         )
         try writeJSON(manifest, to: directory.appendingPathComponent("manifest.json"))
+    }
+
+    private static func writeSystemInfo(to directory: URL) throws {
+        let info = SystemInfo(
+            operatingSystemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            appBundleIdentifier: Bundle.main.bundleIdentifier,
+            appBundlePath: Bundle.main.bundlePath,
+            appExecutablePath: Bundle.main.executablePath,
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser.path,
+            installedAppExists: FileManager.default.fileExists(atPath: "/Applications/Image Relay.app")
+        )
+        try writeJSON(info, to: directory.appendingPathComponent("system.json"))
     }
 
     private static func writeConfiguration(to directory: URL, container: URL?) throws {
@@ -89,6 +114,54 @@ enum DiagnosticsExporter {
     private static func writeRecentLogs(to directory: URL) async throws {
         let result = await runLogShow()
         try writeText(result, to: directory.appendingPathComponent("logs.txt"))
+    }
+
+    private static func writeCrashReportSummary(to directory: URL) throws {
+        let diagnosticReportsURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
+        let outputURL = directory.appendingPathComponent("crash-reports.txt")
+        let nameFragments = ["Image Relay", "ImageRelayClient", "FileProviderExtension"]
+
+        do {
+            let urls = try FileManager.default.contentsOfDirectory(
+                at: diagnosticReportsURL,
+                includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                options: [.skipsHiddenFiles]
+            )
+
+            let candidates = urls
+                .filter { url in
+                    let name = url.lastPathComponent
+                    return nameFragments.contains { name.localizedCaseInsensitiveContains($0) }
+                }
+                .sorted { lhs, rhs in
+                    let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                    return lhsDate > rhsDate
+                }
+                .prefix(10)
+
+            guard !candidates.isEmpty else {
+                try writeText("No Image Relay crash reports found.\n", to: outputURL)
+                return
+            }
+
+            let formatter = ISO8601DateFormatter()
+            var lines = ["Recent Image Relay crash reports:"]
+            for url in candidates {
+                let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+                let date = values?.contentModificationDate.map { formatter.string(from: $0) } ?? "unknown-date"
+                let size = values?.fileSize.map(String.init) ?? "unknown-size"
+                lines.append("- \(date) \(url.lastPathComponent) (\(size) bytes)")
+            }
+            lines.append("")
+            try writeText(lines.joined(separator: "\n"), to: outputURL)
+        } catch {
+            try writeText(
+                "Unable to read crash reports at \(diagnosticReportsURL.path): \(error.localizedDescription)\n",
+                to: outputURL
+            )
+        }
     }
 
     private static func runLogShow() async -> String {
@@ -153,6 +226,10 @@ enum DiagnosticsExporter {
     private static func directoryName() -> String {
         "ImageRelay-Diagnostics-\(directoryNameFormatter.string(from: Date()))"
     }
+
+    private static func bundleString(_ key: String) -> String? {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String
+    }
 }
 
 private struct DiagnosticsManifest: Encodable {
@@ -163,6 +240,19 @@ private struct DiagnosticsManifest: Encodable {
     let appContainerPath: String?
     let isDomainActive: Bool
     let lastError: String?
+    let appVersion: String?
+    let buildVersion: String?
+    let updateFeedURL: String?
+    let hasSparklePublicKey: Bool
+}
+
+private struct SystemInfo: Encodable {
+    let operatingSystemVersion: String
+    let appBundleIdentifier: String?
+    let appBundlePath: String
+    let appExecutablePath: String?
+    let homeDirectory: String
+    let installedAppExists: Bool
 }
 
 private struct SanitizedConfiguration: Encodable {

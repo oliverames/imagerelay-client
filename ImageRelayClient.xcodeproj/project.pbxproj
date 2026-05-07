@@ -9,9 +9,11 @@
 /* Begin PBXBuildFile section */
 		1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
 		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
+		1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */; };
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
 		38408F6DD2EFE27C384909D4 /* DiagnosticsExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */; };
+		5E176CE222C64F1164385243 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 70F34D5A8C76987F13E836E2 /* Sparkle */; };
 		6133A31DE66194B43990F655 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8DC1E00B04FE23A41E220AAF /* Assets.xcassets */; };
 		8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		905391112B24E21A2D3B994B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
@@ -54,6 +56,7 @@
 /* Begin PBXFileReference section */
 		10E8B32366DC8A4264C5216C /* ImageRelayClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ImageRelayClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1907D94A32A3AE0968238BFE /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
+		1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
 		413441CD471A316A1D63A161 /* FileProviderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FileProviderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteChangePoller.swift; sourceTree = "<group>"; };
@@ -63,6 +66,7 @@
 		6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		6B768EB375011997B202B6FF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
+		7C160FB06088707BA4C4992A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8474CE4312626B6DF40DEB47 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		8DC1E00B04FE23A41E220AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtension.entitlements; sourceTree = "<group>"; };
@@ -81,6 +85,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */,
+				5E176CE222C64F1164385243 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,7 +153,9 @@
 				D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */,
 				66E79A8CCDC204940416820E /* DomainManager.swift */,
 				D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */,
+				7C160FB06088707BA4C4992A /* Info.plist */,
 				8474CE4312626B6DF40DEB47 /* MenuBarView.swift */,
+				1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */,
 			);
 			path = ImageRelayClient;
 			sourceTree = "<group>";
@@ -202,6 +209,7 @@
 			name = ImageRelayClient;
 			packageProductDependencies = (
 				9EC291125448216A6C5FE8C2 /* ImageRelayKit */,
+				70F34D5A8C76987F13E836E2 /* Sparkle */,
 			);
 			productName = ImageRelayClient;
 			productReference = 10E8B32366DC8A4264C5216C /* ImageRelayClient.app */;
@@ -234,6 +242,7 @@
 			mainGroup = AA5C8E04043665C3E3F0251C;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				AA55A8F4871F53667E7C8EB9 /* XCLocalSwiftPackageReference "ImageRelayKit" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -291,6 +300,7 @@
 				9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */,
 				D9C9F0316A42E9720EF939C9 /* GeneralSettingsView.swift in Sources */,
 				13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */,
+				1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -339,7 +349,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -394,13 +404,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ImageRelayClient/ImageRelayClient.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Image Relay";
-				INFOPLIST_KEY_CFBundleName = "Image Relay";
-				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
-				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ImageRelayClient/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -445,7 +450,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -498,13 +503,8 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Image Relay";
-				INFOPLIST_KEY_CFBundleName = "Image Relay";
-				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
-				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
-				INFOPLIST_KEY_LSUIElement = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ImageRelayClient/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -555,10 +555,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		6B484F18C4C86D49798D03D6 /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
+		};
+		70F34D5A8C76987F13E836E2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 		9EC291125448216A6C5FE8C2 /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;

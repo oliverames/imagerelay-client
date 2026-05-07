@@ -8,6 +8,7 @@ struct GeneralSettingsView: View {
     @State private var remoteRootFolderID = ""
     @State private var defaultFileTypeID = ""
     @State private var launchAtLogin = false
+    @State private var syncUpload = true
     @State private var saveError: String?
     @State private var containerAvailable = true
 
@@ -24,6 +25,10 @@ struct GeneralSettingsView: View {
 
     private var hasValidationError: Bool {
         !rootFolderIDValid || !defaultFileTypeIDValid
+    }
+
+    private var uploadNeedsDefaultFileType: Bool {
+        syncUpload && !apiKey.isEmpty && !remoteRootFolderID.isEmpty && defaultFileTypeID.isEmpty
     }
 
     var body: some View {
@@ -72,6 +77,13 @@ struct GeneralSettingsView: View {
                             .foregroundStyle(.red)
                     }
                 }
+
+                Button {
+                    saveConfig()
+                } label: {
+                    Label("Save and Connect", systemImage: "checkmark.circle")
+                }
+                .disabled(hasValidationError)
             } header: {
                 Text("API Credentials")
             } footer: {
@@ -79,6 +91,10 @@ struct GeneralSettingsView: View {
                     Text("Your API key is in Image Relay under Account Settings → API.")
                     Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**.")
                     Text("Default File Type ID is required for uploading new files.")
+                    if uploadNeedsDefaultFileType {
+                        Label("Uploads are enabled, so new Finder files will fail until a Default File Type ID is set.", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
                 }
                 .font(.caption)
             }
@@ -113,6 +129,7 @@ struct GeneralSettingsView: View {
         apiKey = config.apiKey
         remoteRootFolderID = config.remoteRootFolderID.map(String.init) ?? ""
         defaultFileTypeID = config.defaultFileTypeID.map(String.init) ?? ""
+        syncUpload = config.syncUpload
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

@@ -11,6 +11,7 @@ final class DomainManager {
     static let domainDisplayName = "Image Relay"
     private static let fileProviderDomainSchemaVersion = 2
     private static let domainSchemaVersionFilename = "file-provider-domain-schema-version"
+    private static let hostWatchdogIntervalSeconds = 300
 
     var isDomainActive = false
     var lastError: String?
@@ -202,9 +203,8 @@ final class DomainManager {
 
     private func remotePollLoop() async {
         while !Task.isCancelled {
-            let sleepSeconds = max(loadConfiguration().pollIntervalSeconds, 15)
             do {
-                try await Task.sleep(for: .seconds(sleepSeconds))
+                try await Task.sleep(for: .seconds(Self.hostWatchdogIntervalSeconds))
             } catch {
                 return
             }
@@ -215,10 +215,8 @@ final class DomainManager {
 
             do {
                 try await signalEnumerators(config: config)
-                markRemotePollSucceeded(config: config)
             } catch {
-                logger.warning("Remote poll signal failed: \(error.localizedDescription, privacy: .public)")
-                markRemotePollFailed(error)
+                logger.debug("Remote watchdog signal failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

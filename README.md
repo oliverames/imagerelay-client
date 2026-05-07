@@ -60,20 +60,21 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 - **Conflict preservation** — if a file changes remotely while you're editing locally, your version is uploaded as a conflict copy and the remote version takes the canonical slot; nothing is silently discarded
 - **Pause controls** — pause sync for 30 minutes, 1 hour, until tomorrow, or indefinitely from the menu bar
 - **Live status** — menu bar shows sync state, recent activity, and the next scheduled remote check
-- **Diagnostics export** — export a sanitized bundle (config, activity log, domain status, recent logs) from Settings → Advanced for support or debugging
+- **Update checks** — Sparkle-backed Check for Updates action from the menu bar
+- **Diagnostics export** — export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings → Advanced for support or debugging
 - **Domain reset** — Settings → Advanced → Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
 
 ## How Sync Works
 
 **Downloads** -- When you open a file in Finder, the OS delegates to the extension. It creates a temporary quick link, downloads the file, and hands the local copy back so it opens in the expected app with no manual steps.
 
-**Uploads** -- When you save a new file into the synced Finder location, the extension creates an upload job, sends the file in 5 MB chunks, polls for job completion, and stores the resulting asset ID.
+**Uploads** -- When you save a new file into the synced Finder location, the extension creates an upload job, sends the file in 5 MB chunks, polls for job completion, and stores the resulting asset ID. Image Relay does not return upload file IDs for zero-byte create jobs, so empty files are created as a one-byte placeholder and immediately replaced with a zero-byte version.
 
 **New versions** -- When you modify an existing file, File Provider calls the extension with the local copy. The extension requests a version UUID from Image Relay, uploads the new content in chunks, finalizes the version, and immediately signals affected enumerators so Finder refreshes without waiting for the next remote poll.
 
-**Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API.
+**Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API. Folder moves are blocked in Finder for this beta because the API has no atomic folder-move endpoint.
 
-**Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current selected subtree, diffs it against the local database, and surfaces additions, changes, and deletions to Finder. The host app can also signal enumerators on the configured interval as a safety net after system sleep or extension restarts.
+**Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current selected subtree, diffs it against the local database, and surfaces additions, changes, and deletions to Finder. The host app also signals enumerators every 5 minutes as a quiet watchdog after system sleep or extension restarts.
 
 **Conflict detection** -- On every modify, the extension compares the content version the OS provides against the version in the local database. If they differ, the local edit is uploaded as a conflict copy and the remote version is fetched.
 
@@ -98,11 +99,11 @@ Two hidden launch arguments are available for troubleshooting:
 # Re-register the File Provider domain from the command line
 open -a "Image Relay" --args --reset-file-provider-domain
 
-# Export a sanitized diagnostics bundle to ~/Desktop/ir-diagnostics
-open -a "Image Relay" --args --export-diagnostics ~/Desktop/ir-diagnostics
+# Export a sanitized diagnostics bundle and print the generated path
+open -a "Image Relay" --args --export-diagnostics
 ```
 
-`--export-diagnostics` writes `manifest.json`, `config.json` (API key redacted), `activity.json`, `sync-progress.json`, `domain-status.json`, and `logs.txt` to the specified directory, then exits.
+`--export-diagnostics` writes `manifest.json`, `system.json`, `config.json` (API key redacted), `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt` to the app sandbox temporary directory, then exits. The Settings UI still lets you choose a destination folder through the standard security-scoped folder picker.
 
 ## Architecture
 
@@ -153,13 +154,20 @@ xcodebuild test \
 # SwiftPM-only fallback for ImageRelayKit
 swift test --package-path ImageRelayKit
 
+# Run the release-candidate validation set
+scripts/run-release-candidate-checks.sh 1.0.0-beta.14
+
+# Optional live account smoke matrix, scoped to Oliver's Stuff by default
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14
+
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.0.0-beta.13 --smoke-install
+scripts/build-developer-id-release.sh --version 1.0.0-beta.14 --smoke-install
 ```
 
 ## Known Limitations
 
 - **File renames** are not supported — the Image Relay API does not expose a rename endpoint for files.
+- **Folder moves** are blocked in Finder for this beta — moving a folder would require a non-atomic create/copy/delete sequence against the API.
 - **Remote change detection** is polling-based — the API does not expose a webhook or cursor-based push feed.
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 

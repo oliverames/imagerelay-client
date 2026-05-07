@@ -5,7 +5,9 @@ extension Error {
     /// Maps an underlying error (typically an `APIError`) to the closest
     /// `NSFileProviderError` so Finder can present an appropriate state.
     var asFileProviderError: Error {
-        guard let apiError = self as? APIError else { return self }
+        guard let apiError = self as? APIError else {
+            return NSFileProviderError(.cannotSynchronize)
+        }
         switch apiError {
         case .notAuthenticated:
             return NSFileProviderError(.notAuthenticated)

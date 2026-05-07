@@ -86,6 +86,36 @@ struct APIClientTests {
         #expect(requestedPaths == ["/api/v2/upload_jobs/1/files/2/chunks/1"])
     }
 
+    @Test("Chunked upload skips empty intermediate responses")
+    func uploadChunkedSkipsEmptyIntermediateResponses() async throws {
+        var requestedPaths: [String] = []
+        MockURLProtocol.requestHandler = { request in
+            requestedPaths.append(request.url?.path ?? "")
+            let statusCode = requestedPaths.count == 1 ? 204 : 201
+            let data = requestedPaths.count == 1 ? Data() : #"{"ok":true}"#.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: statusCode,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, data)
+        }
+
+        let client = makeClient()
+        let result = try await client.uploadChunked(
+            fileData: Data(repeating: 1, count: 6),
+            pathBuilder: { "/upload_jobs/1/files/2/chunks/\($0)" },
+            chunkSize: 5,
+            responseType: ChunkAck.self
+        )
+
+        #expect(result.chunkCount == 2)
+        #expect(result.lastResponse?.ok == true)
+        #expect(requestedPaths == [
+            "/api/v2/upload_jobs/1/files/2/chunks/1",
+            "/api/v2/upload_jobs/1/files/2/chunks/2"
+        ])
+    }
+
     @Test("Follows Link header pagination")
     func getAllPagesLinkPagination() async throws {
         var requestCount = 0
