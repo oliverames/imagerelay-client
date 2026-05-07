@@ -100,12 +100,13 @@ ensure_python_deps() {
   if python3 - <<'PY' >/dev/null 2>&1
 import certifi
 import jwt
+from cryptography.hazmat.backends.openssl.backend import backend
 PY
   then
     :
   else
-    echo "Python release dependencies not found; installing them into temporary release staging..."
-    python3 -m pip install --quiet --target "$PYTHON_DEPS_DIR" PyJWT certifi
+    echo "Python release dependencies not usable; installing isolated copies into temporary release staging..."
+    python3 -m pip install --quiet --target "$PYTHON_DEPS_DIR" PyJWT certifi cryptography
     export PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}"
   fi
 

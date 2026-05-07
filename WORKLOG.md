@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-07 - Beta 13: immediate local mutation refresh
+
+**What changed**: Local File Provider mutations now signal affected enumerators immediately after successful API writes. Creates, version uploads, conflict-copy uploads, folder moves, metadata changes, and deletes all notify the working set, root container, and affected parent folder containers without waiting for the next remote polling window. The upload itself was already immediate through `createItem` and `modifyItem`; this beta tightens the post-upload Finder refresh path. Bumped build number to `13`, updated README release docs, and hardened the Developer ID release script so it installs isolated Python release dependencies when the system `cryptography` package is importable but unusable.
+
+**Verification**: `git diff --check` passed. `swift test --package-path ImageRelayKit` passed 50 tests. `xcodebuild test -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` passed 50 tests. Unsigned compile check with `CODE_SIGNING_ALLOWED=NO` passed for the host app and File Provider extension. `scripts/build-developer-id-release.sh --version 1.0.0-beta.13 --smoke-install` archived, exported, notarized and stapled the app and DMG, installed over `/Applications/Image Relay.app`, passed Gatekeeper validation, and confirmed the File Provider extension via `pluginkit`. Live sync test stayed inside `Oliver's Stuff` (`2907644`): local file `Codex-Beta13-ImmediateSync-20260507-123801.txt` uploaded as Image Relay file `206441993`, logged `Signaled immediate local sync after created file`, then local delete removed it remotely and logged `Signaled immediate local sync after deleted item`. Cleanup verified no matching local or remote test file remained. DMG SHA-256: `98188e8dd11475e7b354ae11ece351c2679b2ac08e3345ecc1744cc8b2f3e474`.
+
+**Decisions made**: Did not add a separate filesystem watcher. Apple's replicated File Provider model already calls the extension for local creates, modifications, moves, and deletes, and adding an external watcher would risk duplicate or out-of-order API writes. The safer path is to keep File Provider as the local-change source of truth and make successful local API mutations resignal immediately.
+
+**Left off at**: Beta 13 artifacts are ready in `build/releases/1.0.0-beta.13`, and `/Applications/Image Relay.app` is installed from the notarized Beta 13 DMG.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient if it is still considered exposed. Continue exercising rename, move, and conflict behavior against the selected `Oliver's Stuff` folder before leaving beta.
+
+---
+
 ## 2026-05-05 - Beta 12: release readiness review and testable beta pipeline
 
 **What changed**: Completed a release-readiness pass focused on correctness risks found in first-run setup, folder filtering, uploads, and move/conflict paths. General Settings now refreshes File Provider status and bootstraps the domain after saving a valid configuration, so a fresh install does not depend on relaunching before the domain appears. Folder Settings now lists only root-level folders, surfaces save failures, and signals File Provider immediately after selection changes. Zero-byte uploads now send the required empty upload chunk for both new files and versions instead of reporting a completed chunk count without uploading data. File Provider parent resolution now fails loudly when configuration is missing or identifiers are invalid, conflict copy uploads require an explicit default file type, and folder move child operations no longer suppress remote move/delete errors. Added the missing Xcode shared test scheme for `ImageRelayClient`, bumped build number to `12`, regenerated the Xcode project, and updated README build/release commands for the current test suite and Beta 12 release flow.

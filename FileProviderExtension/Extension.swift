@@ -238,6 +238,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                     let item = FileProviderItem(trackedItem: tracked)
                     handler.value(item, [], false, nil)
+                    self.signalLocalMutation(
+                        affectedContainerIdentifiers: [itemTemplate.parentItemIdentifier],
+                        reason: "created folder"
+                    )
                 } else if let contentURL = url {
                     let fileData = try Data(contentsOf: contentURL)
                     guard let fileTypeID = config.defaultFileTypeID else {
@@ -292,6 +296,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                     let item = FileProviderItem(trackedItem: tracked)
                     handler.value(item, [], false, nil)
+                    self.signalLocalMutation(
+                        affectedContainerIdentifiers: [itemTemplate.parentItemIdentifier],
+                        reason: "created file"
+                    )
                 } else {
                     handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                 }
@@ -384,6 +392,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         // Tell the OS to re-fetch the remote canonical version.
                         self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                         handler.value(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
+                        self.signalLocalMutation(
+                            affectedContainerIdentifiers: [item.parentItemIdentifier],
+                            reason: "uploaded conflict copy"
+                        )
                         return
                     }
                 }
@@ -427,6 +439,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
                     self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                     handler.value(FileProviderItem(trackedItem: newTracked), [], false, nil)
+                    self.signalLocalMutation(
+                        affectedContainerIdentifiers: [
+                            NSFileProviderItemIdentifier(tracked.parentIdentifier),
+                            item.parentItemIdentifier
+                        ],
+                        reason: "moved folder"
+                    )
                     return
                 }
 
@@ -501,6 +520,15 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
                 handler.value(resultItem, [], false, nil)
+                if mutatesRemote {
+                    self.signalLocalMutation(
+                        affectedContainerIdentifiers: [
+                            NSFileProviderItemIdentifier(tracked.parentIdentifier),
+                            NSFileProviderItemIdentifier(updated.parentIdentifier)
+                        ],
+                        reason: "modified \(updated.itemType.rawValue)"
+                    )
+                }
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
@@ -574,6 +602,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 handler.value(nil)
+                self.signalLocalMutation(
+                    affectedContainerIdentifiers: tracked.map {
+                        [NSFileProviderItemIdentifier($0.parentIdentifier)]
+                    } ?? [],
+                    reason: "deleted item"
+                )
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
@@ -696,6 +730,46 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             throw ExtensionError.invalidParentIdentifier(identifier.rawValue)
         }
         return folderID
+    }
+
+    private func signalLocalMutation(
+        affectedContainerIdentifiers: [NSFileProviderItemIdentifier],
+        reason: String
+    ) {
+        let domain = self.domain
+        let logger = self.logger
+        let targets = localMutationSignalTargets(affectedContainerIdentifiers)
+
+        Task {
+            guard let manager = NSFileProviderManager(for: domain) else {
+                logger.warning("Unable to signal immediate local sync after \(reason, privacy: .public): missing File Provider manager")
+                return
+            }
+
+            var failures = 0
+            for target in targets {
+                do {
+                    try await manager.signalEnumerator(for: target)
+                } catch {
+                    failures += 1
+                    logger.debug("Immediate local sync signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+
+            logger.info("Signaled immediate local sync after \(reason, privacy: .public) (targets: \(targets.count, privacy: .public), failures: \(failures, privacy: .public))")
+        }
+    }
+
+    private func localMutationSignalTargets(
+        _ affectedContainerIdentifiers: [NSFileProviderItemIdentifier]
+    ) -> [NSFileProviderItemIdentifier] {
+        var seen = Set<String>()
+        var targets: [NSFileProviderItemIdentifier] = [.workingSet, .rootContainer]
+        targets.append(contentsOf: affectedContainerIdentifiers)
+
+        return targets.filter { identifier in
+            seen.insert(identifier.rawValue).inserted
+        }
     }
 
     private func updateProgress(

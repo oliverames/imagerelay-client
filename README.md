@@ -69,7 +69,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **Uploads** -- When you save a new file into the synced Finder location, the extension creates an upload job, sends the file in 5 MB chunks, polls for job completion, and stores the resulting asset ID.
 
-**New versions** -- When you modify an existing file, the extension requests a version UUID from Image Relay, uploads the new content in chunks, and finalizes the version.
+**New versions** -- When you modify an existing file, File Provider calls the extension with the local copy. The extension requests a version UUID from Image Relay, uploads the new content in chunks, finalizes the version, and immediately signals affected enumerators so Finder refreshes without waiting for the next remote poll.
 
 **Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API.
 
@@ -154,7 +154,7 @@ xcodebuild test \
 swift test --package-path ImageRelayKit
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.0.0-beta.12 --smoke-install
+scripts/build-developer-id-release.sh --version 1.0.0-beta.13 --smoke-install
 ```
 
 ## Known Limitations
