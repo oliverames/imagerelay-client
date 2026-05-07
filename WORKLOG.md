@@ -172,7 +172,7 @@ Other changes: replaced `DomainManager.openDatabase()` (which opened a fresh GRD
 
 ## 2026-05-07 - Beta 14 public-release hardening
 
-**What changed**: Added Sparkle update integration with a menu-bar Check for Updates action, GitHub release appcast URL, app public EdDSA key, and sandbox settings required for Sparkle's installer service. The release script now generates `appcast.xml` beside the notarized DMG and reads the Sparkle private key from 1Password. Added repeatable release-candidate and live-sync scripts: `scripts/run-release-candidate-checks.sh` and `scripts/run-live-sync-matrix.sh`.
+**What changed**: Added Sparkle update integration with a menu-bar Check for Updates action, public GitHub release appcast URL, app public EdDSA key, and sandbox settings required for Sparkle's installer service. The release script now generates `appcast.xml` beside the notarized DMG, points download/update assets at `oliverames/imagerelay-client-releases`, and reads the Sparkle private key from 1Password. Added repeatable release-candidate and live-sync scripts: `scripts/run-release-candidate-checks.sh` and `scripts/run-live-sync-matrix.sh`.
 
 **Sync safety**: Disabled Finder folder moves for the public beta because Image Relay has no atomic folder-move endpoint. File moves and folder renames remain enabled. Removed the old recursive folder move emulation path from the extension so an interrupted create/copy/delete sequence can no longer damage remote folder contents. The host app's remote signal loop is now a 5-minute watchdog; the extension poller remains the source of truth for the configured poll interval and remote-poll status.
 
