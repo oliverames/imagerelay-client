@@ -29,7 +29,7 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/oliverames/imagerelay-client/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/oliverames/imagerelay-client-releases/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>ipQPoCt2o0dMoqaggAu7h/ZT6sGBly0fPEumg4cswhI=</string>
 </dict>

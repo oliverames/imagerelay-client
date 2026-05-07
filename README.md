@@ -16,8 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
-    <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
+  <a href="https://github.com/oliverames/imagerelay-client-releases/releases/latest">
+    <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client-releases?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
   <img src="https://img.shields.io/badge/status-beta-f5a542?style=flat-square" alt="Beta">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
@@ -42,7 +42,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **macOS 26 (Tahoe) required.** The app uses File Provider APIs introduced in macOS 26.
 
-1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
+1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client-releases/releases/latest)
 2. Open the DMG and drag **Image Relay** to Applications
 3. Launch Image Relay — the menu bar icon appears
 4. Open Settings → General and enter your API key and root folder ID

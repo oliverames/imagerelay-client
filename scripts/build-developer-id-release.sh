@@ -16,7 +16,8 @@ LEGACY_APP_BUNDLE_NAME="ImageRelayClient.app"
 APP_EXECUTABLE_NAME="Image Relay"
 SPARKLE_VERSION="2.9.1"
 SPARKLE_1PASSWORD_ITEM="Image Relay Sparkle EdDSA Private Key"
-SPARKLE_RELEASE_BASE_URL="https://github.com/oliverames/imagerelay-client/releases/download"
+SPARKLE_RELEASE_REPOSITORY="oliverames/imagerelay-client-releases"
+SPARKLE_RELEASE_BASE_URL="https://github.com/$SPARKLE_RELEASE_REPOSITORY/releases/download"
 
 VERSION=""
 OUTPUT_DIR=""
@@ -225,26 +226,26 @@ write_appcast() {
   build_version="$(awk -F'"' '/CURRENT_PROJECT_VERSION:/ {print $2; exit}' "$ROOT_DIR/Project.yml")"
   download_url="$SPARKLE_RELEASE_BASE_URL/v$VERSION/ImageRelayClient-$VERSION.dmg"
 
-  python3 - "$appcast_path" "$VERSION" "$build_version" "$download_url" "$signature_attributes" <<'PY'
+  python3 - "$appcast_path" "$VERSION" "$build_version" "$download_url" "$signature_attributes" "$SPARKLE_RELEASE_REPOSITORY" <<'PY'
 from email.utils import formatdate
 import html
 import pathlib
 import sys
 import time
 
-appcast_path, version, build_version, download_url, signature_attributes = sys.argv[1:6]
+appcast_path, version, build_version, download_url, signature_attributes, release_repository = sys.argv[1:7]
 if not build_version:
     raise SystemExit("CURRENT_PROJECT_VERSION could not be read for the appcast.")
 
 title = f"Image Relay {version}"
-release_link = f"https://github.com/oliverames/imagerelay-client/releases/tag/v{version}"
+release_link = f"https://github.com/{release_repository}/releases/tag/v{version}"
 pub_date = formatdate(time.time(), localtime=False, usegmt=True)
 
 xml = f'''<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
     <title>Image Relay Updates</title>
-    <link>https://github.com/oliverames/imagerelay-client/releases</link>
+    <link>https://github.com/{release_repository}/releases</link>
     <description>Image Relay macOS sync client releases.</description>
     <item>
       <title>{html.escape(title)}</title>
