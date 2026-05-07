@@ -53,11 +53,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
 
-        // Warn if a folder move was in progress when the extension last terminated.
-        // This indicates a potentially incomplete (create → move children → delete) sequence.
+        // Warn if a folder move was in progress from an older beta.
+        // Folder moves are now blocked before remote mutation.
         if let stale = try? database.staleFolderMovePayload() {
             Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
-                .warning("Stale folder move detected on init — may require manual cleanup: \(stale)")
+                .warning("Stale folder move detected on init; may require manual cleanup: \(stale)")
         }
 
         let pollerDomain = domain
@@ -178,7 +178,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, (any Error)?) -> Void
     ) -> Progress {
         let db = self.db
-        let api = self.api
         let config = self.config
         let logger = self.logger
         let handler = UncheckedBox(value: completionHandler)
@@ -248,44 +247,37 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         throw ExtensionError.missingDefaultFileTypeID
                     }
 
-                    let jobRequest = UploadJobRequest(
-                        folder_id: parentFolderID,
-                        file_type_id: fileTypeID,
-                        files: [.init(name: itemTemplate.filename, size: fileData.count)]
-                    )
-
-                    let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
-
-                    guard let uploadFileID = job.files?.first?.id else {
-                        throw ExtensionError.uploadJobMissingFileID
+                    let fileID: Int
+                    let contentVersion: String
+                    if let existingRemote = try await self.remoteFile(named: itemTemplate.filename, parentFolderID: parentFolderID) {
+                        // File Provider can send a second create-style request when a
+                        // freshly-created file is edited before enumeration settles on
+                        // the remote identifier. Treat that as a version update.
+                        fileID = existingRemote.id
+                        try await self.replaceFileContents(remoteID: existingRemote.id, name: itemTemplate.filename, data: fileData)
+                        try await self.waitForRemoteFileSize(
+                            remoteID: existingRemote.id,
+                            parentFolderID: parentFolderID,
+                            expectedSize: fileData.count
+                        )
+                        contentVersion = UUID().uuidString
+                    } else {
+                        fileID = try await self.uploadNewFile(
+                            name: itemTemplate.filename,
+                            data: fileData,
+                            parentFolderID: parentFolderID,
+                            fileTypeID: fileTypeID
+                        )
+                        contentVersion = "1"
                     }
-                    let uploadResult = try await api.uploadChunked(
-                        fileData: fileData,
-                        pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
-                        chunkSize: 5 * 1024 * 1024,
-                        responseType: UploadJob.self
-                    )
-
-                    var completedJob = uploadResult.lastResponse ?? job
-                    if completedJob.finished != true || completedJob.assetID == nil {
-                        try Task.checkCancellation()
-                        completedJob = try await api.get("/upload_jobs/\(job.id).json")
-                    }
-
-                    guard let assetID = completedJob.assetID else {
-                        handler.value(nil, [], false, NSFileProviderError(.serverUnreachable))
-                        return
-                    }
-
-                    let fileID = assetID
 
                     let tracked = TrackedItem(
                         identifier: ItemIdentifier.file(fileID).rawValue,
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: fileID, itemType: .file, name: itemTemplate.filename,
-                        size: Int64(fileData.count), contentVersion: "1",
+                        size: Int64(fileData.count), contentVersion: contentVersion,
                         metadataVersion: TrackedItem.fileMetadataVersion(
-                            updatedOn: "1",
+                            updatedOn: contentVersion,
                             parentIdentifier: itemTemplate.parentItemIdentifier.rawValue
                         ),
                         contentModifiedAt: Date()
@@ -358,10 +350,27 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 defer { self.incrementProgress() }
                 var updated = tracked
 
+                if changedFields.contains(.parentItemIdentifier),
+                   item.parentItemIdentifier == .trashContainer {
+                    try await self.deleteTrackedItem(
+                        itemID: itemID,
+                        remoteID: remoteID,
+                        tracked: tracked
+                    )
+                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
+                    handler.value(nil, [], false, nil)
+                    self.signalLocalMutation(
+                        affectedContainerIdentifiers: [NSFileProviderItemIdentifier(tracked.parentIdentifier)],
+                        reason: "moved item to trash"
+                    )
+                    return
+                }
+
                 // Conflict detection: check if remote version changed since last enumeration
                 if changedFields.contains(.contents) {
                     let baseContentVersion = String(data: Data(version.contentVersion), encoding: .utf8) ?? ""
-                    if tracked.contentVersion != baseContentVersion, let contentURL = newContents {
+                    let hasRemoteBaseVersion = !baseContentVersion.isEmpty && baseContentVersion != "0"
+                    if hasRemoteBaseVersion && tracked.contentVersion != baseContentVersion, let contentURL = newContents {
                         let conflictName = ConflictResolver.conflictName(for: tracked.name)
                         logger.warning("Conflict detected for \(tracked.name), saving as \(conflictName)")
                         try? db.logActivity(action: .conflicted, itemName: tracked.name, itemType: .file)
@@ -374,19 +383,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         }
                         let parentFolderID = try self.resolveParentFolderID(item.parentItemIdentifier)
                         let fileData = try Data(contentsOf: contentURL)
-                        let jobRequest = UploadJobRequest(
-                            folder_id: parentFolderID,
-                            file_type_id: fileTypeID,
-                            files: [.init(name: conflictName, size: fileData.count)]
-                        )
-                        let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
-                        guard let uploadFileID = job.files?.first?.id else {
-                            throw ExtensionError.uploadJobMissingFileID
-                        }
-                        try await api.uploadChunked(
-                            fileData: fileData,
-                            pathBuilder: { n in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(n)" },
-                            chunkSize: 5 * 1024 * 1024
+                        _ = try await self.uploadNewFile(
+                            name: conflictName,
+                            data: fileData,
+                            parentFolderID: parentFolderID,
+                            fileTypeID: fileTypeID
                         )
 
                         // Tell the OS to re-fetch the remote canonical version.
@@ -400,75 +401,21 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     }
                 }
 
-                // Folder move across parents: emulated as create → move children → delete original.
-                // We record the in-progress state so a crash can be detected on next init.
                 if changedFields.contains(.parentItemIdentifier) && !itemID.isFile {
-                    let newParentID = try self.resolveParentFolderID(item.parentItemIdentifier)
-                    self.updateProgress(state: .syncing, phase: "Moving folder", currentItem: tracked.name)
-
-                    let createRequest = CreateFolderRequest(name: tracked.name, parent_id: newParentID)
-                    let newFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
-
-                    try? db.recordFolderMoveInProgress(originalID: remoteID, newID: newFolder.id)
-
-                    try await self.migrateChildren(
-                        of: item.itemIdentifier.rawValue,
-                        intoNewFolderID: newFolder.id,
-                        db: db,
-                        api: api
-                    )
-
-                    try await api.delete("/folders/\(remoteID).json")
-                    try db.deleteItem(item.itemIdentifier.rawValue)
-
-                    try? db.clearFolderMoveInProgress()
-
-                    let newTracked = TrackedItem(
-                        identifier: ItemIdentifier.folder(newFolder.id).rawValue,
-                        parentIdentifier: item.parentItemIdentifier.rawValue,
-                        remoteID: newFolder.id, itemType: .folder, name: newFolder.name,
-                        size: 0, contentVersion: newFolder.updatedOn ?? "0",
-                        metadataVersion: TrackedItem.folderMetadataVersion(
-                            updatedOn: newFolder.updatedOn,
-                            parentIdentifier: item.parentItemIdentifier.rawValue,
-                            childCount: newFolder.childCount
-                        ),
-                        contentModifiedAt: newFolder.contentModifiedAt
-                    )
-                    try db.upsertItem(newTracked)
-                    try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .folder)
-                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
-                    handler.value(FileProviderItem(trackedItem: newTracked), [], false, nil)
-                    self.signalLocalMutation(
-                        affectedContainerIdentifiers: [
-                            NSFileProviderItemIdentifier(tracked.parentIdentifier),
-                            item.parentItemIdentifier
-                        ],
-                        reason: "moved folder"
-                    )
-                    return
+                    throw ExtensionError.folderMoveUnsupported
                 }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
                     self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let fileData = try Data(contentsOf: contentURL)
+                    let parentFolderID = try self.resolveParentFolderID(item.parentItemIdentifier)
 
-                    let versionResponse: [String: String] = try await api.post(
-                        "/files/\(remoteID)/versions.json",
-                        body: EmptyBody()
+                    try await self.replaceFileContents(remoteID: remoteID, name: tracked.name, data: fileData)
+                    try await self.waitForRemoteFileSize(
+                        remoteID: remoteID,
+                        parentFolderID: parentFolderID,
+                        expectedSize: fileData.count
                     )
-
-                    if let uuid = versionResponse["uuid"] {
-                        let chunkCount = try await api.uploadChunked(
-                            fileData: fileData,
-                            pathBuilder: { n in "/files/\(remoteID)/versions/\(uuid)/chunk/\(n)" },
-                            chunkSize: 5 * 1024 * 1024
-                        )
-                        try await api.post(
-                            "/files/\(remoteID)/versions/\(uuid)/complete.json",
-                            body: VersionCompleteRequest(file_name: tracked.name, chunk_count: chunkCount)
-                        )
-                    }
 
                     updated.size = Int64(fileData.count)
                     updated.contentVersion = UUID().uuidString
@@ -577,28 +524,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 defer { self.incrementProgress() }
                 self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
 
-                do {
-                    if itemID.isFile {
-                        try await api.delete("/files/\(remoteID).json")
-                    } else {
-                        try await api.delete("/folders/\(remoteID).json")
-                    }
-                } catch let apiError as APIError {
-                    if case .notFound = apiError {
-                        logger.info("Remote item already deleted: \(identifier.rawValue, privacy: .public)")
-                    } else {
-                        throw apiError
-                    }
-                }
-
-                if itemID.isFile {
-                    try db.deleteItem(identifier.rawValue)
-                } else {
-                    try db.deleteSubtree(rootedAt: identifier.rawValue)
-                }
-                if let tracked {
-                    try? db.logActivity(action: .deleted, itemName: tracked.name, itemType: tracked.itemType)
-                }
+                try await self.deleteTrackedItem(itemID: itemID, remoteID: remoteID, tracked: tracked)
                 self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 handler.value(nil)
@@ -633,6 +559,168 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
     // MARK: - Helpers
 
+    private func uploadNewFile(
+        name: String,
+        data fileData: Data,
+        parentFolderID: Int,
+        fileTypeID: Int
+    ) async throws -> Int {
+        let uploadData = fileData.isEmpty ? Data([0]) : fileData
+        let jobRequest = UploadJobRequest(
+            folder_id: parentFolderID,
+            file_type_id: fileTypeID,
+            files: [.init(name: name, size: uploadData.count)]
+        )
+
+        let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
+        guard let uploadFileID = job.files?.first?.id else {
+            throw ExtensionError.uploadJobMissingFileID
+        }
+
+        let uploadResult = try await api.uploadChunked(
+            fileData: uploadData,
+            pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
+            chunkSize: 5 * 1024 * 1024,
+            responseType: UploadJob.self
+        )
+
+        var completedJob = uploadResult.lastResponse ?? job
+        if completedJob.finished != true || completedJob.assetID == nil {
+            try Task.checkCancellation()
+            completedJob = try await api.get("/upload_jobs/\(job.id).json")
+        }
+
+        guard let assetID = completedJob.assetID else {
+            throw ExtensionError.uploadJobMissingAssetID
+        }
+
+        if fileData.isEmpty {
+            do {
+                try await replaceFileContents(remoteID: assetID, name: name, data: fileData)
+                try await waitForRemoteFileSize(remoteID: assetID, parentFolderID: parentFolderID, expectedSize: fileData.count)
+            } catch {
+                try? await api.delete("/files/\(assetID).json")
+                throw error
+            }
+        }
+
+        return assetID
+    }
+
+    private func deleteTrackedItem(itemID: ItemIdentifier, remoteID: Int, tracked: TrackedItem?) async throws {
+        do {
+            if itemID.isFile {
+                let parentFolderID = try tracked.map {
+                    try self.resolveParentFolderID(NSFileProviderItemIdentifier($0.parentIdentifier))
+                }
+                try await self.deleteRemoteFile(remoteID: remoteID, parentFolderID: parentFolderID)
+            } else {
+                try await api.delete("/folders/\(remoteID).json")
+            }
+        } catch let apiError as APIError {
+            if case .notFound = apiError {
+                logger.info("Remote item already deleted: \(itemID.rawValue, privacy: .public)")
+            } else {
+                throw apiError
+            }
+        }
+
+        if itemID.isFile {
+            try db.deleteItem(itemID.rawValue)
+        } else {
+            try db.deleteSubtree(rootedAt: itemID.rawValue)
+        }
+        if let tracked {
+            try? db.logActivity(action: .deleted, itemName: tracked.name, itemType: tracked.itemType)
+        }
+    }
+
+    private func deleteRemoteFile(remoteID: Int, parentFolderID: Int?) async throws {
+        let maxAttempts = 6
+
+        for attempt in 1...maxAttempts {
+            do {
+                try await api.delete("/files/\(remoteID).json")
+            } catch let apiError as APIError {
+                if case .notFound = apiError { return }
+                throw apiError
+            }
+
+            guard let parentFolderID else { return }
+
+            if try await !remoteFileIsVisible(remoteID: remoteID, parentFolderID: parentFolderID) {
+                return
+            }
+
+            guard attempt < maxAttempts else { break }
+            logger.warning("Remote file \(remoteID, privacy: .public) still visible after delete attempt \(attempt, privacy: .public); retrying")
+            try await Task.sleep(for: .seconds(5))
+        }
+
+        throw ExtensionError.remoteDeleteNotConfirmed
+    }
+
+    private func waitForRemoteFileSize(remoteID: Int, parentFolderID: Int, expectedSize: Int) async throws {
+        let maxAttempts = 24
+        for attempt in 1...maxAttempts {
+            if let file = try await remoteFile(remoteID: remoteID, parentFolderID: parentFolderID),
+               file.size == expectedSize {
+                return
+            }
+
+            guard attempt < maxAttempts else { break }
+            logger.debug("Waiting for remote file \(remoteID, privacy: .public) to report \(expectedSize, privacy: .public) bytes")
+            try await Task.sleep(for: .seconds(5))
+        }
+
+        throw ExtensionError.remoteVersionNotConfirmed
+    }
+
+    private func remoteFile(named name: String, parentFolderID: Int) async throws -> RemoteFile? {
+        let files: [RemoteFile] = try await api.getAllPages(
+            "/folders/\(parentFolderID)/files.json",
+            query: ["recursive": "false"]
+        )
+        return files.first { $0.name == name && !$0.isDeleted }
+    }
+
+    private func remoteFile(remoteID: Int, parentFolderID: Int) async throws -> RemoteFile? {
+        let files: [RemoteFile] = try await api.getAllPages(
+            "/folders/\(parentFolderID)/files.json",
+            query: ["recursive": "false"]
+        )
+        return files.first { $0.id == remoteID && !$0.isDeleted }
+    }
+
+    private func remoteFileIsVisible(remoteID: Int, parentFolderID: Int) async throws -> Bool {
+        let files: [RemoteFile] = try await api.getAllPages(
+            "/folders/\(parentFolderID)/files.json",
+            query: ["recursive": "false"]
+        )
+        return files.contains { $0.id == remoteID && !$0.isDeleted }
+    }
+
+    private func replaceFileContents(remoteID: Int, name: String, data fileData: Data) async throws {
+        let versionResponse: [String: String] = try await api.post(
+            "/files/\(remoteID)/versions.json",
+            body: EmptyBody()
+        )
+
+        guard let uuid = versionResponse["uuid"] else {
+            throw ExtensionError.versionMissingUUID
+        }
+
+        let chunkCount = try await api.uploadChunked(
+            fileData: fileData,
+            pathBuilder: { n in "/files/\(remoteID)/versions/\(uuid)/chunk/\(n)" },
+            chunkSize: 5 * 1024 * 1024
+        )
+        try await api.post(
+            "/files/\(remoteID)/versions/\(uuid)/complete.json",
+            body: VersionCompleteRequest(file_name: name, chunk_count: chunkCount)
+        )
+    }
+
     /// Downloads `url` to `destination`, retrying up to `maxAttempts` times on network errors.
     private func downloadWithRetry(
         api: APIClient,
@@ -660,63 +748,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             }
         }
         throw lastError!
-    }
-
-    /// Recursively moves all children of `parentIdentifier` into `newFolderID` on the remote,
-    /// updating the local DB to reflect each change. Subfolders are created on the remote then
-    /// their own children are migrated before the old remote folder is deleted.
-    private func migrateChildren(
-        of parentIdentifier: String,
-        intoNewFolderID newFolderID: Int,
-        db: SyncDatabase,
-        api: APIClient
-    ) async throws {
-        let children = try db.children(of: parentIdentifier)
-        for child in children {
-            guard let childItemID = ItemIdentifier(rawValue: child.identifier),
-                  let childRemoteID = childItemID.numericID else { continue }
-
-            if child.itemType == .file {
-                try await api.post(
-                    "/files/\(childRemoteID)/move.json",
-                    body: MoveRequest(folder_ids: [String(newFolderID)])
-                )
-                var updatedChild = child
-                updatedChild.parentIdentifier = ItemIdentifier.folder(newFolderID).rawValue
-                try db.upsertItem(updatedChild)
-            } else {
-                // Create a mirror folder inside the new parent, then recurse.
-                let createRequest = CreateFolderRequest(name: child.name, parent_id: newFolderID)
-                let createdFolder: RemoteFolder = try await api.post("/folders.json", body: createRequest)
-
-                try await migrateChildren(
-                    of: child.identifier,
-                    intoNewFolderID: createdFolder.id,
-                    db: db,
-                    api: api
-                )
-
-                try await api.delete("/folders/\(childRemoteID).json")
-                try db.deleteItem(child.identifier)
-
-                let newSubfolder = TrackedItem(
-                    identifier: ItemIdentifier.folder(createdFolder.id).rawValue,
-                    parentIdentifier: ItemIdentifier.folder(newFolderID).rawValue,
-                    remoteID: createdFolder.id,
-                    itemType: .folder,
-                    name: createdFolder.name,
-                    size: 0,
-                    contentVersion: createdFolder.updatedOn ?? "0",
-                    metadataVersion: TrackedItem.folderMetadataVersion(
-                        updatedOn: createdFolder.updatedOn,
-                        parentIdentifier: ItemIdentifier.folder(newFolderID).rawValue,
-                        childCount: createdFolder.childCount
-                    ),
-                    contentModifiedAt: createdFolder.contentModifiedAt
-                )
-                try db.upsertItem(newSubfolder)
-            }
-        }
     }
 
     private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) throws -> Int {
@@ -849,7 +880,12 @@ private enum ExtensionError: LocalizedError {
     case missingRootFolderID
     case invalidParentIdentifier(String)
     case uploadJobMissingFileID
+    case uploadJobMissingAssetID
+    case versionMissingUUID
     case fileRenameUnsupported
+    case folderMoveUnsupported
+    case remoteDeleteNotConfirmed
+    case remoteVersionNotConfirmed
 
     var errorDescription: String? {
         switch self {
@@ -861,8 +897,18 @@ private enum ExtensionError: LocalizedError {
             return "Could not resolve the Image Relay folder for parent identifier \(identifier)."
         case .uploadJobMissingFileID:
             return "Image Relay did not return an upload file ID for the new file."
+        case .uploadJobMissingAssetID:
+            return "Image Relay did not return an asset ID for the uploaded file."
+        case .versionMissingUUID:
+            return "Image Relay did not return a version ID for the file update."
         case .fileRenameUnsupported:
             return "Renaming files from Finder is not supported yet."
+        case .folderMoveUnsupported:
+            return "Moving folders from Finder is disabled for this beta to protect remote contents. Create the folder in its new location and move files instead."
+        case .remoteDeleteNotConfirmed:
+            return "Image Relay still listed the file after several delete attempts. Try again after processing finishes."
+        case .remoteVersionNotConfirmed:
+            return "Image Relay did not report the uploaded version in the folder listing before the sync timeout."
         }
     }
 }

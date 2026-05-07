@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main, "claude/**", "codex/**"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test-kit:
@@ -40,6 +41,13 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
+
+      - name: Resolve Xcode package dependencies
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project ImageRelayClient.xcodeproj \
+            -scheme ImageRelayClient
 
       - name: Build ImageRelayClient
         run: |

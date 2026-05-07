@@ -14,6 +14,9 @@ APPEX_PROFILE_NAME="ImageRelayClient FileProviderExtension Developer ID"
 APP_BUNDLE_NAME="Image Relay.app"
 LEGACY_APP_BUNDLE_NAME="ImageRelayClient.app"
 APP_EXECUTABLE_NAME="Image Relay"
+SPARKLE_VERSION="2.9.1"
+SPARKLE_1PASSWORD_ITEM="Image Relay Sparkle EdDSA Private Key"
+SPARKLE_RELEASE_BASE_URL="https://github.com/oliverames/imagerelay-client/releases/download"
 
 VERSION=""
 OUTPUT_DIR=""
@@ -69,7 +72,7 @@ require_command() {
   fi
 }
 
-for tool in op python3 xcodegen xcodebuild xcrun hdiutil codesign spctl ditto shasum security pluginkit; do
+for tool in op python3 xcodegen xcodebuild xcrun hdiutil codesign spctl ditto shasum security pluginkit curl unzip; do
   require_command "$tool"
 done
 
@@ -87,12 +90,15 @@ mkdir -p "$ARTIFACT_DIR"
 STAGE_DIR="$(mktemp -d "/tmp/imagerelay-release.$(sanitize_name "$VERSION").XXXXXX")"
 KEY_PATH="$STAGE_DIR/AuthKey.p8"
 PYTHON_DEPS_DIR="$STAGE_DIR/python-deps"
+SPARKLE_TOOLS_DIR="$STAGE_DIR/sparkle-tools"
+SPARKLE_KEY_PATH="$STAGE_DIR/sparkle-ed25519-private-key.txt"
 SMOKE_MOUNT_POINT=""
 cleanup() {
   if [[ -n "${SMOKE_MOUNT_POINT:-}" ]]; then
     hdiutil detach "$SMOKE_MOUNT_POINT" >/dev/null 2>&1 || true
   fi
   rm -f "$KEY_PATH"
+  rm -f "$SPARKLE_KEY_PATH"
 }
 trap cleanup EXIT
 
@@ -140,6 +146,124 @@ sys.exit("hdiutil attach did not return a mounted volume")
 PY
 }
 
+sparkle_sign_update_tool() {
+  if [[ -n "${SPARKLE_SIGN_UPDATE:-}" && -x "${SPARKLE_SIGN_UPDATE:-}" ]]; then
+    printf '%s\n' "$SPARKLE_SIGN_UPDATE"
+    return 0
+  fi
+
+  if command -v sign_update >/dev/null 2>&1; then
+    command -v sign_update
+    return 0
+  fi
+
+  local tool_path="$SPARKLE_TOOLS_DIR/bin/sign_update"
+  if [[ -x "$tool_path" ]]; then
+    printf '%s\n' "$tool_path"
+    return 0
+  fi
+
+  mkdir -p "$SPARKLE_TOOLS_DIR"
+  echo "Fetching Sparkle signing tool..." >&2
+  curl -fsSL \
+    "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-for-Swift-Package-Manager.zip" \
+    -o "$SPARKLE_TOOLS_DIR/Sparkle-for-Swift-Package-Manager.zip"
+  unzip -q -o "$SPARKLE_TOOLS_DIR/Sparkle-for-Swift-Package-Manager.zip" \
+    bin/sign_update -d "$SPARKLE_TOOLS_DIR"
+
+  if [[ ! -x "$tool_path" ]]; then
+    echo "Unable to locate Sparkle sign_update tool." >&2
+    exit 70
+  fi
+
+  printf '%s\n' "$tool_path"
+}
+
+write_sparkle_private_key() {
+  local item_json="$STAGE_DIR/sparkle-1password-item.json"
+  op item get --vault Development "$SPARKLE_1PASSWORD_ITEM" --format json > "$item_json"
+  python3 - "$item_json" "$SPARKLE_KEY_PATH" <<'PY'
+import json
+import pathlib
+import sys
+
+item = json.loads(pathlib.Path(sys.argv[1]).read_text())
+notes = ""
+for field in item.get("fields", []):
+    if field.get("id") == "notesPlain" or field.get("purpose") == "NOTES":
+        notes = field.get("value") or ""
+        break
+
+lines = [line.strip() for line in notes.splitlines()]
+try:
+    start = lines.index("Private key:") + 1
+except ValueError:
+    raise SystemExit("Sparkle private key was not found in the 1Password item notes.")
+
+private_key = next((line for line in lines[start:] if line), "")
+if not private_key:
+    raise SystemExit("Sparkle private key was empty in the 1Password item notes.")
+
+path = pathlib.Path(sys.argv[2])
+path.write_text(private_key + "\n")
+path.chmod(0o600)
+PY
+  rm -f "$item_json"
+}
+
+write_appcast() {
+  local dmg_path="$1"
+  local appcast_path="$2"
+  local sign_update_tool
+  local signature_attributes
+  local build_version
+  local download_url
+
+  sign_update_tool="$(sparkle_sign_update_tool)"
+  write_sparkle_private_key
+  signature_attributes="$("$sign_update_tool" --ed-key-file "$SPARKLE_KEY_PATH" "$dmg_path")"
+  build_version="$(awk -F'"' '/CURRENT_PROJECT_VERSION:/ {print $2; exit}' "$ROOT_DIR/Project.yml")"
+  download_url="$SPARKLE_RELEASE_BASE_URL/v$VERSION/ImageRelayClient-$VERSION.dmg"
+
+  python3 - "$appcast_path" "$VERSION" "$build_version" "$download_url" "$signature_attributes" <<'PY'
+from email.utils import formatdate
+import html
+import pathlib
+import sys
+import time
+
+appcast_path, version, build_version, download_url, signature_attributes = sys.argv[1:6]
+if not build_version:
+    raise SystemExit("CURRENT_PROJECT_VERSION could not be read for the appcast.")
+
+title = f"Image Relay {version}"
+release_link = f"https://github.com/oliverames/imagerelay-client/releases/tag/v{version}"
+pub_date = formatdate(time.time(), localtime=False, usegmt=True)
+
+xml = f'''<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Image Relay Updates</title>
+    <link>https://github.com/oliverames/imagerelay-client/releases</link>
+    <description>Image Relay macOS sync client releases.</description>
+    <item>
+      <title>{html.escape(title)}</title>
+      <link>{html.escape(release_link)}</link>
+      <sparkle:version>{html.escape(build_version)}</sparkle:version>
+      <sparkle:shortVersionString>{html.escape(version)}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0.0</sparkle:minimumSystemVersion>
+      <pubDate>{html.escape(pub_date)}</pubDate>
+      <enclosure url="{html.escape(download_url)}"
+                 {signature_attributes}
+                 type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
+'''
+pathlib.Path(appcast_path).write_text(xml)
+PY
+}
+
 echo "Fetching App Store Connect key from 1Password..."
 op document get --vault Development 'App Store Connect AuthKey (.p8)' --out-file "$KEY_PATH" >/dev/null
 ASC_KEY_ID="$(op read 'op://Development/App Store Connect API Key/credential')"
@@ -174,6 +298,7 @@ APP_ZIP_PATH="$ARTIFACT_DIR/ImageRelayClient-$VERSION.app.zip"
 DMG_ROOT="$STAGE_DIR/dmgroot"
 DMG_PATH="$ARTIFACT_DIR/ImageRelayClient-$VERSION.dmg"
 CHECKSUM_PATH="$ARTIFACT_DIR/ImageRelayClient-$VERSION.dmg.sha256"
+APPCAST_PATH="$ARTIFACT_DIR/appcast.xml"
 
 cat >"$EXPORT_OPTIONS_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -259,6 +384,9 @@ xcrun stapler staple "$DMG_PATH" | tee "$ARTIFACT_DIR/stapler-dmg.log"
 xcrun stapler validate "$DMG_PATH" | tee "$ARTIFACT_DIR/stapler-dmg-validate.log"
 spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH" 2>&1 | tee "$ARTIFACT_DIR/spctl-dmg.log"
 shasum -a 256 "$DMG_PATH" | tee "$CHECKSUM_PATH"
+
+echo "Generating Sparkle appcast..."
+write_appcast "$DMG_PATH" "$APPCAST_PATH"
 
 if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   echo "Running smoke install from notarized DMG..."
@@ -413,4 +541,5 @@ Release artifacts created successfully.
 Artifact directory: $ARTIFACT_DIR
 Temporary staging directory: $STAGE_DIR
 DMG: $DMG_PATH
+Appcast: $APPCAST_PATH
 EOF

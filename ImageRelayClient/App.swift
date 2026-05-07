@@ -6,6 +6,7 @@ import ImageRelayKit
 @main
 struct ImageRelayClientApp: App {
     @State private var domainManager: DomainManager
+    @State private var updateController: UpdateController
 
     init() {
         let arguments = CommandLine.arguments
@@ -13,14 +14,20 @@ struct ImageRelayClientApp: App {
             || arguments.contains("--reset-file-provider-domain")
 
         _domainManager = State(initialValue: DomainManager(autoBootstrap: !isUtilityInvocation))
+        _updateController = State(initialValue: UpdateController(startingUpdater: !isUtilityInvocation))
 
-        if let exportIndex = arguments.firstIndex(of: "--export-diagnostics"),
-           arguments.indices.contains(exportIndex + 1) {
-            let destination = URL(fileURLWithPath: arguments[exportIndex + 1], isDirectory: true)
+        if let exportIndex = arguments.firstIndex(of: "--export-diagnostics") {
             Task { @MainActor in
                 let manager = DomainManager(autoBootstrap: false)
                 manager.refreshStatus()
                 do {
+                    let destination: URL
+                    if arguments.indices.contains(exportIndex + 1),
+                       !arguments[exportIndex + 1].hasPrefix("--") {
+                        destination = URL(fileURLWithPath: arguments[exportIndex + 1], isDirectory: true)
+                    } else {
+                        destination = try DiagnosticsExporter.defaultCommandLineDestination()
+                    }
                     let exportURL = try await DiagnosticsExporter.export(to: destination, domainManager: manager)
                     print(exportURL.path)
                     fflush(stdout)
@@ -45,6 +52,7 @@ struct ImageRelayClientApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environment(domainManager)
+                .environment(updateController)
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -71,6 +79,7 @@ struct ImageRelayClientApp: App {
             }
             .frame(width: 520, height: 420)
             .environment(domainManager)
+            .environment(updateController)
         }
     }
 }
