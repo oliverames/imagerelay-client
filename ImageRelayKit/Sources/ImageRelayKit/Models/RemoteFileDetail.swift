@@ -18,15 +18,43 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
     public let keywords: [String]
     public let customFields: [CustomField]
 
-    public struct CustomField: Codable, Sendable, Hashable {
+    public struct CustomField: Codable, Sendable, Hashable, Identifiable {
         public let id: Int?
         public let name: String
         public let value: String?
+        public let fieldType: String?
 
-        public init(id: Int?, name: String, value: String?) {
+        public var stableID: String { id.map(String.init) ?? "name:\(name)" }
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case value
+            case fieldType = "field_type"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decodeIfPresent(Int.self, forKey: .id)
+            name = try c.decode(String.self, forKey: .name)
+            // `value` may be string, number, or null in API responses — coerce to string.
+            if let stringValue = try? c.decodeIfPresent(String.self, forKey: .value) {
+                value = stringValue
+            } else if let intValue = try? c.decodeIfPresent(Int.self, forKey: .value) {
+                value = String(intValue)
+            } else if let doubleValue = try? c.decodeIfPresent(Double.self, forKey: .value) {
+                value = String(doubleValue)
+            } else {
+                value = nil
+            }
+            fieldType = try c.decodeIfPresent(String.self, forKey: .fieldType)
+        }
+
+        public init(id: Int?, name: String, value: String?, fieldType: String? = nil) {
             self.id = id
             self.name = name
             self.value = value
+            self.fieldType = fieldType
         }
     }
 
@@ -127,24 +155,58 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
 public struct FileMetadataUpdate: Codable, Sendable {
     public let description: String?
     public let keywords: [String]?
+    public let customFields: [CustomFieldUpdate]?
 
-    public init(description: String? = nil, keywords: [String]? = nil) {
+    public struct CustomFieldUpdate: Codable, Sendable, Hashable {
+        public let id: Int?
+        public let name: String
+        public let value: String?
+
+        public init(id: Int? = nil, name: String, value: String?) {
+            self.id = id
+            self.name = name
+            self.value = value
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case value
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encodeIfPresent(id, forKey: .id)
+            try c.encode(name, forKey: .name)
+            // Always encode value, even if nil, so the server clears the field.
+            try c.encode(value, forKey: .value)
+        }
+    }
+
+    public init(
+        description: String? = nil,
+        keywords: [String]? = nil,
+        customFields: [CustomFieldUpdate]? = nil
+    ) {
         self.description = description
         self.keywords = keywords
+        self.customFields = customFields
     }
 
     enum CodingKeys: String, CodingKey {
         case description
         case keywords
+        case customFields = "custom_fields"
     }
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(description, forKey: .description)
         try c.encodeIfPresent(keywords, forKey: .keywords)
+        try c.encodeIfPresent(customFields, forKey: .customFields)
     }
 
     public var hasChanges: Bool {
-        description != nil || keywords != nil
+        description != nil || keywords != nil || (customFields?.isEmpty == false)
     }
 }

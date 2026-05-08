@@ -222,17 +222,14 @@ struct MenuBarView: View {
                 presentEditor(item.remoteID, item.name)
                 return
             }
-            // URL was outside the FP domain, or selected item is a folder. Open the
-            // window in failed state so the user has feedback.
-            openWindow(id: "metadata-editor")
-            NSApp.activate(ignoringOtherApps: true)
-            metadataEditor.phase = .failed(
-                message: "The selected item isn't an Image Relay file. Select a single file inside the Image Relay Finder location and try again.",
-                remoteID: nil
-            )
+            await openManualPicker(presentEditor: presentEditor, fallbackMessage: "The selected item isn't an Image Relay file. Pick a file from the dialog instead.")
+        } catch FinderSelectionReader.SelectionError.notAuthorized {
+            // User declined or hasn't granted Automation permission. Fall back to a file picker
+            // so the feature stays usable without the entitlement granted.
+            await openManualPicker(presentEditor: presentEditor, fallbackMessage: nil)
+        } catch FinderSelectionReader.SelectionError.noSelection {
+            await openManualPicker(presentEditor: presentEditor, fallbackMessage: "Nothing was selected in Finder. Pick a file from the dialog instead.")
         } catch {
-            // Permission denial, no selection, or other AppleScript failure — open the
-            // window so the user sees the message.
             openWindow(id: "metadata-editor")
             NSApp.activate(ignoringOtherApps: true)
             metadataEditor.phase = .failed(
@@ -240,6 +237,48 @@ struct MenuBarView: View {
                 remoteID: nil
             )
         }
+    }
+
+    private func openManualPicker(
+        presentEditor: @escaping (Int, String) -> Void,
+        fallbackMessage: String?
+    ) async {
+        let panel = NSOpenPanel()
+        panel.message = fallbackMessage ?? "Pick an Image Relay file to edit its metadata."
+        panel.prompt = "Edit Metadata"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.directoryURL = defaultPickerDirectory()
+
+        guard panel.runModal() == .OK, let pickedURL = panel.url else { return }
+
+        if let item = await metadataEditingService.trackedItem(for: pickedURL),
+           item.itemType == .file {
+            presentEditor(item.remoteID, item.name)
+        } else {
+            openWindow(id: "metadata-editor")
+            NSApp.activate(ignoringOtherApps: true)
+            metadataEditor.phase = .failed(
+                message: "That file isn't tracked by Image Relay yet. Wait for the next sync, or try selecting a different file.",
+                remoteID: nil
+            )
+        }
+    }
+
+    /// Returns the most likely directory to start the file picker in — the user-visible
+    /// Image Relay sync location if known, otherwise CloudStorage.
+    private func defaultPickerDirectory() -> URL? {
+        let cloudStorage = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("CloudStorage")
+        guard let cloudStorage else { return nil }
+        // Prefer an Image Relay-named subdirectory if present.
+        if let contents = try? FileManager.default.contentsOfDirectory(atPath: cloudStorage.path) {
+            for name in contents where name.hasPrefix("ImageRelayClient-") || name.hasPrefix("Image Relay-") {
+                return cloudStorage.appendingPathComponent(name)
+            }
+        }
+        return cloudStorage
     }
 
     private func openSettingsWindow() {

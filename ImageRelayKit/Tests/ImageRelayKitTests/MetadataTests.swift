@@ -100,9 +100,155 @@ struct MetadataTests {
 
     @Test("FileMetadataUpdate hasChanges reflects which fields are set")
     func fileMetadataUpdateHasChanges() {
-        #expect(FileMetadataUpdate(description: nil, keywords: nil).hasChanges == false)
-        #expect(FileMetadataUpdate(description: "x", keywords: nil).hasChanges == true)
-        #expect(FileMetadataUpdate(description: nil, keywords: []).hasChanges == true)
-        #expect(FileMetadataUpdate(description: nil, keywords: ["a"]).hasChanges == true)
+        #expect(FileMetadataUpdate().hasChanges == false)
+        #expect(FileMetadataUpdate(description: "x").hasChanges == true)
+        #expect(FileMetadataUpdate(keywords: []).hasChanges == true)
+        #expect(FileMetadataUpdate(keywords: ["a"]).hasChanges == true)
+        #expect(FileMetadataUpdate(customFields: []).hasChanges == false)
+        #expect(FileMetadataUpdate(customFields: [.init(name: "x", value: "y")]).hasChanges == true)
+    }
+
+    @Test("FileMetadataUpdate encodes custom_fields key")
+    func fileMetadataUpdateEncodesCustomFields() throws {
+        let update = FileMetadataUpdate(
+            customFields: [
+                .init(id: 11, name: "Photographer", value: "Ada Lovelace"),
+                .init(id: 12, name: "Usage Rights", value: nil)
+            ]
+        )
+        let json = try JSONEncoder.imageRelay.encode(update)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        let fields = try #require(dict["custom_fields"] as? [[String: Any]])
+        #expect(fields.count == 2)
+        #expect(fields[0]["name"] as? String == "Photographer")
+        #expect(fields[0]["value"] as? String == "Ada Lovelace")
+        #expect(fields[1]["name"] as? String == "Usage Rights")
+        #expect(fields[1]["value"] is NSNull)
+    }
+
+    @Test("CustomField decodes integer values as strings")
+    func customFieldNumericValueDecodesAsString() throws {
+        let json = """
+        {
+            "id": 1,
+            "filename": "x.png",
+            "file_size": 0,
+            "folder_ids": [],
+            "custom_fields": [
+                {"id": 50, "name": "Year", "value": 2026},
+                {"id": 51, "name": "Score", "value": 7.5}
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder.imageRelay.decode(RemoteFileDetail.self, from: json)
+        #expect(file.customFields[0].value == "2026")
+        #expect(file.customFields[1].value == "7.5")
+    }
+}
+
+@Suite("Upload Links")
+struct UploadLinkTests {
+    @Test("Decode UploadLink list payload")
+    func decodeUploadLinkList() throws {
+        let json = """
+        [
+            {
+                "id": 100,
+                "token": "abc123",
+                "url": "https://app.imagerelay.com/uploads/abc123",
+                "name": "Spring 2026 contributors",
+                "folder_id": 200,
+                "folder_name": "Inbox",
+                "expires_on": "2026-12-31T23:59:59Z",
+                "max_files": 50,
+                "password_required": true,
+                "created_on": "2026-05-08T12:00:00Z",
+                "upload_count": 3
+            },
+            {
+                "id": 101,
+                "name": "Photographer drop"
+            }
+        ]
+        """.data(using: .utf8)!
+
+        let links = try JSONDecoder.imageRelay.decode([UploadLink].self, from: json)
+        #expect(links.count == 2)
+        #expect(links[0].name == "Spring 2026 contributors")
+        #expect(links[0].folderID == 200)
+        #expect(links[0].passwordRequired == true)
+        #expect(links[0].uploadCount == 3)
+        #expect(links[1].name == "Photographer drop")
+        #expect(links[1].passwordRequired == false)
+        #expect(links[1].folderID == nil)
+    }
+
+    @Test("UploadLinkCreate omits unset optional fields")
+    func uploadLinkCreateOmitsOptionals() throws {
+        let create = UploadLinkCreate(name: "Drop A", folderID: 200)
+        let json = try JSONEncoder.imageRelay.encode(create)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+
+        #expect(dict["name"] as? String == "Drop A")
+        #expect(dict["folder_id"] as? Int == 200)
+        #expect(dict["expires_on"] == nil)
+        #expect(dict["max_files"] == nil)
+        #expect(dict["password"] == nil)
+    }
+
+    @Test("UploadLinkCreate includes provided optional fields")
+    func uploadLinkCreateIncludesOptionals() throws {
+        let create = UploadLinkCreate(
+            name: "Drop A",
+            folderID: 200,
+            expiresOn: "2026-12-31",
+            maxFiles: 50,
+            password: "secret"
+        )
+        let json = try JSONEncoder.imageRelay.encode(create)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+
+        #expect(dict["expires_on"] as? String == "2026-12-31")
+        #expect(dict["max_files"] as? Int == 50)
+        #expect(dict["password"] as? String == "secret")
+    }
+
+    @Test("UploadLink isExpired reflects current date")
+    func uploadLinkExpiry() {
+        let pastLink = UploadLink(
+            id: 1,
+            name: "Old",
+            expiresOn: "2020-01-01T00:00:00Z"
+        )
+        let futureLink = UploadLink(
+            id: 2,
+            name: "Future",
+            expiresOn: "2099-01-01T00:00:00Z"
+        )
+        let neverLink = UploadLink(id: 3, name: "Never", expiresOn: nil)
+
+        #expect(pastLink.isExpired == true)
+        #expect(futureLink.isExpired == false)
+        #expect(neverLink.isExpired == false)
+    }
+}
+
+@Suite("Keywords")
+struct KeywordTests {
+    @Test("Decode Keyword list payload")
+    func decodeKeywordList() throws {
+        let json = """
+        [
+            {"id": 1, "name": "spring", "usage_count": 12},
+            {"id": 2, "name": "campaign"}
+        ]
+        """.data(using: .utf8)!
+
+        let keywords = try JSONDecoder.imageRelay.decode([Keyword].self, from: json)
+        #expect(keywords.count == 2)
+        #expect(keywords[0].name == "spring")
+        #expect(keywords[0].usageCount == 12)
+        #expect(keywords[1].usageCount == nil)
     }
 }

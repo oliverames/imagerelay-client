@@ -73,6 +73,9 @@ struct ImageRelayClientApp: App {
                 Tab("Folders", systemImage: "folder") {
                     FoldersSettingsView()
                 }
+                Tab("Upload Links", systemImage: "link") {
+                    UploadLinksSettingsView()
+                }
                 Tab("Activity", systemImage: "clock") {
                     ActivitySettingsView()
                 }
@@ -80,7 +83,7 @@ struct ImageRelayClientApp: App {
                     AdvancedSettingsView()
                 }
             }
-            .frame(width: 520, height: 420)
+            .frame(width: 540, height: 460)
             .environment(domainManager)
             .environment(updateController)
         }
