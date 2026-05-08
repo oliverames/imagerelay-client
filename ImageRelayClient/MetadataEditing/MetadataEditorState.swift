@@ -2,9 +2,9 @@ import Foundation
 import ImageRelayKit
 import os.log
 
-/// View-model for `MetadataEditorView`. Holds the loading/error/dirty state and
-/// coordinates calls into `MetadataEditingService`. Bound to the SwiftUI view via
-/// `@Bindable`; mutated only on `@MainActor`.
+/// View-model for `MetadataEditorView`. Holds the loading/error/dirty state, drafts for
+/// description/keywords/custom fields, and coordinates calls into `MetadataEditingService`.
+/// Bound to the SwiftUI view via `@Bindable`; mutated only on `@MainActor`.
 @Observable @MainActor
 final class MetadataEditorState {
     private let logger = Logger(
@@ -25,6 +25,8 @@ final class MetadataEditorState {
     var phase: Phase = .empty
     var descriptionDraft: String = ""
     var keywordsDraft: String = ""
+    /// Map keyed by `CustomField.stableID` so renames are stable across reloads.
+    var customFieldDrafts: [String: String] = [:]
 
     var isBusy: Bool {
         switch phase {
@@ -54,8 +56,7 @@ final class MetadataEditorState {
         phase = .loading(remoteID: remoteID, fileName: fileName)
         do {
             let detail = try await service.fetchDetail(remoteID: remoteID)
-            descriptionDraft = detail.description ?? ""
-            keywordsDraft = detail.keywords.joined(separator: ", ")
+            applyDrafts(from: detail)
             phase = .loaded(detail)
         } catch {
             logger.warning("Metadata fetch failed for \(remoteID): \(error.localizedDescription)")
@@ -77,18 +78,26 @@ final class MetadataEditorState {
     func save() async {
         guard case .loaded(let detail) = phase else { return }
         phase = .saving(detail)
+
+        let descriptionUpdate = descriptionDraft != (detail.description ?? "") ? descriptionDraft : nil
+        let parsedKWs = parsedKeywords()
+        let keywordsUpdate = parsedKWs != detail.keywords ? parsedKWs : nil
+        let customFieldsUpdate = changedCustomFieldUpdates(from: detail)
+
         let update = FileMetadataUpdate(
-            description: descriptionDraft != (detail.description ?? "") ? descriptionDraft : nil,
-            keywords: parsedKeywords() != detail.keywords ? parsedKeywords() : nil
+            description: descriptionUpdate,
+            keywords: keywordsUpdate,
+            customFields: customFieldsUpdate.isEmpty ? nil : customFieldsUpdate
         )
+
         guard update.hasChanges else {
             phase = .loaded(detail)
             return
         }
+
         do {
             let saved = try await service.updateMetadata(remoteID: detail.id, update: update)
-            descriptionDraft = saved.description ?? ""
-            keywordsDraft = saved.keywords.joined(separator: ", ")
+            applyDrafts(from: saved)
             phase = .saved(saved)
         } catch {
             logger.warning("Metadata save failed for \(detail.id): \(error.localizedDescription)")
@@ -96,9 +105,20 @@ final class MetadataEditorState {
         }
     }
 
+    private func applyDrafts(from detail: RemoteFileDetail) {
+        descriptionDraft = detail.description ?? ""
+        keywordsDraft = detail.keywords.joined(separator: ", ")
+        var newDrafts: [String: String] = [:]
+        for field in detail.customFields {
+            newDrafts[field.stableID] = field.value ?? ""
+        }
+        customFieldDrafts = newDrafts
+    }
+
     private func draftsDifferFrom(_ detail: RemoteFileDetail) -> Bool {
         if descriptionDraft != (detail.description ?? "") { return true }
         if parsedKeywords() != detail.keywords { return true }
+        if !changedCustomFieldUpdates(from: detail).isEmpty { return true }
         return false
     }
 
@@ -107,5 +127,24 @@ final class MetadataEditorState {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    private func changedCustomFieldUpdates(
+        from detail: RemoteFileDetail
+    ) -> [FileMetadataUpdate.CustomFieldUpdate] {
+        var changes: [FileMetadataUpdate.CustomFieldUpdate] = []
+        for field in detail.customFields {
+            let current = field.value ?? ""
+            let draft = customFieldDrafts[field.stableID] ?? ""
+            guard draft != current else { continue }
+            changes.append(
+                .init(
+                    id: field.id,
+                    name: field.name,
+                    value: draft.isEmpty ? nil : draft
+                )
+            )
+        }
+        return changes
     }
 }

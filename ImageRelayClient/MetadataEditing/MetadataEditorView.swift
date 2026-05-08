@@ -21,10 +21,8 @@ struct MetadataEditorView: View {
 
             footer
         }
-        .frame(minWidth: 460, minHeight: 360)
+        .frame(minWidth: 480, minHeight: 420)
     }
-
-    // MARK: - Header
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -38,8 +36,12 @@ struct MetadataEditorView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                if case .loaded(let detail) = state.phase, let id = Optional(detail.id) {
-                    Text("Asset ID \(id)")
+                if case .loaded(let detail) = state.phase {
+                    Text("Asset ID \(detail.id)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if case .saved(let detail) = state.phase {
+                    Text("Asset ID \(detail.id)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -56,26 +58,24 @@ struct MetadataEditorView: View {
         .padding(.vertical, 14)
     }
 
-    // MARK: - Content
-
     @ViewBuilder
     private var content: some View {
         switch state.phase {
         case .empty:
-            empty
+            emptyState
 
         case .loading:
-            loading
+            loadingState
 
         case .loaded, .saving, .saved:
             form
 
         case .failed(let message, _):
-            failed(message: message)
+            failedState(message: message)
         }
     }
 
-    private var empty: some View {
+    private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "info.circle.fill")
                 .font(.largeTitle)
@@ -91,7 +91,7 @@ struct MetadataEditorView: View {
         .padding(.vertical, 40)
     }
 
-    private var loading: some View {
+    private var loadingState: some View {
         VStack(spacing: 8) {
             ProgressView()
             Text("Fetching metadata...")
@@ -102,6 +102,7 @@ struct MetadataEditorView: View {
         .padding(.vertical, 40)
     }
 
+    @ViewBuilder
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
             if case .saved = state.phase {
@@ -133,41 +134,67 @@ struct MetadataEditorView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if case .loaded(let detail) = state.phase, !detail.customFields.isEmpty {
-                Divider()
-                customFieldsSection(detail.customFields)
-            } else if case .saving(let detail) = state.phase, !detail.customFields.isEmpty {
-                Divider()
-                customFieldsSection(detail.customFields)
-            } else if case .saved(let detail) = state.phase, !detail.customFields.isEmpty {
+            if let detail = currentDetail(), !detail.customFields.isEmpty {
                 Divider()
                 customFieldsSection(detail.customFields)
             }
+        }
+    }
+
+    private func currentDetail() -> RemoteFileDetail? {
+        switch state.phase {
+        case .loaded(let detail), .saving(let detail), .saved(let detail):
+            return detail
+        default:
+            return nil
         }
     }
 
     private func customFieldsSection(_ fields: [RemoteFileDetail.CustomField]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Custom Fields")
                 .font(.subheadline.bold())
-            Text("Read-only in this beta — editing custom fields will land in a follow-up.")
+            Text("Editing constrained-type fields (dropdowns, dates) sends the value as text — the server may reject malformed input.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
-                HStack(alignment: .top) {
-                    Text(field.name)
-                        .frame(width: 140, alignment: .leading)
-                        .foregroundStyle(.secondary)
-                    Text(field.value ?? "—")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                }
-                .font(.callout)
+            ForEach(fields, id: \.stableID) { field in
+                customFieldRow(field)
             }
         }
     }
 
-    private func failed(message: String) -> some View {
+    @ViewBuilder
+    private func customFieldRow(_ field: RemoteFileDetail.CustomField) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(field.name)
+                    .font(.callout.weight(.medium))
+                if let type = field.fieldType {
+                    Text(type)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(.secondary.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+            }
+            .frame(width: 140, alignment: .leading)
+            .padding(.top, 4)
+
+            TextField(
+                "—",
+                text: Binding(
+                    get: { state.customFieldDrafts[field.stableID] ?? "" },
+                    set: { state.customFieldDrafts[field.stableID] = $0 }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .disabled(state.isBusy)
+        }
+    }
+
+    private func failedState(message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.largeTitle)
@@ -186,8 +213,6 @@ struct MetadataEditorView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
     }
-
-    // MARK: - Footer
 
     private var footer: some View {
         HStack {
