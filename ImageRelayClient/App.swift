@@ -7,6 +7,7 @@ import ImageRelayKit
 struct ImageRelayClientApp: App {
     @State private var domainManager: DomainManager
     @State private var updateController: UpdateController
+    @State private var metadataEditor: MetadataEditorState
 
     init() {
         let arguments = CommandLine.arguments
@@ -15,6 +16,7 @@ struct ImageRelayClientApp: App {
 
         _domainManager = State(initialValue: DomainManager(autoBootstrap: !isUtilityInvocation))
         _updateController = State(initialValue: UpdateController(startingUpdater: !isUtilityInvocation))
+        _metadataEditor = State(initialValue: MetadataEditorState())
 
         if let exportIndex = arguments.firstIndex(of: "--export-diagnostics") {
             Task { @MainActor in
@@ -53,6 +55,7 @@ struct ImageRelayClientApp: App {
             MenuBarView()
                 .environment(domainManager)
                 .environment(updateController)
+                .environment(metadataEditor)
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -81,5 +84,11 @@ struct ImageRelayClientApp: App {
             .environment(domainManager)
             .environment(updateController)
         }
+
+        Window("Edit Metadata", id: "metadata-editor") {
+            MetadataEditorView(state: metadataEditor)
+        }
+        .defaultSize(width: 520, height: 480)
+        .windowResizability(.contentMinSize)
     }
 }
