@@ -5,8 +5,11 @@ import ImageRelayKit
 struct MenuBarView: View {
     @Environment(DomainManager.self) private var domainManager
     @Environment(UpdateController.self) private var updateController
+    @Environment(MetadataEditorState.self) private var metadataEditor
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
     @State private var timer: Timer?
+    @State private var metadataEditingService = MetadataEditingService()
 
     var body: some View {
         Group {
@@ -40,6 +43,13 @@ struct MenuBarView: View {
                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(!domainManager.isDomainActive || !domainManager.syncDownloadEnabled || domainManager.pauseState.isActive)
+
+            Button {
+                Task { await editMetadataForSelected() }
+            } label: {
+                Label("Edit Metadata for Selected...", systemImage: "info.circle")
+            }
+            .disabled(!domainManager.isDomainActive)
 
             Button {
                 updateController.checkForUpdates()
@@ -193,6 +203,42 @@ struct MenuBarView: View {
             domainManager.setPause(choice: choice)
         } label: {
             Label(title, systemImage: systemImage)
+        }
+    }
+
+    private func editMetadataForSelected() async {
+        let reader = FinderSelectionReader()
+        let presentEditor: (Int, String) -> Void = { remoteID, name in
+            openWindow(id: "metadata-editor")
+            NSApp.activate(ignoringOtherApps: true)
+            Task { await metadataEditor.load(remoteID: remoteID, fileName: name) }
+        }
+
+        do {
+            let urls = try reader.readSelection()
+            guard let firstURL = urls.first else { return }
+            if let item = await metadataEditingService.trackedItem(for: firstURL),
+               item.itemType == .file {
+                presentEditor(item.remoteID, item.name)
+                return
+            }
+            // URL was outside the FP domain, or selected item is a folder. Open the
+            // window in failed state so the user has feedback.
+            openWindow(id: "metadata-editor")
+            NSApp.activate(ignoringOtherApps: true)
+            metadataEditor.phase = .failed(
+                message: "The selected item isn't an Image Relay file. Select a single file inside the Image Relay Finder location and try again.",
+                remoteID: nil
+            )
+        } catch {
+            // Permission denial, no selection, or other AppleScript failure — open the
+            // window so the user sees the message.
+            openWindow(id: "metadata-editor")
+            NSApp.activate(ignoringOtherApps: true)
+            metadataEditor.phase = .failed(
+                message: error.localizedDescription,
+                remoteID: nil
+            )
         }
     }
 
