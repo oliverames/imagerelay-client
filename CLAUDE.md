@@ -24,7 +24,7 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run ImageRelayKit unit tests (45 tests)
+# Run ImageRelayKit unit tests (53 tests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \

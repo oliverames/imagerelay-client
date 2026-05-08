@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a problem with Finder sync, settings, updates, or installation.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Image Relay Client. Please attach a diagnostics export when the issue involves sync, settings, or File Provider behavior.
+  - type: input
+    id: version
+    attributes:
+      label: App version and build
+      description: Find this in the diagnostics manifest or the release you installed.
+      placeholder: "1.0.0 (15)"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "macOS 26.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Install or launch
+        - Settings
+        - Finder sync
+        - Upload
+        - Download
+        - Rename or move
+        - Delete
+        - Updates
+        - Diagnostics
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Image Relay in Finder
+        2. Rename ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Attach the exported diagnostics folder as a zip if it is safe to share.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I installed from the signed DMG release.
+        - label: I removed or redacted sensitive folder names, filenames, or local paths before posting publicly.

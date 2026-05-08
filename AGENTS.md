@@ -24,7 +24,7 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run ImageRelayKit unit tests (45 tests)
+# Run ImageRelayKit unit tests (53 tests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -81,6 +81,9 @@ Task { completionHandler(...) }
 
 - Upload flow: `POST /upload_jobs.json` → `PUT /upload_jobs/{job_id}/files/{upload_file_id}/chunks/{n}` → `POST /upload_jobs/{job_id}/files/{upload_file_id}/complete.json`
 - Quick link download: send `asset_id` (not `file_id`) and `disposition: "attachment"`
-- Folder listing: `GET /folders.json?parent_id=X` (there is no `/folders/{id}/children.json`)
+- Folder listing: `GET /folders/{id}/children?per_page=100&page=N`; `GET /folders/{id}/children` without pagination currently returns 404
+- Create folder: `POST /folders/{parent_id}/children` with `{ "name": "..." }`
+- Rename or move folder: `PUT /folders/{id}.json` with `name` and optional `parent_id`
+- Rename file: complete a new version with the new `file_name`; direct `/files/{id}.json` rename endpoints returned 404 in live API probing
 - Move file: `folder_ids` is array of strings (not int)
 - Rate limit responses include `Retry-After` header -- honor it; `APIClient` does this automatically

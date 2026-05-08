@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Support guide
+    url: https://github.com/oliverames/imagerelay-client/blob/main/SUPPORT.md
+    about: Read what to include in a useful bug report.
+  - name: Privacy notes
+    url: https://github.com/oliverames/imagerelay-client/blob/main/PRIVACY.md
+    about: See what diagnostics collect and redact.

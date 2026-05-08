@@ -5,14 +5,14 @@ currently uses or intentionally leaves out.
 
 ## Fully Supported
 
-- `GET /folders.json`
+- `GET /folders/{id}/children`
   Used for remote folder discovery and polling-based change detection.
 - `GET /folders/root.json`
   Used during init when the sync root is auto-detected.
-- `POST /folders.json`
+- `POST /folders/{id}/children`
   Used for local folder creation mirrored upstream.
 - `PUT /folders/{id}.json`
-  Used for in-place folder renames under the same remote parent.
+  Used for in-place folder renames and folder moves through `parent_id`.
 - `DELETE /folders/{id}.json`
   Used for folder deletions mirrored upstream.
 - `GET /folders/{id}/files.json`
@@ -32,7 +32,8 @@ currently uses or intentionally leaves out.
 - `POST /files/{id}/versions/{uuid}/chunk/{chunk_number}`
   Used for chunked version uploads.
 - `POST /files/{id}/versions/{uuid}/complete.json`
-  Used to finalize new versions.
+  Used to finalize new versions. Passing a new `file_name` here also mirrors
+  Finder file renames while preserving the remote file ID.
 - `POST /quick_links.json`
   Used to create temporary download links.
 - `DELETE /quick_links/{id}.json`
@@ -52,10 +53,6 @@ currently uses or intentionally leaves out.
 - Remote change detection
   Implemented through polling the folder and file listing endpoints. The client records the
   last successful pull and next scheduled pull, but it does not yet integrate webhooks.
-- Folder moves
-  Renames within the same parent are supported. Moving a folder to a different remote parent
-  is still not implemented because this codebase only relies on the documented update-folder
-  path.
 
 ## Not Yet Implemented
 
@@ -71,6 +68,25 @@ currently uses or intentionally leaves out.
 
 ## Important Edge-Case Decisions
 
+- Finder folder create maps to `POST /folders/{parent_id}/children`, then waits for the
+  new folder to appear in `GET /folders/{parent_id}/children` before updating local tracking.
+  If confirmation times out, the client attempts to delete the newly-created remote folder
+  and reports the operation as failed.
+- Finder file create maps to upload jobs, then waits for `GET /folders/{id}/files.json`
+  to report the expected size before updating local tracking. If confirmation times out,
+  the client attempts to delete the newly-created remote file and reports the operation as
+  failed.
+- Finder file edits and file renames map to version uploads, then wait for the folder
+  listing to report the expected size or filename before updating local tracking.
+- Finder file moves map to `POST /files/{id}/move.json`, then wait for the file to
+  disappear from the old folder listing and appear in the new folder listing before updating
+  local tracking.
+- Finder folder renames and moves map to `PUT /folders/{id}.json`, then wait for the
+  destination parent listing to report the expected folder ID and name before updating local
+  tracking.
+- Finder deletes map to the file or folder delete endpoints. File deletes retry while the
+  file remains visible; folder deletes wait for the parent listing to drop the folder before
+  local subtree cleanup.
 - Deleted remote files returned by the listing API are ignored instead of treated as active
   files.
 - A transient API failure during daemon sync marks progress as failed, logs the exception,
