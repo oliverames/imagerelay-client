@@ -8,6 +8,9 @@ struct ImageRelayClientApp: App {
     @State private var domainManager: DomainManager
     @State private var updateController: UpdateController
     @State private var metadataEditor: MetadataEditorState
+    @State private var collections: CollectionsState
+    @State private var webhooks: WebhooksState
+    @State private var products: ProductsState
 
     init() {
         let arguments = CommandLine.arguments
@@ -17,6 +20,9 @@ struct ImageRelayClientApp: App {
         _domainManager = State(initialValue: DomainManager(autoBootstrap: !isUtilityInvocation))
         _updateController = State(initialValue: UpdateController(startingUpdater: !isUtilityInvocation))
         _metadataEditor = State(initialValue: MetadataEditorState())
+        _collections = State(initialValue: CollectionsState())
+        _webhooks = State(initialValue: WebhooksState())
+        _products = State(initialValue: ProductsState())
 
         if let exportIndex = arguments.firstIndex(of: "--export-diagnostics") {
             Task { @MainActor in
@@ -56,6 +62,9 @@ struct ImageRelayClientApp: App {
                 .environment(domainManager)
                 .environment(updateController)
                 .environment(metadataEditor)
+                .environment(collections)
+                .environment(webhooks)
+                .environment(products)
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -93,5 +102,20 @@ struct ImageRelayClientApp: App {
         }
         .defaultSize(width: 520, height: 480)
         .windowResizability(.contentMinSize)
+
+        Window("Collections", id: "collections-browser") {
+            CollectionsBrowserView(state: collections)
+        }
+        .defaultSize(width: 720, height: 540)
+
+        Window("Webhooks", id: "webhooks-admin") {
+            WebhooksAdminView(state: webhooks)
+        }
+        .defaultSize(width: 600, height: 540)
+
+        Window("Products", id: "products-browser") {
+            ProductsBrowserView(state: products)
+        }
+        .defaultSize(width: 600, height: 540)
     }
 }

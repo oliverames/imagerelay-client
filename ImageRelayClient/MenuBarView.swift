@@ -51,6 +51,29 @@ struct MenuBarView: View {
             }
             .disabled(!domainManager.isDomainActive)
 
+            Menu {
+                Button {
+                    openWindow(id: "collections-browser")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Label("Collections...", systemImage: "rectangle.stack")
+                }
+                Button {
+                    openWindow(id: "products-browser")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Label("Products...", systemImage: "shippingbox")
+                }
+                Button {
+                    openWindow(id: "webhooks-admin")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Label("Webhooks...", systemImage: "antenna.radiowaves.left.and.right")
+                }
+            } label: {
+                Label("Library", systemImage: "books.vertical")
+            }
+
             Button {
                 updateController.checkForUpdates()
             } label: {
