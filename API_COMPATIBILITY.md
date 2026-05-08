@@ -54,17 +54,50 @@ currently uses or intentionally leaves out.
   Implemented through polling the folder and file listing endpoints. The client records the
   last successful pull and next scheduled pull, but it does not yet integrate webhooks.
 
+## Implemented in 1.1 betas
+
+- File metadata editing
+  `GET /files/{id}.json` returns description, keyword list, and any custom file-type fields;
+  `PUT /files/{id}.json` updates them. Used by the metadata editor window. Custom file-type
+  fields are sent as text values; the server validates per-type and may reject malformed input.
+- Upload links
+  `GET /upload_links.json` lists existing links, `POST /upload_links.json` creates a new
+  link with name/folder/expiry/max-files/password, `DELETE /upload_links/{id}.json` revokes.
+  Used by the Upload Links Settings tab.
+- Collections
+  `GET /collections.json` lists collections, `GET /collections/{id}/items.json` lists members,
+  `POST /collections/{id}/items.json` adds files, `DELETE /collections/{id}/items/{file_id}.json`
+  removes files. Used by the Collections browser window.
+- Products (read-only)
+  `GET /products.json` lists products. Used by the Products browser window.
+- Webhook administration
+  `GET /webhooks.json`, `POST /webhooks.json`, `DELETE /webhooks/{id}.json`. Used by the
+  Webhooks admin window. Some accounts require an admin-tier API key for these endpoints;
+  the UI surfaces 403 responses with a recovery hint.
+
 ## Not Yet Implemented
 
-- Webhooks
-  The API supports webhooks, but this desktop client does not register or consume them yet.
+- Webhook consumption
+  The desktop client doesn't subscribe to webhook deliveries yet — that requires a public
+  relay (NAT'd desktop can't host a webhook URL directly). Planned: a Cloudflare Worker
+  receives Image Relay webhook POSTs, validates an HMAC signature, and pushes events to
+  subscribed desktop clients via Server-Sent Events. Tracked as Phase 7 of 1.1.
 - OAuth-based auth flows
   The client currently assumes API-key style access through configured credentials.
-- Metadata editing, tag editing, and file-type/template management beyond a single default
-  `file_type_id`
+- File type / template administration
+  `GET /file_types.json` and per-template field schemas not yet consumed; the metadata
+  editor sends custom fields as text values without per-type validation.
+- Keyword administration
+  `GET /keywords.json` model is in place but the keyword autocomplete UI hookup ships in
+  beta 4.
+- User administration
+  `GET /users.json` not consumed yet.
+- Synced files / multi-folder asset memberships
+  See "Partially Supported" below — multi-folder downloads work, but creating new
+  multi-folder memberships through the dedicated synced-file API doesn't.
 - Upload by URL
-- Duplicate file, folder links, upload links, and public sharing link management
-- User, collection, catalog, product, keyword, and webhook administration endpoints
+- Duplicate file, folder links, and public sharing link management
+- Catalog endpoints beyond product list
 
 ## Important Edge-Case Decisions
 
