@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-05-08 - 1.1.0-beta.3: Phase 3 (Collections) + Phase 4 (Products) + Phase 5 (Webhooks admin)
+
+**What changed**: Three new feature surfaces, all delivered as standalone Window scenes triggered from a new menu bar "Library" submenu rather than expanding the Settings TabView (which would have hit 8+ tabs and become unwieldy). New ImageRelayKit models: `Collection`, `CollectionItem`, `CollectionItemAdd`, `Webhook`, `WebhookCreate`, `WebhookEventType`, and `Product`, with custom decoders that tolerate the field-name aliasing common across Image Relay deployments (`item_count` vs `file_count`, `filename` vs `file_name`, `is_active` vs `active` vs `enabled`, string-array events vs object-array events with `name` keys, category as either string or nested object). Each model includes an explicit `encode(to:)` to round-trip cleanly.
+
+Host-app additions: `CollectionsService`/`CollectionsState`/`CollectionsBrowserView` (NavigationSplitView with collection list on the left, item list on the right with inline remove), `WebhooksService`/`WebhooksState`/`WebhooksAdminView` (list with active/inactive badges, sheet-based create form with toggle list of known event types, signing secret field, confirmation-aware delete), `ProductsService`/`ProductsState`/`ProductsBrowserView` (read-only list with search filter, asset count, category, SKU). New Window scenes: `collections-browser`, `webhooks-admin`, `products-browser`. New "Library" submenu in the menu bar with three items, each opening its window and activating the app via `NSApp.activate(ignoringOtherApps:)`. Bumped marketing version to `1.1.0-beta.3`, build number to `19`.
+
+**Verification**: 80/80 ImageRelayKit tests pass (66 prior + 14 new across `CollectionTests`, `WebhookTests`, and `ProductTests`). `xcodebuild build` clean. The CRUD shapes (response wrappers, request bodies) follow the same tolerant-decoder pattern as `UploadLinksService`: try the wrapped form first, fall back to bare-array/bare-object.
+
+**Decisions made**: Window scenes over Settings tabs. Read-only Products instead of full edit (write APIs aren't documented and the user value is mostly browsing for now). Removed-from-collection action is per-item via a row button rather than multi-select; multi-select needs more thought about whether it batches or sequences. Webhook event subscription uses a fixed list of known event types (`WebhookEventType.allKnown`) rather than fetching the catalog from the API — newer event types will need a model update, but this avoids an extra API roundtrip on every form open.
+
+**Open questions**: Image Relay's exact response shape for `/collections.json`, `/collections/{id}/items.json`, `/webhooks.json`, `/products.json`, and create/delete responses are inferred from common patterns; the tolerant decoders in each service should absorb most variation, but live testing may reveal a shape that doesn't match. Some accounts require admin-tier API keys for webhook administration — the UI surfaces 403 responses as a "Couldn't load webhooks" error with a hint about admin credentials. Add-to-collection-from-Finder-selection isn't wired in the UI yet (the service supports it). Still open: rotate the App Store Connect API key when convenient if it is still considered exposed.
+
+**Left off at**: Source for 1.1.0-beta.3 staged for commit. Build, notarize, GitHub prerelease still need to run. After beta 3 publishes, the remaining 1.1 scope is: Phase 1 polish remainder (multi-select metadata, keyword autocomplete, SQLite cache) + Phase 6 (file types, keywords, users admin) + Phase 7 (consumer webhook relay via Cloudflare Worker + SSE).
+
+---
+
 ## 2026-05-08 - 1.1.0-beta.2: Phase 1 polish (custom fields + NSOpenPanel fallback) + Phase 2 (Upload Links)
 
 **What changed**: Two coherent feature additions on top of beta 1.
