@@ -16,7 +16,7 @@ LEGACY_APP_BUNDLE_NAME="ImageRelayClient.app"
 APP_EXECUTABLE_NAME="Image Relay"
 SPARKLE_VERSION="2.9.1"
 SPARKLE_1PASSWORD_ITEM="Image Relay Sparkle EdDSA Private Key"
-SPARKLE_RELEASE_REPOSITORY="oliverames/imagerelay-client-releases"
+SPARKLE_RELEASE_REPOSITORY="oliverames/imagerelay-client"
 SPARKLE_RELEASE_BASE_URL="https://github.com/$SPARKLE_RELEASE_REPOSITORY/releases/download"
 
 VERSION=""

@@ -28,6 +28,6 @@ open -a "Image Relay" --args --export-diagnostics
 ## Before Filing
 
 - Confirm you are running the latest release from the public release page:
-  https://github.com/oliverames/imagerelay-client-releases/releases/latest
+  https://github.com/oliverames/imagerelay-client/releases/latest
 - Try **Settings > Advanced > Reset Finder Sync** if the Finder location is missing or stale.
 - Use **Check for Updates** from the menu bar item before reporting an issue that may already be fixed.

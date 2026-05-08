@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-08 - 1.0.1 release prep: repo consolidation + Liquid Glass icon
+
+**What changed**: Consolidated public release hosting from `oliverames/imagerelay-client-releases` into the source repo `oliverames/imagerelay-client`. Updated `SUFeedURL` in the host app `Info.plist`, the `SPARKLE_RELEASE_REPOSITORY` constant in the release script, README badges and download link, and the SUPPORT.md latest-release link. Bumped marketing version to `1.0.1` and build number to `16`. Migrated the AppIcon from a legacy `.appiconset` (PNG bitmaps with hand-rolled rounded-rectangle corners) to a single Icon Composer `.icon` bundle at `ImageRelayClient/AppIcon.icon`, so macOS 26 renders the proper continuous-curve squircle, specular highlight, and adaptive light/dark/tinted/clear variants at runtime through Liquid Glass material instead of from baked-in bitmaps. Confirmed the README test count claim (`51 tests across 9 suites` → `53 tests across 9 suites`).
+
+**Verification**: `swift test --package-path ImageRelayKit` passed 53 tests. `xcodebuild build` succeeded with the new `.icon` file routed through `actool` — the resulting `Assets.car` contains 7 Icon Image variants, 3 IconImageStack arrangements, and the SVG vector layer preserved as scalable vector (vs. the legacy 8 PNG bitmaps). Generated `assetcatalog_generated_info.plist` now sets `CFBundleIconName = AppIcon`. xcodegen 2.45.4 recognized `AppIcon.icon` as `wrapper.icon` and added it to the Resources build phase as a single bundle reference, not recursively.
+
+**Decisions made**: Kept `App Icon/Image Relay Icon.pxd` and `Image Relay Icon.svg` as authoring masters in the existing `App Icon/` directory; the `.icon` bundle that ships is in `ImageRelayClient/AppIcon.icon` so there is one canonical build-wired version. Did not retroactively rewrite earlier WORKLOG entries that reference `imagerelay-client-releases` — those are historical narrative for the releases that actually shipped from there.
+
+**Left off at**: 1.0.1 source is staged for commit. The build, notarization, GitHub release, and one-time bridge appcast publish to `imagerelay-client-releases` for existing 1.0.0 users still need to run.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient if it is still considered exposed.
+
+---
+
 ## 2026-05-08 - 1.0.0 public release
 
 **What changed**: Completed the Finder parity pass for local API mutations. Folder create now uses `POST /folders/{parent_id}/children`; folder rename and move use `PUT /folders/{id}.json`; file move waits for the file to leave the old folder and appear in the new one; file rename preserves the remote file ID through a version upload with `file_name`; deletes wait for remote confirmation before local cleanup. Added confirmation and cleanup safety around local creates, uploads, renames, moves, and deletes so the database is not advanced until Image Relay listings show the expected remote state. Updated API compatibility docs, release testing docs, README, support/privacy notes, issue templates, and release scripts for 1.0.0 build 15.
