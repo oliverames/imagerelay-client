@@ -297,11 +297,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
     private func listChildFolders(parentID: Int) async throws -> [RemoteFolder] {
         let folders: [RemoteFolder] = try await api.getAllPages(
-            "/folders.json",
-            query: ["parent_id": "\(parentID)"]
+            "/folders/\(parentID)/children"
         )
-        // Image Relay currently accepts the parent_id query but may still return
-        // sibling folders. Trust the payload parent field before exposing items.
         return folders
             .filter { $0.parentID == parentID }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

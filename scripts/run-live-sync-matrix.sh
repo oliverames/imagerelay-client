@@ -22,9 +22,12 @@ Runs a live, destructive sync smoke test using uniquely named temporary files.
 Defaults are scoped to Oliver's Stuff (folder 2907644). The script verifies:
   - local file create uploads remotely
   - local file modify updates remote size
+  - local file rename updates the remote filename
+  - local file move updates the remote parent folder
   - local file delete removes the remote file
   - zero-byte file create/delete
   - 6 MB file create/delete, unless --skip-large is passed
+  - local folder create, rename, and move update remote folders
 
 Set IMAGE_RELAY_API_KEY to avoid reading the API key from 1Password.
 EOF
@@ -83,17 +86,25 @@ fi
 
 TMP_DIR="$(mktemp -d /tmp/imagerelay-live-matrix.XXXXXX)"
 API_HELPER="$TMP_DIR/api.py"
-PREFIX="Codex-Beta14-LiveMatrix-$(date +%Y%m%d-%H%M%S)-$$"
+PREFIX="Codex-ReleaseLiveMatrix-$(date +%Y%m%d-%H%M%S)-$$"
 CREATED_NAMES=()
+CREATED_FOLDER_NAMES=()
 LOCAL_PATHS=()
+LOCAL_DIRS=()
 
 cleanup() {
   set +e
   for local_path in "${LOCAL_PATHS[@]:-}"; do
     [[ -e "$local_path" ]] && rm -f "$local_path"
   done
+  for local_dir in "${LOCAL_DIRS[@]:-}"; do
+    [[ -e "$local_dir" ]] && rm -rf "$local_dir"
+  done
   for name in "${CREATED_NAMES[@]:-}"; do
     python3 "$API_HELPER" delete-name "$name" >/dev/null 2>&1 || true
+  done
+  for name in "${CREATED_FOLDER_NAMES[@]:-}"; do
+    python3 "$API_HELPER" delete-folder-name "$REMOTE_FOLDER_ID" "$name" >/dev/null 2>&1 || true
   done
   rm -rf "$TMP_DIR"
 }
@@ -132,21 +143,47 @@ def request(method, path, body=None):
     return json.loads(raw.decode("utf-8")) if raw else None
 
 
-def files():
+def files(folder_id=FOLDER_ID):
     items = []
     for page in range(1, 11):
         query = urllib.parse.urlencode({"recursive": "false", "per_page": "100", "page": str(page)})
-        page_items = request("GET", f"/folders/{FOLDER_ID}/files.json?{query}") or []
+        response = request("GET", f"/folders/{folder_id}/files.json?{query}") or []
+        if isinstance(response, dict):
+            page_items = response.get("files") or []
+        else:
+            page_items = response
         items.extend(page_items)
         if len(page_items) < 100:
             break
     return items
 
 
-def find_name(name):
-    for item in files():
+def folders(parent_id):
+    items = []
+    for page in range(1, 11):
+        query = urllib.parse.urlencode({"per_page": "100", "page": str(page)})
+        response = request("GET", f"/folders/{parent_id}/children?{query}") or []
+        if isinstance(response, dict):
+            page_items = response.get("folders") or []
+        else:
+            page_items = response
+        items.extend(page_items)
+        if len(page_items) < 100:
+            break
+    return items
+
+
+def find_name(name, folder_id=FOLDER_ID):
+    for item in files(folder_id):
         item_name = item.get("filename") or item.get("name")
         if item_name == name and not item.get("deleted", False):
+            return item
+    return None
+
+
+def find_folder(parent_id, name):
+    for item in folders(parent_id):
+        if item.get("name") == name and not item.get("deleted", False):
             return item
     return None
 
@@ -163,8 +200,17 @@ if command == "assert-size":
         print(json.dumps(item))
         sys.exit(0)
     sys.exit(1)
+if command == "assert-size-in-folder":
+    item = find_name(sys.argv[3], sys.argv[2])
+    expected = int(sys.argv[4])
+    if item and int(item.get("file_size") or item.get("size") or 0) == expected:
+        print(json.dumps(item))
+        sys.exit(0)
+    sys.exit(1)
 if command == "assert-absent":
     sys.exit(0 if find_name(sys.argv[2]) is None else 1)
+if command == "assert-absent-in-folder":
+    sys.exit(0 if find_name(sys.argv[3], sys.argv[2]) is None else 1)
 if command == "delete-name":
     deleted = 0
     for item in files():
@@ -172,6 +218,22 @@ if command == "delete-name":
         if item_name == sys.argv[2] and not item.get("deleted", False):
             request("DELETE", f"/files/{item['id']}.json")
             deleted += 1
+    print(deleted)
+    sys.exit(0)
+if command == "folder-id":
+    item = find_folder(sys.argv[2], sys.argv[3])
+    if item:
+        print(item["id"])
+        sys.exit(0)
+    sys.exit(1)
+if command == "assert-folder-absent":
+    sys.exit(0 if find_folder(sys.argv[2], sys.argv[3]) is None else 1)
+if command == "delete-folder-name":
+    deleted = 0
+    item = find_folder(sys.argv[2], sys.argv[3])
+    if item:
+        request("DELETE", f"/folders/{item['id']}.json")
+        deleted += 1
     print(deleted)
     sys.exit(0)
 
@@ -194,6 +256,23 @@ wait_for_size() {
   return 1
 }
 
+wait_for_size_in_folder() {
+  local folder_id="$1"
+  local name="$2"
+  local size="$3"
+  local elapsed=0
+  while ((elapsed <= TIMEOUT_SECONDS)); do
+    if python3 "$API_HELPER" assert-size-in-folder "$folder_id" "$name" "$size" >/dev/null 2>&1; then
+      echo "Verified remote file in folder $folder_id: $name ($size bytes)"
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+    elapsed=$((elapsed + POLL_SECONDS))
+  done
+  echo "Timed out waiting for remote file $name in folder $folder_id to reach $size bytes." >&2
+  return 1
+}
+
 wait_for_absent() {
   local name="$1"
   local elapsed=0
@@ -206,6 +285,55 @@ wait_for_absent() {
     elapsed=$((elapsed + POLL_SECONDS))
   done
   echo "Timed out waiting for remote deletion of $name." >&2
+  return 1
+}
+
+wait_for_absent_in_folder() {
+  local folder_id="$1"
+  local name="$2"
+  local elapsed=0
+  while ((elapsed <= TIMEOUT_SECONDS)); do
+    if python3 "$API_HELPER" assert-absent-in-folder "$folder_id" "$name" >/dev/null 2>&1; then
+      echo "Verified remote deletion in folder $folder_id: $name"
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+    elapsed=$((elapsed + POLL_SECONDS))
+  done
+  echo "Timed out waiting for remote deletion of $name in folder $folder_id." >&2
+  return 1
+}
+
+wait_for_folder() {
+  local parent_id="$1"
+  local name="$2"
+  local elapsed=0
+  local result_file="$TMP_DIR/folder-id.txt"
+  while ((elapsed <= TIMEOUT_SECONDS)); do
+    if python3 "$API_HELPER" folder-id "$parent_id" "$name" >"$result_file" 2>/dev/null; then
+      cat "$result_file"
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+    elapsed=$((elapsed + POLL_SECONDS))
+  done
+  echo "Timed out waiting for remote folder $name under folder $parent_id." >&2
+  return 1
+}
+
+wait_for_folder_absent() {
+  local parent_id="$1"
+  local name="$2"
+  local elapsed=0
+  while ((elapsed <= TIMEOUT_SECONDS)); do
+    if python3 "$API_HELPER" assert-folder-absent "$parent_id" "$name" >/dev/null 2>&1; then
+      echo "Verified remote folder absent under $parent_id: $name"
+      return 0
+    fi
+    sleep "$POLL_SECONDS"
+    elapsed=$((elapsed + POLL_SECONDS))
+  done
+  echo "Timed out waiting for remote folder $name under folder $parent_id to disappear." >&2
   return 1
 }
 
@@ -251,12 +379,25 @@ echo "Running live sync matrix in: $SYNC_FOLDER_PATH"
 echo "Remote folder ID: $REMOTE_FOLDER_ID"
 
 small_name="$PREFIX-create-modify-delete.txt"
-write_file "$small_name" "beta14-create"
+write_file "$small_name" "release-create"
 small_path="$SYNC_FOLDER_PATH/$small_name"
-wait_for_size "$small_name" 13
-printf 'beta14-create-modified' > "$small_path"
-wait_for_size "$small_name" 22
+wait_for_size "$small_name" 14
+printf 'release-create-modified' > "$small_path"
+wait_for_size "$small_name" 23
 remove_file_and_wait "$small_name"
+
+rename_old_name="$PREFIX-rename-old.txt"
+rename_new_name="$PREFIX-rename-new.txt"
+write_file "$rename_old_name" "release-rename"
+rename_old_path="$SYNC_FOLDER_PATH/$rename_old_name"
+rename_new_path="$SYNC_FOLDER_PATH/$rename_new_name"
+wait_for_size "$rename_old_name" 14
+mv "$rename_old_path" "$rename_new_path"
+LOCAL_PATHS+=("$rename_new_path")
+CREATED_NAMES+=("$rename_new_name")
+wait_for_absent "$rename_old_name"
+wait_for_size "$rename_new_name" 14
+remove_file_and_wait "$rename_new_name"
 
 zero_name="$PREFIX-zero-byte.txt"
 zero_path="$SYNC_FOLDER_PATH/$zero_name"
@@ -276,6 +417,59 @@ if [[ "$RUN_LARGE_FILE" -eq 1 ]]; then
   remove_file_and_wait "$large_name"
 else
   echo "Skipping large-file upload check."
+fi
+
+source_folder="$PREFIX-source"
+destination_folder="$PREFIX-destination"
+folder_to_rename="$PREFIX-folder-old"
+folder_renamed="$PREFIX-folder-new"
+folder_to_move="$PREFIX-folder-to-move"
+
+mkdir "$SYNC_FOLDER_PATH/$source_folder" "$SYNC_FOLDER_PATH/$destination_folder" "$SYNC_FOLDER_PATH/$folder_to_rename"
+LOCAL_DIRS+=("$SYNC_FOLDER_PATH/$source_folder" "$SYNC_FOLDER_PATH/$destination_folder" "$SYNC_FOLDER_PATH/$folder_to_rename")
+CREATED_FOLDER_NAMES+=("$source_folder" "$destination_folder" "$folder_to_rename" "$folder_renamed")
+
+source_folder_id="$(wait_for_folder "$REMOTE_FOLDER_ID" "$source_folder")"
+destination_folder_id="$(wait_for_folder "$REMOTE_FOLDER_ID" "$destination_folder")"
+rename_folder_id="$(wait_for_folder "$REMOTE_FOLDER_ID" "$folder_to_rename")"
+
+mv "$SYNC_FOLDER_PATH/$folder_to_rename" "$SYNC_FOLDER_PATH/$folder_renamed"
+LOCAL_DIRS+=("$SYNC_FOLDER_PATH/$folder_renamed")
+renamed_folder_id="$(wait_for_folder "$REMOTE_FOLDER_ID" "$folder_renamed")"
+wait_for_folder_absent "$REMOTE_FOLDER_ID" "$folder_to_rename"
+if [[ "$rename_folder_id" != "$renamed_folder_id" ]]; then
+  echo "Folder rename changed the remote folder ID ($rename_folder_id -> $renamed_folder_id)." >&2
+  exit 1
+fi
+
+move_file_name="$PREFIX-move-between-folders.txt"
+move_file_source_path="$SYNC_FOLDER_PATH/$source_folder/$move_file_name"
+move_file_destination_path="$SYNC_FOLDER_PATH/$destination_folder/$move_file_name"
+printf 'release-file-move' > "$move_file_source_path"
+LOCAL_PATHS+=("$move_file_source_path" "$move_file_destination_path")
+CREATED_NAMES+=("$move_file_name")
+wait_for_size_in_folder "$source_folder_id" "$move_file_name" 17
+mv "$move_file_source_path" "$move_file_destination_path"
+wait_for_absent_in_folder "$source_folder_id" "$move_file_name"
+wait_for_size_in_folder "$destination_folder_id" "$move_file_name" 17
+osascript - "$move_file_destination_path" <<'OSA' >/dev/null
+on run argv
+  set targetFile to POSIX file (item 1 of argv)
+  tell application "Finder" to delete targetFile
+end run
+OSA
+wait_for_absent_in_folder "$destination_folder_id" "$move_file_name"
+
+mkdir "$SYNC_FOLDER_PATH/$source_folder/$folder_to_move"
+LOCAL_DIRS+=("$SYNC_FOLDER_PATH/$source_folder/$folder_to_move" "$SYNC_FOLDER_PATH/$destination_folder/$folder_to_move")
+CREATED_FOLDER_NAMES+=("$folder_to_move")
+move_folder_id="$(wait_for_folder "$source_folder_id" "$folder_to_move")"
+mv "$SYNC_FOLDER_PATH/$source_folder/$folder_to_move" "$SYNC_FOLDER_PATH/$destination_folder/$folder_to_move"
+moved_folder_id="$(wait_for_folder "$destination_folder_id" "$folder_to_move")"
+wait_for_folder_absent "$source_folder_id" "$folder_to_move"
+if [[ "$move_folder_id" != "$moved_folder_id" ]]; then
+  echo "Folder move changed the remote folder ID ($move_folder_id -> $moved_folder_id)." >&2
+  exit 1
 fi
 
 echo "Live sync matrix passed."

@@ -19,7 +19,7 @@
   <a href="https://github.com/oliverames/imagerelay-client-releases/releases/latest">
     <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client-releases?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
-  <img src="https://img.shields.io/badge/status-beta-f5a542?style=flat-square" alt="Beta">
+  <img src="https://img.shields.io/badge/status-1.0-f5a542?style=flat-square" alt="1.0">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
     <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
@@ -30,7 +30,7 @@
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **Beta**: Image Relay Client is currently in public beta on macOS 26 (Tahoe). Core sync, upload, download, and conflict handling are working; see [Known Limitations](#known-limitations) for what isn't.
+> **1.0 release**: Image Relay Client is ready for day-to-day Finder sync on macOS 26 (Tahoe). See [Known Limitations](#known-limitations) for the few behaviors that still depend on Image Relay API shape rather than local Finder support.
 
 ## Why This Exists
 
@@ -72,7 +72,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **New versions** -- When you modify an existing file, File Provider calls the extension with the local copy. The extension requests a version UUID from Image Relay, uploads the new content in chunks, finalizes the version, and immediately signals affected enumerators so Finder refreshes without waiting for the next remote poll.
 
-**Rename / move** -- Folder renames use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames are not supported by the Image Relay API. Folder moves are blocked in Finder for this beta because the API has no atomic folder-move endpoint.
+**Rename / move** -- Folder renames and folder moves use `PUT /folders/{id}.json`. File moves use `POST /files/{id}/move.json`. File renames preserve the remote file ID by completing a new version with the new `file_name`.
 
 **Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current selected subtree, diffs it against the local database, and surfaces additions, changes, and deletions to Finder. The host app also signals enumerators every 5 minutes as a quiet watchdog after system sleep or extension restarts.
 
@@ -145,7 +145,7 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB automatically.
 
 ```sh
-# Run the unit test suite (50 tests across 9 suites)
+# Run the unit test suite (51 tests across 9 suites)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -155,25 +155,24 @@ xcodebuild test \
 swift test --package-path ImageRelayKit
 
 # Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.0.0-beta.14
+scripts/run-release-candidate-checks.sh 1.0.0
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.0.0-beta.14 --smoke-install
+scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install
 ```
 
 ## Known Limitations
 
-- **File renames** are not supported — the Image Relay API does not expose a rename endpoint for files.
-- **Folder moves** are blocked in Finder for this beta — moving a folder would require a non-atomic create/copy/delete sequence against the API.
 - **Remote change detection** is polling-based — the API does not expose a webhook or cursor-based push feed.
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
+- **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 
 ## Contributing & Issues
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). If you're testing the beta, the [`BETA_TESTING.md`](BETA_TESTING.md) checklist covers the full set of scenarios worth verifying against a real Image Relay account.
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). Please include a diagnostics export when reporting sync behavior; see [Support](SUPPORT.md), [Privacy](PRIVACY.md), and the [release testing checklist](RELEASE_TESTING.md) for what is collected and redacted.
 
 ---
 

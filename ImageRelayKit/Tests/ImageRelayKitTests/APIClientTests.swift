@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import ImageRelayKit
 
@@ -33,7 +34,7 @@ private struct ChunkAck: Decodable, Sendable {
 struct APIClientTests {
     let baseURL = URL(string: "https://api.test.imagerelay.com/api/v2")!
 
-    func makeClient() -> APIClient {
+    func makeClient(maxRetries: Int = 3, maxRetryDelay: TimeInterval = 30) -> APIClient {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
         return APIClient(
@@ -41,7 +42,9 @@ struct APIClientTests {
             apiKey: "test-key",
             userAgent: "TestAgent/1.0",
             sessionConfiguration: config,
-            rateLimiter: RateLimiter(maxRequests: 100, period: 1.0)
+            rateLimiter: RateLimiter(maxRequests: 100, period: 1.0),
+            maxRetries: maxRetries,
+            maxRetryDelay: maxRetryDelay
         )
     }
 
@@ -212,6 +215,45 @@ struct APIClientTests {
         #expect(folders.map(\.id) == [1, 2])
     }
 
+    @Test("Folder children pagination sends page and per_page")
+    func getAllPagesFolderChildrenPaginationQuery() async throws {
+        var observedQuery: [String: String] = [:]
+        MockURLProtocol.requestHandler = { request in
+            let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
+            observedQuery = Dictionary(
+                uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") }
+            )
+            let json = """
+            {
+              "folders": [
+                {"id":1,"name":"Child","parent_id":123,"path":"/Root/Child","updated_on":null,"child_count":0}
+              ],
+              "pagination": {
+                "current": 1,
+                "next": null,
+                "per_page": 100,
+                "pages": 1,
+                "count": 1,
+                "prev_page_path": null,
+                "next_page_path": null
+              }
+            }
+            """
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, json.data(using: .utf8)!)
+        }
+
+        let client = makeClient()
+        let folders: [RemoteFolder] = try await client.getAllPages("/folders/123/children")
+
+        #expect(folders.map(\.id) == [1])
+        #expect(observedQuery["page"] == "1")
+        #expect(observedQuery["per_page"] == "100")
+    }
+
     @Test("Decodes folder list from API response")
     func decodeFolderList() async throws {
         let json = """
@@ -253,6 +295,33 @@ struct APIClientTests {
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
+    }
+
+    @Test("Retries 429 before surfacing rate limit failures")
+    func retriesRateLimitedRequests() async throws {
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if requestCount == 1 {
+                let response = HTTPURLResponse(
+                    url: request.url!, statusCode: 429,
+                    httpVersion: nil, headerFields: ["Retry-After": "0"]
+                )!
+                return (response, Data())
+            }
+
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, #"[]"#.data(using: .utf8)!)
+        }
+
+        let client = makeClient(maxRetries: 1, maxRetryDelay: 0)
+        let folders: [RemoteFolder] = try await client.get("/folders.json")
+
+        #expect(folders.isEmpty)
+        #expect(requestCount == 2)
     }
 
     @Test("404 throws notFound")

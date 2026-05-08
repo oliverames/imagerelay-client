@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-08 - 1.0.0 public release
+
+**What changed**: Completed the Finder parity pass for local API mutations. Folder create now uses `POST /folders/{parent_id}/children`; folder rename and move use `PUT /folders/{id}.json`; file move waits for the file to leave the old folder and appear in the new one; file rename preserves the remote file ID through a version upload with `file_name`; deletes wait for remote confirmation before local cleanup. Added confirmation and cleanup safety around local creates, uploads, renames, moves, and deletes so the database is not advanced until Image Relay listings show the expected remote state. Updated API compatibility docs, release testing docs, README, support/privacy notes, issue templates, and release scripts for 1.0.0 build 15.
+
+**Verification**: `swift test --package-path ImageRelayKit` passed 53 tests. `scripts/run-release-candidate-checks.sh 1.0.0` passed, including package tests, XcodeGen, Xcode scheme tests, and unsigned app build. `scripts/build-developer-id-release.sh --version 1.0.0 --smoke-install` produced a signed, notarized, stapled DMG and installed build 15 over `/Applications/Image Relay.app`. Live sync matrix passed in selected folder `Oliver's Stuff` (`2907644`) and a temporary second folder, covering local file create, modify, rename, move, delete, zero-byte upload, 6 MB upload, folder create, folder rename, and folder move. Diagnostics export was verified to omit API key material. Public Sparkle appcast and DMG download were verified anonymously from `oliverames/imagerelay-client-releases`, and a Beta 14 install fetched and completed the update to build 15 after app quit.
+
+**Decisions made**: Screenshots were skipped for this release per user direction. Webhooks, metadata editing, upload links, and collection/product administration remain intentionally outside 1.0.0 scope.
+
+**Left off at**: Version `1.0.0` build `15` is published as the latest public release in `oliverames/imagerelay-client-releases`, and `/Applications/Image Relay.app` is installed from build 15.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient if it is still considered exposed.
+
+---
+
 ## 2026-05-07 - Beta 13: immediate local mutation refresh
 
 **What changed**: Local File Provider mutations now signal affected enumerators immediately after successful API writes. Creates, version uploads, conflict-copy uploads, folder moves, metadata changes, and deletes all notify the working set, root container, and affected parent folder containers without waiting for the next remote polling window. The upload itself was already immediate through `createItem` and `modifyItem`; this beta tightens the post-upload Finder refresh path. Bumped build number to `13`, updated README release docs, and hardened the Developer ID release script so it installs isolated Python release dependencies when the system `cryptography` package is importable but unusable.

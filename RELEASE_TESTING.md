@@ -1,4 +1,4 @@
-# ImageRelayClient Beta Testing Checklist
+# ImageRelayClient Release Testing Checklist
 
 Use this checklist with a signed release build from GitHub Releases, not a local Debug build. Record the app version, macOS version, Image Relay account, selected folder IDs, and whether the File Provider domain had to be reset.
 
@@ -24,7 +24,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 ## Folder Selection
 
 - Open Settings > Folders.
-- Select only the intended beta folder, for example Oliver's Stuff.
+- Select only the intended test folder, for example Oliver's Stuff.
 - Close and reopen Settings.
 - Confirm only the selected folder remains checked.
 - Trigger Sync Now from the menu bar.
@@ -81,9 +81,9 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 - Delete a small local test file in Finder and confirm it is removed from Image Relay.
 - Rename a local folder and confirm the folder rename reaches Image Relay.
-- Attempt to rename a local file and confirm the app reports or handles the unsupported operation cleanly.
+- Rename a local file and confirm the new filename reaches Image Relay while the file remains downloadable.
 - Move a local file between synced folders and confirm Image Relay reflects the move.
-- Attempt to move a local folder and confirm Finder reports the unsupported operation without creating, deleting, or moving remote folders.
+- Move a local folder between synced folders and confirm Image Relay reflects the move without changing the remote folder ID.
 
 ## Bad API Key
 
@@ -110,7 +110,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Release Automation
 
-- Run `scripts/run-release-candidate-checks.sh 1.0.0-beta.14` on a macOS 26 machine with Xcode 26.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14`.
-- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.0.0-beta.14`.
+- Run `scripts/run-release-candidate-checks.sh 1.0.0` on a macOS 26 machine with Xcode 26.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.0.0`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
