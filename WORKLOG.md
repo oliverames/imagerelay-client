@@ -180,7 +180,11 @@ Other changes: replaced `DomainManager.openDatabase()` (which opened a fresh GRD
 
 **Diagnostics and polish**: Diagnostics export now includes `system.json` and `crash-reports.txt`, and `manifest.json` records app version/build and update-feed presence without exposing secrets. General settings now includes a Save and Connect action plus a warning when uploads are enabled but no Default File Type ID is configured.
 
-**Verification target**: Run the full RC script, live matrix against selected folder `2907644` only, signed Developer ID packaging, smoke install, and GitHub prerelease publishing for final Beta 14.
+**Verification**: Final Beta 14 passed `scripts/run-release-candidate-checks.sh 1.0.0-beta.14`, signed Developer ID packaging, notarization, stapling, `/Applications` smoke install, codesign/Gatekeeper/stapler validation, diagnostics export, public appcast download, public DMG checksum download, and `scripts/run-live-sync-matrix.sh` against selected folder `2907644` only. The live matrix covered create, rapid edit, Finder delete, zero-byte upload/delete, and 6 MB upload/delete.
+
+**Left off at**: Beta 14 is released from the public asset host at `https://github.com/oliverames/imagerelay-client-releases/releases/tag/v1.0.0-beta.14`. The source repo's private `v1.0.0-beta.14` release and tag were also updated to the final source commit and final assets so the internal release does not point at stale artifacts.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient because an earlier repo-local copy was treated as exposed.
 
 ---
 
