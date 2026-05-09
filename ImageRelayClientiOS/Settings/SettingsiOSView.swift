@@ -23,12 +23,15 @@ struct SettingsiOSView: View {
             } header: {
                 Text("Account")
             } footer: {
-                Text("The root folder ID is the numeric ID of the folder you want to expose in Files. Leave Sync Upload off for read-only mobile use.")
+                Text("The root folder ID is the numeric ID of the folder you want to expose in Files.")
             }
 
             Section("Sync") {
                 Toggle("Allow downloads", isOn: bindingForSyncDownload)
-                Toggle("Allow uploads", isOn: bindingForSyncUpload)
+                LabeledContent("Uploads") {
+                    Text("Read-only in Files")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -80,13 +83,6 @@ struct SettingsiOSView: View {
         Binding(
             get: { configuration.snapshot.syncDownload },
             set: { configuration.setSyncDownload($0) }
-        )
-    }
-
-    private var bindingForSyncUpload: Binding<Bool> {
-        Binding(
-            get: { configuration.snapshot.syncUpload },
-            set: { configuration.setSyncUpload($0) }
         )
     }
 

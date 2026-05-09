@@ -51,6 +51,7 @@ final class ConfigurationStore {
         next.apiKey = draftAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedRoot = draftRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
         next.remoteRootFolderID = trimmedRoot.isEmpty ? nil : Int(trimmedRoot)
+        next.syncUpload = false
         next.userAgent = "ImageRelayClient/1.1 (iOS)"
 
         let materialChange = next.apiKey != snapshot.apiKey
@@ -75,12 +76,6 @@ final class ConfigurationStore {
         return persistSnapshot()
     }
 
-    @discardableResult
-    func setSyncUpload(_ value: Bool) -> Bool {
-        snapshot.syncUpload = value
-        return persistSnapshot()
-    }
-
     private func persistSnapshot() -> Bool {
         guard let container = AppConfiguration.containerURL() else {
             lastError = "App Group container unavailable. Reinstall the app."
@@ -99,6 +94,11 @@ final class ConfigurationStore {
 
     private func load() -> AppConfiguration {
         guard let container = AppConfiguration.containerURL() else { return .default }
-        return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        var loaded = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        loaded.syncUpload = false
+        if !loaded.userAgent.contains("(iOS)") {
+            loaded.userAgent = "ImageRelayClient/1.1 (iOS)"
+        }
+        return loaded
     }
 }

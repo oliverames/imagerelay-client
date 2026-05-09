@@ -115,8 +115,8 @@ for a mobile read-only client.
 **iOS read-only by protocol.** `NSFileProviderReplicatedExtension`
 requires `createItem`/`modifyItem`/`deleteItem` — they aren't `@optional`.
 The iOS implementation provides them as no-ops returning
-`NSFileProviderError(.notAuthenticated)`, which Files.app surfaces as
-"Can't be created/modified."
+`NSFileProviderError(.cannotSynchronize)` with a read-only message so Files
+doesn't surface upload attempts as authentication failures.
 
 **Service/state files compiled by both targets.** The Codex-authored
 `CollectionsService.swift`, `ProductsService.swift`,
@@ -145,6 +145,6 @@ Automatic signing; macOS Release uses Manual `Developer ID Application`.
 
 - Upload flow: `POST /upload_jobs.json` → `PUT /upload_jobs/{job_id}/files/{upload_file_id}/chunks/{n}` → `POST /upload_jobs/{job_id}/files/{upload_file_id}/complete.json`
 - Quick link download: send `asset_id` (not `file_id`) and `disposition: "attachment"`
-- Folder listing: `GET /folders.json?parent_id=X` (there is no `/folders/{id}/children.json`)
+- Folder listing: `GET /folders/{id}/children?per_page=100&page=N`; `GET /folders/{id}/children` without pagination currently returns 404
 - Move file: `folder_ids` is array of strings (not int)
 - Rate limit responses include `Retry-After` header -- honor it; `APIClient` does this automatically

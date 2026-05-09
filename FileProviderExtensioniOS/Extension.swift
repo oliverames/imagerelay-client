@@ -96,7 +96,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     completionHandler(FileProviderItem(file: file, parentItemIdentifier: parent), nil)
                 }
             } catch {
-                completionHandler(nil, error)
+                completionHandler(nil, error.asFileProviderError)
             }
         }
         return Progress()
@@ -121,7 +121,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         request: NSFileProviderRequest,
         completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, (any Error)?) -> Void
     ) -> Progress {
-        completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+        completionHandler(nil, [], false, fileProviderCannotSynchronize("Image Relay is read-only in Files on iOS."))
         return Progress()
     }
 
@@ -134,7 +134,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         request: NSFileProviderRequest,
         completionHandler: @escaping (NSFileProviderItem?, NSFileProviderItemFields, Bool, (any Error)?) -> Void
     ) -> Progress {
-        completionHandler(nil, [], false, NSFileProviderError(.notAuthenticated))
+        completionHandler(nil, [], false, fileProviderCannotSynchronize("Image Relay is read-only in Files on iOS."))
         return Progress()
     }
 
@@ -145,7 +145,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         request: NSFileProviderRequest,
         completionHandler: @escaping ((any Error)?) -> Void
     ) -> Progress {
-        completionHandler(NSFileProviderError(.notAuthenticated))
+        completionHandler(fileProviderCannotSynchronize("Image Relay is read-only in Files on iOS."))
         return Progress()
     }
 
@@ -198,7 +198,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("iOS fetchContents failed for \(itemIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                completionHandler(nil, nil, error)
+                completionHandler(nil, nil, error.asFileProviderError)
             }
         }
 
@@ -234,10 +234,13 @@ struct ExtensionServices: Sendable {
         }
 
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        let userAgent = config.userAgent.contains("(iOS)")
+            ? config.userAgent
+            : "ImageRelayClient/1.1 (iOS)"
         let api = APIClient(
             baseURL: config.baseURL,
             apiKey: config.apiKey,
-            userAgent: "ImageRelayClient/1.1 (iOS)"
+            userAgent: userAgent
         )
         return ExtensionServices(api: api, config: config)
     }

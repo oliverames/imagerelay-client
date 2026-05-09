@@ -196,13 +196,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 // Block uploads when sync upload is disabled
                 if !config.syncUpload {
-                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, fileProviderCannotSynchronize("Upload sync is disabled in Image Relay settings."))
                     return
                 }
 
                 // Block uploads when sync is paused
                 if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                    handler.value(nil, [], false, fileProviderCannotSynchronize(pauseState.description))
                     return
                 }
 
@@ -338,12 +338,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 if mutatesRemote {
                     if !config.syncUpload {
-                        handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                        handler.value(nil, [], false, fileProviderCannotSynchronize("Upload sync is disabled in Image Relay settings."))
                         return
                     }
 
                     if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                        handler.value(nil, [], false, NSFileProviderError(.notAuthenticated))
+                        handler.value(nil, [], false, fileProviderCannotSynchronize(pauseState.description))
                         return
                     }
                 }
@@ -558,12 +558,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 let tracked = try db.item(for: identifier.rawValue)
 
                 if !config.syncUpload {
-                    handler.value(NSFileProviderError(.notAuthenticated))
+                    handler.value(fileProviderCannotSynchronize("Upload sync is disabled in Image Relay settings."))
                     return
                 }
 
                 if let pauseState = try? db.getPauseState(), pauseState.isActive {
-                    handler.value(NSFileProviderError(.notAuthenticated))
+                    handler.value(fileProviderCannotSynchronize(pauseState.description))
                     return
                 }
 
@@ -919,7 +919,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 try await Task.sleep(for: .seconds(delay))
             }
         }
-        throw lastError!
+        throw lastError ?? APIError.invalidResponse
     }
 
     private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) throws -> Int {
