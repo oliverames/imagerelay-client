@@ -109,7 +109,7 @@ returns nil so the system never asks for incremental changes.
 **iOS read-only by protocol.** `NSFileProviderReplicatedExtension`
 requires `createItem`/`modifyItem`/`deleteItem` — they aren't
 `@optional`. The iOS implementation provides them as no-ops returning
-`NSFileProviderError(.notAuthenticated)`.
+`NSFileProviderError(.cannotSynchronize)` with a read-only message.
 
 **Service/state files compiled by both targets.** `CollectionsService`,
 `ProductsService`, `LibraryAdminService` (each containing a service +

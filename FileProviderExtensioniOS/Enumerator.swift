@@ -49,13 +49,20 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                     for: containerIdentifier,
                     config: services.config
                 )
-                let items = try await Self.fetchChildren(folderID: folderID, services: services)
+                let parentIdentifier = (containerIdentifier == .rootContainer || containerIdentifier == .workingSet)
+                    ? NSFileProviderItemIdentifier.rootContainer
+                    : containerIdentifier
+                let items = try await Self.fetchChildren(
+                    folderID: folderID,
+                    parentItemIdentifier: parentIdentifier,
+                    services: services
+                )
                 logger.info("iOS enumerated \(items.count, privacy: .public) items for \(containerIdentifier.rawValue, privacy: .public) (folder \(folderID, privacy: .public))")
                 observer.didEnumerate(items)
                 observer.finishEnumerating(upTo: nil)
             } catch {
                 logger.error("iOS enumeration failed for \(containerIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                observer.finishEnumeratingWithError(error)
+                observer.finishEnumeratingWithError(error.asFileProviderError)
             }
         }
     }
@@ -89,11 +96,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
     private static func fetchChildren(
         folderID: Int,
+        parentItemIdentifier: NSFileProviderItemIdentifier,
         services: ExtensionServices
     ) async throws -> [NSFileProviderItem] {
         async let foldersTask: [RemoteFolder] = services.api.getAllPages(
-            "/folders.json",
-            query: ["parent_id": String(folderID)]
+            "/folders/\(folderID)/children"
         )
         async let filesTask: [RemoteFile] = services.api.getAllPages(
             "/folders/\(folderID)/files.json",
@@ -103,14 +110,13 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         let folders = try await foldersTask
         let files = try await filesTask
 
-        let parent = NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
         var items: [NSFileProviderItem] = []
         items.reserveCapacity(folders.count + files.count)
-        for folder in folders where !folder.name.isEmpty {
-            items.append(FileProviderItem(folder: folder, parentItemIdentifier: parent))
+        for folder in folders where folder.parentID == folderID && !folder.name.isEmpty {
+            items.append(FileProviderItem(folder: folder, parentItemIdentifier: parentItemIdentifier))
         }
         for file in files where !file.isDeleted {
-            items.append(FileProviderItem(file: file, parentItemIdentifier: parent))
+            items.append(FileProviderItem(file: file, parentItemIdentifier: parentItemIdentifier))
         }
         return items
     }

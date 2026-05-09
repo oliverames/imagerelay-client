@@ -100,32 +100,69 @@ final class DomainManager {
         refreshStatus()
     }
 
-    func setupDomain() async {
+    @discardableResult
+    func setupDomain() async -> Bool {
         do {
+            if try await isDomainRegistered() {
+                isDomainActive = true
+                lastError = nil
+                logger.info("File Provider domain already registered")
+                return true
+            }
+
             try await NSFileProviderManager.add(domain)
+            guard await waitForDomainRegistration(expected: true) else {
+                isDomainActive = false
+                lastError = "Timed out waiting for the File Provider domain to register."
+                logger.error("Timed out waiting for File Provider domain registration")
+                return false
+            }
             isDomainActive = true
             lastError = nil
             logger.info("File Provider domain added successfully")
+            return true
         } catch let error as NSError where error.code == NSFileWriteFileExistsError {
-            isDomainActive = true
-            lastError = nil
+            let ready = await waitForDomainRegistration(expected: true)
+            isDomainActive = ready
+            lastError = ready ? nil : "Timed out waiting for the existing File Provider domain to become ready."
+            return ready
         } catch {
             isDomainActive = false
             lastError = error.localizedDescription
             logger.error("Failed to add domain: \(error.localizedDescription)")
+            return false
         }
     }
 
-    func removeDomain() async {
+    @discardableResult
+    func removeDomain() async -> Bool {
         do {
-            try await NSFileProviderManager.remove(domain)
+            if try await isDomainRegistered() {
+                try await NSFileProviderManager.remove(domain)
+                guard await waitForDomainRegistration(expected: false) else {
+                    lastError = "Timed out waiting for the File Provider domain to unregister."
+                    logger.error("Timed out waiting for File Provider domain removal")
+                    return false
+                }
+            }
             isDomainActive = false
+            lastError = nil
+            return true
         } catch {
+            if (try? await isDomainRegistered()) == false {
+                isDomainActive = false
+                lastError = nil
+                return true
+            }
+
+            lastError = error.localizedDescription
             logger.error("Failed to remove domain: \(error.localizedDescription)")
+            return false
         }
     }
 
-    func resetDomain(clearTrackedState: Bool = true) async {
+    @discardableResult
+    func resetDomain(clearTrackedState: Bool = true) async -> Bool {
         if clearTrackedState {
             do {
                 try ensureDatabase()?.resetTrackedState()
@@ -135,10 +172,16 @@ final class DomainManager {
             }
         }
 
-        await removeDomain()
-        try? await Task.sleep(for: .seconds(1))
-        await setupDomain()
+        guard await removeDomain() else { return false }
+        guard await setupDomain() else { return false }
+        guard await waitForManagerReady() else {
+            isDomainActive = false
+            lastError = "Timed out waiting for the File Provider manager to become ready."
+            logger.error("Timed out waiting for File Provider manager readiness")
+            return false
+        }
         await signalSync()
+        return true
     }
 
     func signalSync() async {
@@ -192,6 +235,34 @@ final class DomainManager {
         var folderIDs = Set(config.selectedFolderIDs)
         folderIDs.formUnion((try? ensureDatabase()?.folders().map(\.remoteID)) ?? [])
         return folderIDs.sorted()
+    }
+
+    private func isDomainRegistered() async throws -> Bool {
+        try await NSFileProviderManager.domains().contains { $0.identifier == Self.domainIdentifier }
+    }
+
+    private func waitForDomainRegistration(expected: Bool, timeoutSeconds: TimeInterval = 10) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        repeat {
+            if (try? await isDomainRegistered()) == expected {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        } while Date() < deadline
+
+        return (try? await isDomainRegistered()) == expected
+    }
+
+    private func waitForManagerReady(timeoutSeconds: TimeInterval = 10) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        repeat {
+            if NSFileProviderManager(for: domain) != nil {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        } while Date() < deadline
+
+        return NSFileProviderManager(for: domain) != nil
     }
 
     private func startRemotePolling() {

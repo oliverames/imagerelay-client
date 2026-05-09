@@ -52,6 +52,7 @@
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
 		BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
+		C31A658171BDF0414EE6A18D /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */; };
 		CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */; };
 		D39BABEE6FA73544F07647C6 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */; };
@@ -114,6 +115,7 @@
 		17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHomeView.swift; sourceTree = "<group>"; };
 		1907D94A32A3AE0968238BFE /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
+		1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorMapping.swift; sourceTree = "<group>"; };
 		1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksState.swift; sourceTree = "<group>"; };
 		24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListiOSView.swift; sourceTree = "<group>"; };
 		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
@@ -353,6 +355,7 @@
 		B2E7E1FC294B17D53B2849F7 /* FileProviderExtensioniOS */ = {
 			isa = PBXGroup;
 			children = (
+				1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */,
 				D43BFF79E08904BFEC78A777 /* Enumerator.swift */,
 				354821ECFF0127BC8CC280A1 /* Extension.swift */,
 				91E6A2C15BD4E7EBFA2BAA11 /* FileProviderExtensioniOS.entitlements */,
@@ -609,6 +612,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C31A658171BDF0414EE6A18D /* APIErrorMapping.swift in Sources */,
 				F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */,
 				99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */,
 				3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */,

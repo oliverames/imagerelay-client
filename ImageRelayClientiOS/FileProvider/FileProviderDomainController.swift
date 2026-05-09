@@ -51,9 +51,7 @@ final class FileProviderDomainController {
     /// their Files-app browse position; this is the right tradeoff for a
     /// genuine config change but would be wasteful for incidental tweaks.
     func reload(isConfigured: Bool) async {
-        if isRegistered {
-            await unregister()
-        }
+        await unregister()
         await bootstrap(isConfigured: isConfigured)
     }
 
@@ -61,7 +59,10 @@ final class FileProviderDomainController {
     func unregister() async {
         let domain = NSFileProviderDomain(identifier: Self.identifier, displayName: Self.displayName)
         do {
-            try await NSFileProviderManager.remove(domain)
+            let domains = try await NSFileProviderManager.domains()
+            if domains.contains(where: { $0.identifier == Self.identifier }) {
+                try await NSFileProviderManager.remove(domain)
+            }
             isRegistered = false
             lastError = nil
         } catch {
@@ -76,6 +77,7 @@ final class FileProviderDomainController {
         guard let manager = NSFileProviderManager(for: domain) else { return }
         do {
             try await manager.signalEnumerator(for: .workingSet)
+            try await manager.signalEnumerator(for: .rootContainer)
         } catch {
             logger.warning("signalEnumerator failed: \(error.localizedDescription)")
         }
