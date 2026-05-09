@@ -1,15 +1,25 @@
 # imagerelay-client
 
-Native macOS sync client for Image Relay DAM. Swift 6, SwiftUI, File Provider API (NSFileProviderReplicatedExtension). macOS 26 exclusive.
+Native Image Relay DAM client. Swift 6, SwiftUI, File Provider API
+(`NSFileProviderReplicatedExtension`). Two host apps share one
+`ImageRelayKit` package:
+
+- **macOS** (macOS 26+): full bidirectional sync, MenuBarExtra UI,
+  metadata editing, admin features. Target: `ImageRelayClient`.
+- **iOS** (iOS 18+): read-only on-demand browser whose primary purpose
+  is surfacing Image Relay folders inside the Files app via a stateless
+  File Provider extension. Target: `ImageRelayClientiOS`.
 
 ## Project Structure
 
 ```
-ImageRelayClient.xcodeproj   # XcodeGen-generated; tracked in git
-Project.yml                  # XcodeGen source of truth
-ImageRelayKit/               # Local Swift package (shared library)
-FileProviderExtension/       # NSFileProviderReplicatedExtension
-ImageRelayClient/            # Host app (MenuBarExtra + Settings)
+ImageRelayClient.xcodeproj    # XcodeGen-generated; tracked in git
+Project.yml                   # XcodeGen source of truth (4 targets)
+ImageRelayKit/                # Local Swift package (macOS 15 + iOS 18)
+FileProviderExtension/        # macOS NSFileProviderReplicatedExtension
+ImageRelayClient/             # macOS host (MenuBarExtra + Settings + admin)
+FileProviderExtensioniOS/     # iOS NSFileProviderReplicatedExtension (read-only)
+ImageRelayClientiOS/          # iOS host (TabView: Files / Library / Settings)
 ```
 
 ## Commands
@@ -18,17 +28,23 @@ ImageRelayClient/            # Host app (MenuBarExtra + Settings)
 # Regenerate Xcode project after any Project.yml change
 xcodegen generate
 
-# Build host app (macOS 26 SDK required)
+# Build macOS host (macOS 26 SDK required)
 xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run ImageRelayKit unit tests (53 tests)
+# Run ImageRelayKit unit tests (currently 90 across 16 suites)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
+
+# Build iOS host + extension for a Simulator
+xcodebuild build \
+  -project ImageRelayClient.xcodeproj \
+  -scheme ImageRelayClientiOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17e'
 ```
 
 ## Key Constants
@@ -76,6 +92,42 @@ Task { completionHandler(...) }
 - Settings tabs: use `Tab("Title", systemImage:) { }` -- NOT `.tabItem {}` (creates duplicate tabs)
 - Settings window for `LSUIElement` apps needs `NSApp.activate(ignoringOtherApps: true)` to come to front
 - `NSFileProviderItemProtocol`: `itemIdentifier`/`parentItemIdentifier` (not `identifier`/`parentIdentifier`)
+
+## iOS Port Notes
+
+**Cross-platform discipline.** ImageRelayKit imports only `Foundation`,
+`GRDB`, `Security`, `os.log` — no AppKit/UIKit. Adding a feature there
+makes it work on both platforms; adding to a host app keeps it on that
+platform only.
+
+**iOS extension is stateless and on-demand.** No `SyncDatabase`, no
+`RemoteChangePoller`, no upload paths. Every enumeration calls the API
+live; every `fetchContents` mints a fresh quick-link, downloads to a
+temp file, and deletes the quick-link. `Enumerator.currentSyncAnchor`
+returns nil so the system never asks for incremental changes.
+
+**iOS read-only by protocol.** `NSFileProviderReplicatedExtension`
+requires `createItem`/`modifyItem`/`deleteItem` — they aren't
+`@optional`. The iOS implementation provides them as no-ops returning
+`NSFileProviderError(.notAuthenticated)`.
+
+**Service/state files compiled by both targets.** `CollectionsService`,
+`ProductsService`, `LibraryAdminService` (each containing a service +
+an `@Observable` state class) live under `ImageRelayClient/<feature>/`
+but are listed as additional `sources:` paths in the iOS target. Views
+remain platform-specific.
+
+**Distinct keychain access groups per platform.** The iOS bundle IDs
+include `.ios`, so the iOS targets use
+`PV3W52NDZ3.com.oliverames.imagerelay-client.ios` as the keychain
+access group (a valid prefix of both iOS bundle IDs). macOS keeps
+`PV3W52NDZ3.com.oliverames.imagerelay-client`.
+`KeychainStore.sharedAccessGroup` is platform-conditionalized so the
+public API "just works."
+
+**App Group reused across platforms.** Both platforms declare
+`group.com.oliverames.imagerelay-client`. Per-device sandbox containers
+are independent, so iOS state and macOS state never interfere.
 
 ## Image Relay API Notes
 
