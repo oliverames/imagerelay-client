@@ -93,12 +93,18 @@ struct SettingsiOSView: View {
     private func save() async {
         isSaving = true
         defer { isSaving = false }
-        if configuration.save() {
-            savedNotice = "Saved. Refreshing Files location..."
+        let result = configuration.save()
+        guard result.saved else { return }
+        savedNotice = "Saved. Refreshing Files location..."
+        if result.materialChange {
+            // API key or root folder changed — need a full domain bounce so
+            // the extension re-instantiates with the new credentials.
+            await domain.reload(isConfigured: configuration.snapshot.isConfigured)
+        } else {
             await domain.bootstrap(isConfigured: configuration.snapshot.isConfigured)
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            savedNotice = nil
         }
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        savedNotice = nil
     }
 
     private func signOut() async {

@@ -3,9 +3,17 @@ import Security
 
 /// Thin wrapper around SecItem for storing string secrets in the login Keychain.
 /// The shared access group allows both the host app and File Provider extension
-/// to read and write the same item.
+/// on a single platform to read and write the same item. iOS and macOS use
+/// distinct groups because the iOS bundle IDs include `.ios` and the access
+/// group must be a prefix of every bundle ID that declares it (Automatic
+/// signing won't authorise an arbitrary group on device).
 public enum KeychainStore {
+    #if os(macOS)
     public static let sharedAccessGroup = "PV3W52NDZ3.com.oliverames.imagerelay-client"
+    #else
+    public static let sharedAccessGroup = "PV3W52NDZ3.com.oliverames.imagerelay-client.ios"
+    #endif
+
     private static let service = "com.oliverames.imagerelay-client"
 
     /// Saves or replaces `value` for `account`. Returns true on success.

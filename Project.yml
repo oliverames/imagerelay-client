@@ -148,7 +148,7 @@ targets:
         com.apple.security.application-groups:
           - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client.ios
     info:
       path: ImageRelayClientiOS/Info.plist
       properties:
@@ -193,7 +193,7 @@ targets:
         com.apple.security.application-groups:
           - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client.ios
     info:
       path: FileProviderExtensioniOS/Info.plist
       properties:
