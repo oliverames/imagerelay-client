@@ -43,6 +43,20 @@ final class FileProviderDomainController {
         }
     }
 
+    /// Forces the system to tear down and re-create the extension by
+    /// unregistering and re-registering the domain. Used after Settings → save
+    /// changes the API key or root folder ID — the extension caches its
+    /// `APIClient` and `AppConfiguration` in its `init()` and won't see the
+    /// new values without being instantiated fresh. The user briefly loses
+    /// their Files-app browse position; this is the right tradeoff for a
+    /// genuine config change but would be wasteful for incidental tweaks.
+    func reload(isConfigured: Bool) async {
+        if isRegistered {
+            await unregister()
+        }
+        await bootstrap(isConfigured: isConfigured)
+    }
+
     /// Removes the domain. Used when the user signs out from Settings.
     func unregister() async {
         let domain = NSFileProviderDomain(identifier: Self.identifier, displayName: Self.displayName)
