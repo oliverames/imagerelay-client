@@ -3,6 +3,7 @@ options:
   minimumXcodeGenVersion: "2.42"
   deploymentTarget:
     macOS: "26.0"
+    iOS: "18.0"
   bundleIdPrefix: com.oliverames
   groupSortPosition: top
 
@@ -16,7 +17,6 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
     DEVELOPMENT_TEAM: PV3W52NDZ3
     MARKETING_VERSION: "1.1.0-beta.4"
     CURRENT_PROJECT_VERSION: "20"
@@ -33,6 +33,15 @@ schemes:
       config: Debug
       targets:
         - package: ImageRelayKit/ImageRelayKitTests
+    archive:
+      config: Release
+
+  ImageRelayClientiOS:
+    build:
+      targets:
+        ImageRelayClientiOS: [run, profile, analyze, archive]
+    run:
+      config: Debug
     archive:
       config: Release
 
@@ -69,6 +78,7 @@ targets:
       base:
         PRODUCT_NAME: "Image Relay"
         PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: ImageRelayClient/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -110,8 +120,99 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.fileprovider
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
           PROVISIONING_PROFILE_SPECIFIER: "ImageRelayClient FileProviderExtension Developer ID"
+
+  ImageRelayClientiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: ImageRelayClientiOS
+      # The service+state files are pure Swift and reused on both platforms.
+      # Views stay platform-specific; iOS gets its own NavigationStack/Form-driven UIs.
+      - path: ImageRelayClient/Collections/CollectionsService.swift
+      - path: ImageRelayClient/Products/ProductsService.swift
+      - path: ImageRelayClient/LibraryAdmin/LibraryAdminService.swift
+    dependencies:
+      - package: ImageRelayKit
+      - target: FileProviderExtensioniOS
+        embed: true
+        codeSign: true
+    entitlements:
+      path: ImageRelayClientiOS/ImageRelayClientiOS.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+    info:
+      path: ImageRelayClientiOS/Info.plist
+      properties:
+        CFBundleDisplayName: "Image Relay"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_NAME: "Image Relay"
+        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.ios
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: ImageRelayClientiOS/Info.plist
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Automatic
+
+  FileProviderExtensioniOS:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FileProviderExtensioniOS
+    dependencies:
+      - package: ImageRelayKit
+    entitlements:
+      path: FileProviderExtensioniOS/FileProviderExtensioniOS.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+    info:
+      path: FileProviderExtensioniOS/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionFileProviderDocumentGroup: $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          NSExtensionFileProviderSupportsEnumeration: true
+          NSExtensionFileProviderSupportsPickingFolders: true
+          NSExtensionPointIdentifier: com.apple.fileprovider-nonui
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).Extension
+        CFBundleDisplayName: "Image Relay"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.ios.fileprovider
+        IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Automatic

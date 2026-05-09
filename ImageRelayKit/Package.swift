@@ -3,9 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "ImageRelayKit",
-    // macOS 15 minimum keeps CI working on macos-latest runners (Xcode 16 / Swift 6.0).
-    // The host app and extension target macOS 26 via Project.yml / xcodebuild.
-    platforms: [.macOS(.v15)],
+    // macOS 15 keeps CI on macos-latest (Xcode 16 / Swift 6.0). iOS 18 is the minimum
+    // for the iOS host app + File Provider extension. Hosts target newer SDKs via
+    // Project.yml / xcodebuild (macOS 26 / iOS 18).
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(name: "ImageRelayKit", targets: ["ImageRelayKit"]),
     ],
