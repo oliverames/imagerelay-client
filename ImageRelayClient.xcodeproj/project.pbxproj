@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0950333D2FBD0A0B7ACFD780 /* WebhooksAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D53A68B665657946F223C4D /* WebhooksAdminView.swift */; };
+		0B6D6305DC1868B1AE40508B /* ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */; };
 		127F1DB94C7A817B7A0D3EBA /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
 		1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
 		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
@@ -16,8 +17,14 @@
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
 		2E30D35C36D48061B8D97767 /* LibraryAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */; };
+		312468E3E4801ED595A2E2E8 /* FilesGatewayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09905997BC489A37591154DE /* FilesGatewayView.swift */; };
+		3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F41FA6140E7852A9DBB0B4E /* FileProviderItem.swift */; };
 		3529DE22EE5EB98132A64A5B /* MetadataEditingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EBFD21DED0779DC0B30930 /* MetadataEditingService.swift */; };
+		3760C91BCA478E90087C9E3E /* CollectionsListiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */; };
 		38408F6DD2EFE27C384909D4 /* DiagnosticsExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */; };
+		3903ABC0508F39FBEC7269F0 /* LibraryAdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F073384C166485C57856B16A /* LibraryAdminService.swift */; };
+		3B2BE3713D6DD4F8B1B11282 /* FileProviderExtensioniOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		4949A71A7BF547E8E2E1C854 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = EA55A5F80292B27EC2A4FAFB /* ImageRelayKit */; };
 		4B63D3FA832D274532192D3E /* MetadataEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */; };
 		596AF611CF0D654188390AED /* FinderSelectionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D17F2D1E59CF74B34C4633C /* FinderSelectionReader.swift */; };
 		5B8711EF0CBDC3B49D19143D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4ACFCF895BE3EF6017459B2B /* AppIcon.icon */; };
@@ -25,14 +32,25 @@
 		6133A31DE66194B43990F655 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8DC1E00B04FE23A41E220AAF /* Assets.xcassets */; };
 		712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */; };
 		74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */; };
+		75DE4CDC04A5F462BA38C431 /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */; };
+		787E887F51E8D73C62824E81 /* ProductsListiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */; };
+		7A7EA3E4B08D42807AF4FD3A /* APIDirectoryiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */; };
+		83FCA1A5E566EE87F8AF27BD /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1F29EDBF47C83AC5414A490E /* ImageRelayKit */; };
+		894EBEA3886CDD2B030EA09C /* FileProviderDomainController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */; };
 		8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8F8F64B8B4FC610E865DC1B5 /* WebhooksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 336DBC3887926D6E12C41EB1 /* WebhooksService.swift */; };
 		905391112B24E21A2D3B994B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
+		9370F6959D4C6228C61F6A4C /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
 		960B40F8B168A16893E05254 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
+		99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354821ECFF0127BC8CC280A1 /* Extension.swift */; };
 		9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */; };
+		9FFC6D0E1823F299FA694432 /* SettingsiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145F672001C655C841754CED /* SettingsiOSView.swift */; };
 		A3679080BADF744F9E4DCAC9 /* LibraryAdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F073384C166485C57856B16A /* LibraryAdminService.swift */; };
+		A74837C0585C2FB2C67074BF /* LibraryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */; };
+		A82E8ADB3A29C40B4E00E94D /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB249F188A4072D000A1BBDB /* App.swift */; };
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
+		BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
 		CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */; };
@@ -42,9 +60,18 @@
 		DE4D78A483B3275786907ADA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46B76A4D571BB9BA19CDE4B /* App.swift */; };
 		E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6B484F18C4C86D49798D03D6 /* ImageRelayKit */; };
 		F7E97E14C2C6166EDA091B50 /* UploadLinksState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */; };
+		F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43BFF79E08904BFEC78A777 /* Enumerator.swift */; };
+		F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0CA6FB5CB8A04A06B32540E /* RootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		8690BC1A12FD94E56FD3D1AB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 80C293D6F3A19389FD7ACA92 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 426C6EE40B1DD222E4C6D3B9;
+			remoteInfo = FileProviderExtensioniOS;
+		};
 		C3DA156C6C0B5E881BB54375 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 80C293D6F3A19389FD7ACA92 /* Project object */;
@@ -55,6 +82,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		0F2485C8FFC531D271AFD5CB /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3B2BE3713D6DD4F8B1B11282 /* FileProviderExtensioniOS.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EDE0797623EC6AD4D6CB9F1E /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -69,43 +107,63 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		09905997BC489A37591154DE /* FilesGatewayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilesGatewayView.swift; sourceTree = "<group>"; };
 		10E8B32366DC8A4264C5216C /* ImageRelayClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ImageRelayClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		145F672001C655C841754CED /* SettingsiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsiOSView.swift; sourceTree = "<group>"; };
+		1509C71F6AC6940B444DBEE6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHomeView.swift; sourceTree = "<group>"; };
 		1907D94A32A3AE0968238BFE /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksState.swift; sourceTree = "<group>"; };
+		24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListiOSView.swift; sourceTree = "<group>"; };
 		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
 		2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksService.swift; sourceTree = "<group>"; };
 		336DBC3887926D6E12C41EB1 /* WebhooksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhooksService.swift; sourceTree = "<group>"; };
+		354821ECFF0127BC8CC280A1 /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		413441CD471A316A1D63A161 /* FileProviderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FileProviderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FileProviderExtensioniOS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4ACFCF895BE3EF6017459B2B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsListiOSView.swift; sourceTree = "<group>"; };
 		4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteChangePoller.swift; sourceTree = "<group>"; };
+		4F41FA6140E7852A9DBB0B4E /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
 		521080E6927D868992384F20 /* ImageRelayKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ImageRelayKit; path = ImageRelayKit; sourceTree = SOURCE_ROOT; };
 		5214AA13DEAEE7F7687D4000 /* Enumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enumerator.swift; sourceTree = "<group>"; };
+		5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderDomainController.swift; sourceTree = "<group>"; };
 		60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsBrowserView.swift; sourceTree = "<group>"; };
 		61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorView.swift; sourceTree = "<group>"; };
 		66E79A8CCDC204940416820E /* DomainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainManager.swift; sourceTree = "<group>"; };
 		687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsService.swift; sourceTree = "<group>"; };
 		6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
+		6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsService.swift; sourceTree = "<group>"; };
 		6B768EB375011997B202B6FF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
+		76C6EE284A105ED7D2747AA5 /* ImageRelayClientiOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClientiOS.entitlements; sourceTree = "<group>"; };
 		7C160FB06088707BA4C4992A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7D53A68B665657946F223C4D /* WebhooksAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhooksAdminView.swift; sourceTree = "<group>"; };
 		8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsBrowserView.swift; sourceTree = "<group>"; };
 		8474CE4312626B6DF40DEB47 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		8D17F2D1E59CF74B34C4633C /* FinderSelectionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSelectionReader.swift; sourceTree = "<group>"; };
 		8DC1E00B04FE23A41E220AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		91E6A2C15BD4E7EBFA2BAA11 /* FileProviderExtensioniOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtensioniOS.entitlements; sourceTree = "<group>"; };
 		9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksSettingsView.swift; sourceTree = "<group>"; };
 		A5EBFD21DED0779DC0B30930 /* MetadataEditingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditingService.swift; sourceTree = "<group>"; };
+		B0CA6FB5CB8A04A06B32540E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtension.entitlements; sourceTree = "<group>"; };
 		B2FE83D474ABB6C82A35F22A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BB249F188A4072D000A1BBDB /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorMapping.swift; sourceTree = "<group>"; };
+		CF5682F14039E5F3EC1D8C28 /* ImageRelayClientiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ImageRelayClientiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D43BFF79E08904BFEC78A777 /* Enumerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enumerator.swift; sourceTree = "<group>"; };
 		D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClient.entitlements; sourceTree = "<group>"; };
 		D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsExporter.swift; sourceTree = "<group>"; };
+		D8174F47023DC5F681694A0D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIDirectoryiOSView.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
 		E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminView.swift; sourceTree = "<group>"; };
 		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
 		F073384C166485C57856B16A /* LibraryAdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminService.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStore.swift; sourceTree = "<group>"; };
 		FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -116,6 +174,22 @@
 			files = (
 				B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */,
 				5E176CE222C64F1164385243 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B360216544836AC9506F9539 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				83FCA1A5E566EE87F8AF27BD /* ImageRelayKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BBF5AF5D8EC757A7E49D47A7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4949A71A7BF547E8E2E1C854 /* ImageRelayKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -194,12 +268,44 @@
 			path = Webhooks;
 			sourceTree = "<group>";
 		};
+		6173667F7E101F17F5B8BBA5 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				145F672001C655C841754CED /* SettingsiOSView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		6F1461F0AB0F2B619A85BB1B /* Packages */ = {
 			isa = PBXGroup;
 			children = (
 				521080E6927D868992384F20 /* ImageRelayKit */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		761CB1C54BAAEBBEB0945304 /* FileProvider */ = {
+			isa = PBXGroup;
+			children = (
+				5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */,
+			);
+			path = FileProvider;
+			sourceTree = "<group>";
+		};
+		7834F907CC79F2CCAC3F004E /* ImageRelayClientiOS */ = {
+			isa = PBXGroup;
+			children = (
+				C3D2989142D3CB3647A77D1A /* Configuration */,
+				761CB1C54BAAEBBEB0945304 /* FileProvider */,
+				890DD5FE1CA26E261D62E44D /* Library */,
+				6173667F7E101F17F5B8BBA5 /* Settings */,
+				BB249F188A4072D000A1BBDB /* App.swift */,
+				09905997BC489A37591154DE /* FilesGatewayView.swift */,
+				76C6EE284A105ED7D2747AA5 /* ImageRelayClientiOS.entitlements */,
+				D8174F47023DC5F681694A0D /* Info.plist */,
+				B0CA6FB5CB8A04A06B32540E /* RootView.swift */,
+			);
+			path = ImageRelayClientiOS;
 			sourceTree = "<group>";
 		};
 		7EED038C82C73FBCB08F521E /* UploadLinks */ = {
@@ -212,10 +318,22 @@
 			path = UploadLinks;
 			sourceTree = "<group>";
 		};
+		890DD5FE1CA26E261D62E44D /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */,
+				24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */,
+				17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */,
+				4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
 		A8AD4E9FB4F06EA5A0D31B98 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */,
+				6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */,
 			);
 			path = Products;
 			sourceTree = "<group>";
@@ -224,10 +342,32 @@
 			isa = PBXGroup;
 			children = (
 				1337FB025DB622C6D770D76F /* FileProviderExtension */,
+				B2E7E1FC294B17D53B2849F7 /* FileProviderExtensioniOS */,
 				CF9CEB146B013A57E60F8BED /* ImageRelayClient */,
+				7834F907CC79F2CCAC3F004E /* ImageRelayClientiOS */,
 				6F1461F0AB0F2B619A85BB1B /* Packages */,
 				F080F5CB09D5EBB077BC0E92 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B2E7E1FC294B17D53B2849F7 /* FileProviderExtensioniOS */ = {
+			isa = PBXGroup;
+			children = (
+				D43BFF79E08904BFEC78A777 /* Enumerator.swift */,
+				354821ECFF0127BC8CC280A1 /* Extension.swift */,
+				91E6A2C15BD4E7EBFA2BAA11 /* FileProviderExtensioniOS.entitlements */,
+				4F41FA6140E7852A9DBB0B4E /* FileProviderItem.swift */,
+				1509C71F6AC6940B444DBEE6 /* Info.plist */,
+			);
+			path = FileProviderExtensioniOS;
+			sourceTree = "<group>";
+		};
+		C3D2989142D3CB3647A77D1A /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */,
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 		CF9CEB146B013A57E60F8BED /* ImageRelayClient */ = {
@@ -257,7 +397,9 @@
 			isa = PBXGroup;
 			children = (
 				413441CD471A316A1D63A161 /* FileProviderExtension.appex */,
+				4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */,
 				10E8B32366DC8A4264C5216C /* ImageRelayClient.app */,
+				CF5682F14039E5F3EC1D8C28 /* ImageRelayClientiOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -265,6 +407,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED2048ACCEAA088B6A6F3E09 /* Build configuration list for PBXNativeTarget "FileProviderExtensioniOS" */;
+			buildPhases = (
+				91C738115E5F61715B8ACFE5 /* Sources */,
+				BBF5AF5D8EC757A7E49D47A7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FileProviderExtensioniOS;
+			packageProductDependencies = (
+				EA55A5F80292B27EC2A4FAFB /* ImageRelayKit */,
+			);
+			productName = FileProviderExtensioniOS;
+			productReference = 4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		7753FDCBBDB77346A54BDEFC /* FileProviderExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A8B4E626E36E68BF2A44AB14 /* Build configuration list for PBXNativeTarget "FileProviderExtension" */;
@@ -308,6 +469,27 @@
 			productReference = 10E8B32366DC8A4264C5216C /* ImageRelayClient.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D512C549A59A501AD83404A2 /* ImageRelayClientiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 556F196425422EA1A67872D8 /* Build configuration list for PBXNativeTarget "ImageRelayClientiOS" */;
+			buildPhases = (
+				E12B8BEEF537913FBD4635D8 /* Sources */,
+				B360216544836AC9506F9539 /* Frameworks */,
+				0F2485C8FFC531D271AFD5CB /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3119CEBBB6F4BDFB45407CC6 /* PBXTargetDependency */,
+			);
+			name = ImageRelayClientiOS;
+			packageProductDependencies = (
+				1F29EDBF47C83AC5414A490E /* ImageRelayKit */,
+			);
+			productName = ImageRelayClientiOS;
+			productReference = CF5682F14039E5F3EC1D8C28 /* ImageRelayClientiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -317,11 +499,19 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					426C6EE40B1DD222E4C6D3B9 = {
+						DevelopmentTeam = PV3W52NDZ3;
+						ProvisioningStyle = Automatic;
+					};
 					7753FDCBBDB77346A54BDEFC = {
 						DevelopmentTeam = PV3W52NDZ3;
 					};
 					7D99ADACA8F4377D63E996E2 = {
 						DevelopmentTeam = PV3W52NDZ3;
+					};
+					D512C549A59A501AD83404A2 = {
+						DevelopmentTeam = PV3W52NDZ3;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -344,7 +534,9 @@
 			projectRoot = "";
 			targets = (
 				7753FDCBBDB77346A54BDEFC /* FileProviderExtension */,
+				426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */,
 				7D99ADACA8F4377D63E996E2 /* ImageRelayClient */,
+				D512C549A59A501AD83404A2 /* ImageRelayClientiOS */,
 			);
 		};
 /* End PBXProject section */
@@ -403,6 +595,7 @@
 				712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */,
 				4B63D3FA832D274532192D3E /* MetadataEditorView.swift in Sources */,
 				1EFBDC3067A3706986893FA3 /* ProductsBrowserView.swift in Sources */,
+				BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */,
 				1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */,
 				74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */,
 				786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */,
@@ -412,9 +605,44 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		91C738115E5F61715B8ACFE5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */,
+				99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */,
+				3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E12B8BEEF537913FBD4635D8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A7EA3E4B08D42807AF4FD3A /* APIDirectoryiOSView.swift in Sources */,
+				A82E8ADB3A29C40B4E00E94D /* App.swift in Sources */,
+				3760C91BCA478E90087C9E3E /* CollectionsListiOSView.swift in Sources */,
+				9370F6959D4C6228C61F6A4C /* CollectionsService.swift in Sources */,
+				0B6D6305DC1868B1AE40508B /* ConfigurationStore.swift in Sources */,
+				894EBEA3886CDD2B030EA09C /* FileProviderDomainController.swift in Sources */,
+				312468E3E4801ED595A2E2E8 /* FilesGatewayView.swift in Sources */,
+				3903ABC0508F39FBEC7269F0 /* LibraryAdminService.swift in Sources */,
+				A74837C0585C2FB2C67074BF /* LibraryHomeView.swift in Sources */,
+				787E887F51E8D73C62824E81 /* ProductsListiOSView.swift in Sources */,
+				75DE4CDC04A5F462BA38C431 /* ProductsService.swift in Sources */,
+				F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */,
+				9FFC6D0E1823F299FA694432 /* SettingsiOSView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		3119CEBBB6F4BDFB45407CC6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */;
+			targetProxy = 8690BC1A12FD94E56FD3D1AB /* PBXContainerItemProxy */;
+		};
 		B744B747E8485558BE316036 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 7753FDCBBDB77346A54BDEFC /* FileProviderExtension */;
@@ -477,13 +705,13 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = "1.1.0-beta.4";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
@@ -501,6 +729,7 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
 				SDKROOT = macosx;
 			};
@@ -518,6 +747,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
 				PRODUCT_NAME = "Image Relay";
 				SDKROOT = macosx;
@@ -572,12 +802,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = "1.1.0-beta.4";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
@@ -597,9 +827,92 @@
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
 				PROVISIONING_PROFILE_SPECIFIER = "ImageRelayClient FileProviderExtension Developer ID";
 				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		7B119EF210D5339E7183EB4B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ImageRelayClientiOS/ImageRelayClientiOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ImageRelayClientiOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios";
+				PRODUCT_NAME = "Image Relay";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E20EB8332BC8B4D821F4272A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = ImageRelayClientiOS/ImageRelayClientiOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ImageRelayClientiOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios";
+				PRODUCT_NAME = "Image Relay";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F4AE230541B776F1A67FAE92 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FileProviderExtensioniOS/FileProviderExtensioniOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = FileProviderExtensioniOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios.fileprovider";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F53A8E1E0BEE9FE42C246CAA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FileProviderExtensioniOS/FileProviderExtensioniOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = FileProviderExtensioniOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios.fileprovider";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -617,6 +930,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
 				PRODUCT_NAME = "Image Relay";
 				PROVISIONING_PROFILE_SPECIFIER = "ImageRelayClient Developer ID";
@@ -636,6 +950,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		556F196425422EA1A67872D8 /* Build configuration list for PBXNativeTarget "ImageRelayClientiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E20EB8332BC8B4D821F4272A /* Debug */,
+				7B119EF210D5339E7183EB4B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		A8B4E626E36E68BF2A44AB14 /* Build configuration list for PBXNativeTarget "FileProviderExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -650,6 +973,15 @@
 			buildConfigurations = (
 				13726E5A498AC4FD5F888635 /* Debug */,
 				5B73251BED380150A82E5D7F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		ED2048ACCEAA088B6A6F3E09 /* Build configuration list for PBXNativeTarget "FileProviderExtensioniOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4AE230541B776F1A67FAE92 /* Debug */,
+				F53A8E1E0BEE9FE42C246CAA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -675,6 +1007,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1F29EDBF47C83AC5414A490E /* ImageRelayKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImageRelayKit;
+		};
 		6B484F18C4C86D49798D03D6 /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
@@ -685,6 +1021,10 @@
 			productName = Sparkle;
 		};
 		9EC291125448216A6C5FE8C2 /* ImageRelayKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImageRelayKit;
+		};
+		EA55A5F80292B27EC2A4FAFB /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
 		};

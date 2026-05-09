@@ -96,48 +96,63 @@ final class LibraryAdminState {
     func load() async {
         phase = .loading
         sectionErrors = [:]
-
-        await loadSection("File Types") {
-            fileTypes = try await service.fileTypes()
-        }
-        await loadSection("Keyword Sets") {
-            keywordSets = try await service.keywordSets()
-        }
         keywordsBySetID = [:]
-        for set in keywordSets {
-            await loadSection("Keywords: \(set.name)") {
-                keywordsBySetID[set.id] = try await service.keywords(in: set)
+
+        // Fan out the seven top-level fetches in parallel. Keyword sets must complete
+        // before per-set keyword fetches start, so those happen in a second pass.
+        async let aFileTypes: Result<[FileType], Error> = capturing { try await service.fileTypes() }
+        async let aKeywordSets: Result<[KeywordSet], Error> = capturing { try await service.keywordSets() }
+        async let aCurrentUser: Result<ImageRelayUser, Error> = capturing { try await service.currentUser() }
+        async let aUsers: Result<[ImageRelayUser], Error> = capturing { try await service.users() }
+        async let aFolderLinks: Result<[FolderLink], Error> = capturing { try await service.folderLinks() }
+        async let aQuickLinks: Result<[QuickLink], Error> = capturing { try await service.quickLinks() }
+        async let aSupported: Result<[SupportedWebhook], Error> = capturing { try await service.supportedWebhooks() }
+
+        ingest("File Types", await aFileTypes) { fileTypes = $0 }
+        ingest("Keyword Sets", await aKeywordSets) { keywordSets = $0 }
+        ingest("Current User", await aCurrentUser) { currentUser = $0 }
+        ingest("Users", await aUsers) { users = $0 }
+        ingest("Folder Links", await aFolderLinks) { folderLinks = $0 }
+        ingest("Quick Links", await aQuickLinks) { quickLinks = $0 }
+        ingest("Supported Webhooks", await aSupported) { supportedWebhooks = $0 }
+
+        if !keywordSets.isEmpty {
+            await withTaskGroup(of: (KeywordSet, Result<[Keyword], Error>).self) { group in
+                let service = self.service
+                for set in keywordSets {
+                    group.addTask {
+                        let result: Result<[Keyword], Error>
+                        do { result = .success(try await service.keywords(in: set)) }
+                        catch { result = .failure(error) }
+                        return (set, result)
+                    }
+                }
+                for await (set, result) in group {
+                    ingest("Keywords: \(set.name)", result) { keywordsBySetID[set.id] = $0 }
+                }
             }
         }
-        await loadSection("Current User") {
-            currentUser = try await service.currentUser()
-        }
-        await loadSection("Users") {
-            users = try await service.users()
-        }
-        await loadSection("Folder Links") {
-            folderLinks = try await service.folderLinks()
-        }
-        await loadSection("Quick Links") {
-            quickLinks = try await service.quickLinks()
-        }
-        await loadSection("Supported Webhooks") {
-            supportedWebhooks = try await service.supportedWebhooks()
-        }
 
-        if sectionErrors.count >= 8 {
-            phase = .failed("Couldn't load Image Relay API directory.")
-        } else {
-            phase = .loaded
-        }
+        // Eight top-level sections plus per-set keyword fetches: if every one failed,
+        // surface a single global error instead of eight overlapping toasts.
+        let topLevelSections = 7 + keywordSets.count
+        phase = sectionErrors.count >= topLevelSections
+            ? .failed("Couldn't load Image Relay API directory.")
+            : .loaded
     }
 
-    private func loadSection(_ name: String, operation: () async throws -> Void) async {
-        do {
-            try await operation()
-        } catch {
+    private func ingest<T>(_ name: String, _ result: Result<T, Error>, apply: (T) -> Void) {
+        switch result {
+        case .success(let value):
+            apply(value)
+        case .failure(let error):
             logger.warning("\(name) load failed: \(error.localizedDescription)")
             sectionErrors[name] = error.localizedDescription
         }
     }
+}
+
+private func capturing<T>(_ operation: @Sendable () async throws -> T) async -> Result<T, Error> {
+    do { return .success(try await operation()) }
+    catch { return .failure(error) }
 }

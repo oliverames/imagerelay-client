@@ -1,5 +1,76 @@
 # Worklog
 
+## 2026-05-09 - iOS port scaffold: ImageRelayClientiOS + FileProviderExtensioniOS
+
+**What changed**: First iOS targets land in this repo. `ImageRelayKit` is now
+declared cross-platform (`Package.swift` adds `.iOS(.v18)`); no source changes
+were needed inside the kit because it was always disciplined about
+imports — only `Foundation`, `GRDB`, `Security`, `os.log`. Two new targets in
+`Project.yml`: `ImageRelayClientiOS` (iOS 18 host app) and
+`FileProviderExtensioniOS` (iOS app-extension). Bundle IDs distinct from
+the macOS siblings (`*.ios` and `*.ios.fileprovider`); App Group and
+Keychain access group reused from macOS so `AppConfiguration` and the
+shared `KeychainStore` behave identically per device.
+
+`ImageRelayClientiOS/` ships a TabView root with three tabs:
+
+- **Files** (`FilesGatewayView`): explains the File Provider model,
+  shows registration status, opens Files.app via `shareddocuments://`.
+- **Library** (`LibraryHomeView`): NavigationStack into iOS-native
+  `CollectionsListiOSView`, `ProductsListiOSView`, and
+  `APIDirectoryiOSView`. These views reuse Codex's `CollectionsState`,
+  `ProductsState`, `LibraryAdminState` from
+  `ImageRelayClient/<feature>/` — those service+state files are now
+  listed as additional `sources:` paths in the iOS target. Views
+  themselves stay platform-specific.
+- **Settings** (`SettingsiOSView`): Form-based editor for API key,
+  root folder ID, and sync toggles. "Sign out" removes the
+  registered domain.
+
+`FileProviderExtensioniOS/` is read-only and stateless. Unlike the macOS
+sibling, it does NOT use `SyncDatabase` or `RemoteChangePoller`. Every
+enumeration calls the API live; every `fetchContents` mints a fresh
+quick-link, downloads, and deletes the quick-link. `currentSyncAnchor`
+returns nil so the system never asks for incremental changes.
+Required `createItem`/`modifyItem`/`deleteItem` methods are stubbed
+with `NSFileProviderError(.notAuthenticated)` to make the read-only
+posture explicit.
+
+**Code review pass on Codex's beta 4**: stripped three dead
+`import AppKit` lines from `WebhooksAdminView`, `ProductsBrowserView`,
+`CollectionsBrowserView` (none reference AppKit symbols, the import was
+leftover). Parallelized `LibraryAdminState.load()` with `async let` +
+`withTaskGroup` for keyword-set fan-out — eight sequential awaits +
+N per-set keyword fetches collapsed into two waves of parallel work.
+Split `ProductsBrowserView.swift` into `Products/ProductsService.swift`
+(service + state) and `Products/ProductsBrowserView.swift` (view only)
+so the iOS target can compile the service without dragging in the
+macOS view.
+
+**Verification**: macOS test suite still 90/90 across 16 suites.
+iOS host + extension build clean for `arm64-apple-ios18.0-simulator`
+in 4.5s incremental, ~115s clean. `build_run_sim` installs and
+launches; UI hierarchy snapshot confirms `Files` heading,
+`File Provider` section, `Not configured yet` warning, disabled
+`Open Files app` button, three-tab `TabView` at bottom, all with
+populated VoiceOver labels.
+
+**Decisions made**: iOS first cut is on-demand only (no SyncDatabase,
+no upload). Adding caching/uploads later is a fence to cross with
+clearer requirements. Service/state files compile into both targets
+via `Project.yml` — preferred over moving them into `ImageRelayKit`
+on round one because the move would touch existing macOS imports.
+iOS Debug uses Automatic signing; macOS Release stays Manual.
+
+**Left off at**: iOS app builds and renders on iPhone 17e Simulator
+(`iOS 26.4`). File Provider domain hasn't been smoke-tested against
+the live Image Relay account yet — that needs an iOS device with the
+API key entered and a real iCloud-signed dev profile. The macOS path
+is unchanged and the 1.1.0-beta.4 macOS DMG is still the latest
+shipped artifact.
+
+---
+
 ## 2026-05-09 - 1.1.0-beta.4: live API coverage pass + beta release candidate
 
 **What changed**: Re-tested the 1.1 API surfaces against the live Image Relay account and corrected the places where beta 3 had inferred the wrong shapes. Collections now use the live `/collections/{id}/files.json` endpoint for membership and send comma-separated `asset_ids` to `/collections/{id}.json`, matching the API's 204 no-content update response. Upload links now encode `purpose` and decode live fields such as `uid`, `upload_link_url`, and `created_at`. Quick links, folder links, file types, keyword sets, keywords, users, and supported webhook events now have typed models and coverage. Webhook administration now creates `{ url, resource, action, notification_emails }` payloads from the live `/webhooks/supported.json` catalog instead of the beta 3 fixed event list. Added the read-only "API Directory" window for file types, keywords, users, quick/folder links, and webhook event discovery. Products now log load failures and explain account/API-key gating when the live account returns 401/403.
