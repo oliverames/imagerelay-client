@@ -31,21 +31,29 @@ final class CollectionsService {
 
     func items(in collection: Collection) async throws -> [CollectionItem] {
         let api = try makeClient()
-        let response: ItemsResponse = try await api.get("/collections/\(collection.id)/items.json")
+        let response: ItemsResponse = try await api.get("/collections/\(collection.id)/files.json")
         return response.items ?? []
     }
 
     func addItems(_ fileIDs: [Int], to collection: Collection) async throws {
         let api = try makeClient()
-        try await api.post(
-            "/collections/\(collection.id)/items.json",
-            body: CollectionItemAdd(fileIDs: fileIDs)
+        let existing = try await items(in: collection).map(\.fileID)
+        let nextIDs = Array(Set(existing + fileIDs)).sorted()
+        try await api.put(
+            "/collections/\(collection.id).json",
+            body: CollectionUpdate(name: collection.name, assetIDs: nextIDs)
         )
     }
 
     func removeItem(fileID: Int, from collection: Collection) async throws {
         let api = try makeClient()
-        try await api.delete("/collections/\(collection.id)/items/\(fileID).json")
+        let remainingIDs = try await items(in: collection)
+            .map(\.fileID)
+            .filter { $0 != fileID }
+        try await api.put(
+            "/collections/\(collection.id).json",
+            body: CollectionUpdate(name: collection.name, assetIDs: remainingIDs)
+        )
     }
 
     private func makeClient() throws -> APIClient {

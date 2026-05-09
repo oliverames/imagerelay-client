@@ -11,6 +11,7 @@ struct ImageRelayClientApp: App {
     @State private var collections: CollectionsState
     @State private var webhooks: WebhooksState
     @State private var products: ProductsState
+    @State private var libraryAdmin: LibraryAdminState
 
     init() {
         let arguments = CommandLine.arguments
@@ -23,6 +24,7 @@ struct ImageRelayClientApp: App {
         _collections = State(initialValue: CollectionsState())
         _webhooks = State(initialValue: WebhooksState())
         _products = State(initialValue: ProductsState())
+        _libraryAdmin = State(initialValue: LibraryAdminState())
 
         if let exportIndex = arguments.firstIndex(of: "--export-diagnostics") {
             Task { @MainActor in
@@ -65,6 +67,7 @@ struct ImageRelayClientApp: App {
                 .environment(collections)
                 .environment(webhooks)
                 .environment(products)
+                .environment(libraryAdmin)
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -117,5 +120,10 @@ struct ImageRelayClientApp: App {
             ProductsBrowserView(state: products)
         }
         .defaultSize(width: 600, height: 540)
+
+        Window("API Directory", id: "api-directory") {
+            LibraryAdminView(state: libraryAdmin)
+        }
+        .defaultSize(width: 760, height: 560)
     }
 }

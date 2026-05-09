@@ -70,6 +70,12 @@ struct MenuBarView: View {
                 } label: {
                     Label("Webhooks...", systemImage: "antenna.radiowaves.left.and.right")
                 }
+                Button {
+                    openWindow(id: "api-directory")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Label("API Directory...", systemImage: "list.bullet.rectangle")
+                }
             } label: {
                 Label("Library", systemImage: "books.vertical")
             }

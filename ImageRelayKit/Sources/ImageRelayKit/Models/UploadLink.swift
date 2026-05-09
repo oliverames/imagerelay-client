@@ -26,14 +26,18 @@ public struct UploadLink: Codable, Sendable, Identifiable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id
         case token
+        case uid
         case url
+        case uploadLinkURL = "upload_link_url"
         case name
+        case purpose
         case folderID = "folder_id"
         case folderName = "folder_name"
         case expiresOn = "expires_on"
         case maxFiles = "max_files"
         case passwordRequired = "password_required"
         case createdOn = "created_on"
+        case createdAt = "created_at"
         case uploadCount = "upload_count"
     }
 
@@ -41,14 +45,19 @@ public struct UploadLink: Codable, Sendable, Identifiable, Hashable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
         token = try c.decodeIfPresent(String.self, forKey: .token)
+            ?? c.decodeIfPresent(String.self, forKey: .uid)
         url = try c.decodeIfPresent(String.self, forKey: .url)
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Untitled"
+            ?? c.decodeIfPresent(String.self, forKey: .uploadLinkURL)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+            ?? c.decodeIfPresent(String.self, forKey: .purpose)
+            ?? "Untitled"
         folderID = try c.decodeIfPresent(Int.self, forKey: .folderID)
         folderName = try c.decodeIfPresent(String.self, forKey: .folderName)
         expiresOn = try c.decodeIfPresent(String.self, forKey: .expiresOn)
         maxFiles = try c.decodeIfPresent(Int.self, forKey: .maxFiles)
         passwordRequired = try c.decodeIfPresent(Bool.self, forKey: .passwordRequired) ?? false
         createdOn = try c.decodeIfPresent(String.self, forKey: .createdOn)
+            ?? c.decodeIfPresent(String.self, forKey: .createdAt)
         uploadCount = try c.decodeIfPresent(Int.self, forKey: .uploadCount)
     }
 
@@ -77,11 +86,26 @@ public struct UploadLink: Codable, Sendable, Identifiable, Hashable {
         self.createdOn = createdOn
         self.uploadCount = uploadCount
     }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(token, forKey: .token)
+        try c.encodeIfPresent(url, forKey: .url)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(folderID, forKey: .folderID)
+        try c.encodeIfPresent(folderName, forKey: .folderName)
+        try c.encodeIfPresent(expiresOn, forKey: .expiresOn)
+        try c.encodeIfPresent(maxFiles, forKey: .maxFiles)
+        try c.encode(passwordRequired, forKey: .passwordRequired)
+        try c.encodeIfPresent(createdOn, forKey: .createdOn)
+        try c.encodeIfPresent(uploadCount, forKey: .uploadCount)
+    }
 }
 
 /// Request body for `POST /upload_links.json`. Only sends fields the user provided —
 /// the API fills in defaults for the rest.
-public struct UploadLinkCreate: Codable, Sendable {
+public struct UploadLinkCreate: Encodable, Sendable {
     public let name: String
     public let folderID: Int
     public let expiresOn: String?
@@ -103,7 +127,7 @@ public struct UploadLinkCreate: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case name
+        case purpose
         case folderID = "folder_id"
         case expiresOn = "expires_on"
         case maxFiles = "max_files"
@@ -112,7 +136,7 @@ public struct UploadLinkCreate: Codable, Sendable {
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(name, forKey: .name)
+        try c.encode(name, forKey: .purpose)
         try c.encode(folderID, forKey: .folderID)
         try c.encodeIfPresent(expiresOn, forKey: .expiresOn)
         try c.encodeIfPresent(maxFiles, forKey: .maxFiles)

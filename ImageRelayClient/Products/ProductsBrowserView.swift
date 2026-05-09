@@ -1,5 +1,6 @@
 import AppKit
 import ImageRelayKit
+import os.log
 import SwiftUI
 
 @MainActor
@@ -64,6 +65,10 @@ final class ProductsService {
 @Observable @MainActor
 final class ProductsState {
     private let service = ProductsService()
+    private let logger = Logger(
+        subsystem: "com.oliverames.imagerelay-client",
+        category: "Products"
+    )
 
     enum LoadPhase: Equatable {
         case idle, loading, loaded, failed(String)
@@ -89,7 +94,17 @@ final class ProductsState {
             products = try await service.list()
             phase = .loaded
         } catch {
-            phase = .failed(error.localizedDescription)
+            logger.warning("Products list failed: \(error.localizedDescription)")
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .notAuthenticated, .forbidden:
+                    phase = .failed("Products are not enabled for this API key or account.")
+                default:
+                    phase = .failed(apiError.userMessage)
+                }
+            } else {
+                phase = .failed(error.localizedDescription)
+            }
         }
     }
 }

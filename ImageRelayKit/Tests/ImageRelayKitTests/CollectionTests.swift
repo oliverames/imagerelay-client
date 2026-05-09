@@ -89,6 +89,18 @@ struct CollectionTests {
         #expect(item.fileName == "alt-name.png")
     }
 
+    @Test("Decode CollectionItem from collection files endpoint")
+    func decodeCollectionItemFromFilePayload() throws {
+        let json = """
+        {"id": 100, "filename": "collection-file.jpg"}
+        """.data(using: .utf8)!
+
+        let item = try JSONDecoder.imageRelay.decode(CollectionItem.self, from: json)
+        #expect(item.id == 100)
+        #expect(item.fileID == 100)
+        #expect(item.fileName == "collection-file.jpg")
+    }
+
     @Test("CollectionItemAdd encodes file_ids array")
     func encodeCollectionItemAdd() throws {
         let payload = CollectionItemAdd(fileIDs: [1, 2, 3])
@@ -96,5 +108,14 @@ struct CollectionTests {
         let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
         let ids = try #require(dict["file_ids"] as? [Int])
         #expect(ids == [1, 2, 3])
+    }
+
+    @Test("CollectionUpdate encodes comma-separated asset_ids")
+    func encodeCollectionUpdate() throws {
+        let payload = CollectionUpdate(name: "Spring", assetIDs: [3, 5, 8])
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["name"] as? String == "Spring")
+        #expect(dict["asset_ids"] as? String == "3,5,8")
     }
 }
