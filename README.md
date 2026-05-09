@@ -145,7 +145,7 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB automatically.
 
 ```sh
-# Run the unit test suite (53 tests across 9 suites)
+# Run the unit test suite (90 tests across 16 suites)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -155,18 +155,18 @@ xcodebuild test \
 swift test --package-path ImageRelayKit
 
 # Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.0.1
+scripts/run-release-candidate-checks.sh 1.1.0-beta.4
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.1
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0-beta.4
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.0.1 --smoke-install
+scripts/build-developer-id-release.sh --version 1.1.0-beta.4 --smoke-install
 ```
 
 ## Known Limitations
 
-- **Remote change detection** is polling-based — the API does not expose a webhook or cursor-based push feed.
+- **Remote change detection** is polling-based. Webhook consumption needs a public relay that can receive Image Relay POSTs and push events to the desktop app.
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 - **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 

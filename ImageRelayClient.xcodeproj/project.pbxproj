@@ -15,6 +15,7 @@
 		1EFBDC3067A3706986893FA3 /* ProductsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */; };
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
+		2E30D35C36D48061B8D97767 /* LibraryAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */; };
 		3529DE22EE5EB98132A64A5B /* MetadataEditingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EBFD21DED0779DC0B30930 /* MetadataEditingService.swift */; };
 		38408F6DD2EFE27C384909D4 /* DiagnosticsExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */; };
 		4B63D3FA832D274532192D3E /* MetadataEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */; };
@@ -30,6 +31,7 @@
 		905391112B24E21A2D3B994B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
 		960B40F8B168A16893E05254 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
 		9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */; };
+		A3679080BADF744F9E4DCAC9 /* LibraryAdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F073384C166485C57856B16A /* LibraryAdminService.swift */; };
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
 		CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
@@ -100,7 +102,9 @@
 		D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClient.entitlements; sourceTree = "<group>"; };
 		D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsExporter.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
+		E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminView.swift; sourceTree = "<group>"; };
 		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
+		F073384C166485C57856B16A /* LibraryAdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminService.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -135,6 +139,15 @@
 				61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */,
 			);
 			path = MetadataEditing;
+			sourceTree = "<group>";
+		};
+		087B33CED511852509313505 /* LibraryAdmin */ = {
+			isa = PBXGroup;
+			children = (
+				F073384C166485C57856B16A /* LibraryAdminService.swift */,
+				E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */,
+			);
+			path = LibraryAdmin;
 			sourceTree = "<group>";
 		};
 		1337FB025DB622C6D770D76F /* FileProviderExtension */ = {
@@ -221,6 +234,7 @@
 			isa = PBXGroup;
 			children = (
 				23D51AE49EE383DC8BFE7355 /* Collections */,
+				087B33CED511852509313505 /* LibraryAdmin */,
 				03ADE7EB747DF6CA861B814A /* MetadataEditing */,
 				A8AD4E9FB4F06EA5A0D31B98 /* Products */,
 				3D41B1758BA324C54D725161 /* Settings */,
@@ -382,6 +396,8 @@
 				596AF611CF0D654188390AED /* FinderSelectionReader.swift in Sources */,
 				9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */,
 				D9C9F0316A42E9720EF939C9 /* GeneralSettingsView.swift in Sources */,
+				A3679080BADF744F9E4DCAC9 /* LibraryAdminService.swift in Sources */,
+				2E30D35C36D48061B8D97767 /* LibraryAdminView.swift in Sources */,
 				13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */,
 				3529DE22EE5EB98132A64A5B /* MetadataEditingService.swift in Sources */,
 				712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */,
@@ -441,7 +457,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -462,7 +478,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.3";
+				MARKETING_VERSION = "1.1.0-beta.4";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -542,7 +558,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -557,7 +573,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.3";
+				MARKETING_VERSION = "1.1.0-beta.4";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

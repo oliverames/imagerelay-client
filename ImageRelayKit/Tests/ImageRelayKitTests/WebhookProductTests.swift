@@ -53,28 +53,53 @@ struct WebhookTests {
         #expect(webhook.isActive == true)
     }
 
-    @Test("WebhookCreate encodes is_active and secret")
+    @Test("Decode live Webhook resource action payload")
+    func decodeLiveWebhookResourceActionPayload() throws {
+        let json = """
+        {
+            "id": 2017,
+            "url": "https://example.com/imagerelay",
+            "resource": "file",
+            "action": "created",
+            "state": "active",
+            "notification_emails": ["ops@example.com"],
+            "created_at": "2026-05-09T15:10:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let webhook = try JSONDecoder.imageRelay.decode(Webhook.self, from: json)
+        #expect(webhook.name == "file.created")
+        #expect(webhook.eventLabels == ["file.created"])
+        #expect(webhook.isActive == true)
+        #expect(webhook.notificationEmails == ["ops@example.com"])
+        #expect(webhook.createdOn == "2026-05-09T15:10:00Z")
+    }
+
+    @Test("WebhookCreate encodes resource and action")
     func encodeWebhookCreate() throws {
         let create = WebhookCreate(
-            name: "Production sync",
             url: "https://example.com/webhook",
-            events: ["file.created"],
-            isActive: false,
-            secret: "shh"
+            resource: "file",
+            action: "created",
+            notificationEmails: ["ops@example.com"]
         )
         let json = try JSONEncoder.imageRelay.encode(create)
         let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
-        #expect(dict["name"] as? String == "Production sync")
         #expect(dict["url"] as? String == "https://example.com/webhook")
-        #expect(dict["events"] as? [String] == ["file.created"])
-        #expect(dict["is_active"] as? Bool == false)
-        #expect(dict["secret"] as? String == "shh")
+        #expect(dict["resource"] as? String == "file")
+        #expect(dict["action"] as? String == "created")
+        #expect(dict["notification_emails"] as? [String] == ["ops@example.com"])
     }
 
-    @Test("WebhookEventType.allKnown lists expected events")
-    func webhookEventCatalog() {
-        #expect(WebhookEventType.allKnown.contains("file.created"))
-        #expect(WebhookEventType.allKnown.contains("folder.deleted"))
+    @Test("Decode supported webhook resource actions")
+    func decodeSupportedWebhookResourceActions() throws {
+        let json = """
+        {"resource": "folder", "supported_actions": ["created", "deleted"]}
+        """.data(using: .utf8)!
+
+        let supported = try JSONDecoder.imageRelay.decode(SupportedWebhook.self, from: json)
+        #expect(supported.resource == "folder")
+        #expect(supported.supportedActions == ["created", "deleted"])
     }
 }
 

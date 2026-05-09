@@ -273,6 +273,23 @@ struct APIClientTests {
         #expect(folders[0].name == "Root")
     }
 
+    @Test("Void PUT accepts no-content success responses")
+    func putNoContent() async throws {
+        var observedMethod = ""
+        MockURLProtocol.requestHandler = { request in
+            observedMethod = request.httpMethod ?? ""
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 204,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        let client = makeClient()
+        try await client.put("/collections/1.json", body: CollectionUpdate(name: "Spring", assetIDs: []))
+        #expect(observedMethod == "PUT")
+    }
+
     @Test("401 throws notAuthenticated")
     func handles401() async {
         MockURLProtocol.requestHandler = { request in

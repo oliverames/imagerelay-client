@@ -113,6 +113,7 @@ trap cleanup EXIT
 cat > "$API_HELPER" <<'PY'
 import json
 import os
+import ssl
 import sys
 import urllib.error
 import urllib.parse
@@ -121,6 +122,12 @@ import urllib.request
 BASE_URL = os.environ["BASE_URL"].rstrip("/")
 API_KEY = os.environ["IMAGE_RELAY_API_KEY"]
 FOLDER_ID = os.environ["REMOTE_FOLDER_ID"]
+
+try:
+    import certifi
+    SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    SSL_CONTEXT = ssl.create_default_context()
 
 
 def request(method, path, body=None):
@@ -135,7 +142,7 @@ def request(method, path, body=None):
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(f"{BASE_URL}{path}", data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=30, context=SSL_CONTEXT) as response:
             raw = response.read()
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")

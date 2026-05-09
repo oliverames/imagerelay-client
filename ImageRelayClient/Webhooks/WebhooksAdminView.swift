@@ -180,9 +180,9 @@ private struct WebhookRow: View {
                     .truncationMode(.middle)
                     .textSelection(.enabled)
 
-                if !webhook.events.isEmpty {
+                if !webhook.eventLabels.isEmpty {
                     HStack(spacing: 4) {
-                        ForEach(webhook.events.prefix(4), id: \.self) { event in
+                        ForEach(webhook.eventLabels.prefix(4), id: \.self) { event in
                             Text(event)
                                 .font(.caption2)
                                 .padding(.horizontal, 4)
@@ -190,8 +190,8 @@ private struct WebhookRow: View {
                                 .background(.secondary.opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        if webhook.events.count > 4 {
-                            Text("+\(webhook.events.count - 4)")
+                        if webhook.eventLabels.count > 4 {
+                            Text("+\(webhook.eventLabels.count - 4)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
@@ -233,27 +233,26 @@ private struct CreateWebhookSheet: View {
 
             Form {
                 Section {
-                    TextField("Name", text: $state.draftName)
-                        .textFieldStyle(.roundedBorder)
                     TextField("URL", text: $state.draftURL, prompt: Text("https://example.com/webhook"))
                         .textFieldStyle(.roundedBorder)
-                    SecureField("Signing secret (optional)", text: $state.draftSecret)
+                    TextField("Notification emails", text: $state.draftNotificationEmails, prompt: Text("alerts@example.com, ops@example.com"))
                         .textFieldStyle(.roundedBorder)
-                    Toggle("Active", isOn: $state.draftIsActive)
                 }
 
-                Section("Events") {
-                    Text("Select at least one event to subscribe to.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    ForEach(WebhookEventType.allKnown, id: \.self) { event in
-                        Toggle(event, isOn: Binding(
-                            get: { state.draftEvents.contains(event) },
-                            set: { isOn in
-                                if isOn { state.draftEvents.insert(event) }
-                                else { state.draftEvents.remove(event) }
-                            }
-                        ))
+                Section("Event") {
+                    Picker("Resource", selection: Binding(
+                        get: { state.draftResource },
+                        set: { state.selectResource($0) }
+                    )) {
+                        ForEach(state.supportedResources, id: \.self) { resource in
+                            Text(resource).tag(resource)
+                        }
+                    }
+
+                    Picker("Action", selection: $state.draftAction) {
+                        ForEach(state.supportedActionsForDraftResource, id: \.self) { action in
+                            Text(action).tag(action)
+                        }
                     }
                 }
 

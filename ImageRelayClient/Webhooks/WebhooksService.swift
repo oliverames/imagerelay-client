@@ -30,6 +30,11 @@ final class WebhooksService {
         return response.webhooks ?? []
     }
 
+    func supported() async throws -> [SupportedWebhook] {
+        let api = try makeClient()
+        return try await api.get("/webhooks/supported.json")
+    }
+
     func create(_ payload: WebhookCreate) async throws -> Webhook {
         let api = try makeClient()
         let response: CreateResponse = try await api.post("/webhooks.json", body: payload)
@@ -113,27 +118,39 @@ final class WebhooksState {
 
     var phase: LoadPhase = .idle
     var webhooks: [Webhook] = []
+    var supportedWebhooks: [SupportedWebhook] = []
 
     // Create form drafts
-    var draftName: String = ""
     var draftURL: String = ""
-    var draftSecret: String = ""
-    var draftIsActive: Bool = true
-    var draftEvents: Set<String> = []
+    var draftResource: String = ""
+    var draftAction: String = ""
+    var draftNotificationEmails: String = ""
     var isCreating: Bool = false
     var lastCreateError: String? = nil
 
     var canCreate: Bool {
-        !draftName.trimmingCharacters(in: .whitespaces).isEmpty
-            && URL(string: draftURL) != nil
-            && !draftEvents.isEmpty
+        Self.isSupportedWebhookURL(draftURL)
+            && !draftResource.isEmpty
+            && !draftAction.isEmpty
             && !isCreating
+    }
+
+    var supportedResources: [String] {
+        supportedWebhooks.map(\.resource)
+    }
+
+    var supportedActionsForDraftResource: [String] {
+        supportedWebhooks.first { $0.resource == draftResource }?.supportedActions ?? []
     }
 
     func load() async {
         phase = .loading
         do {
-            webhooks = try await service.list()
+            async let loadedWebhooks = service.list()
+            async let loadedSupported = service.supported()
+            webhooks = try await loadedWebhooks
+            supportedWebhooks = try await loadedSupported
+            normalizeDraftSelection()
             phase = .loaded
         } catch {
             logger.warning("Webhooks list failed: \(error.localizedDescription)")
@@ -143,11 +160,10 @@ final class WebhooksState {
 
     func create() async -> Bool {
         let payload = WebhookCreate(
-            name: draftName.trimmingCharacters(in: .whitespaces),
-            url: draftURL,
-            events: Array(draftEvents).sorted(),
-            isActive: draftIsActive,
-            secret: draftSecret.isEmpty ? nil : draftSecret
+            url: draftURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            resource: draftResource,
+            action: draftAction,
+            notificationEmails: parsedNotificationEmails()
         )
 
         isCreating = true
@@ -157,11 +173,8 @@ final class WebhooksState {
         do {
             let created = try await service.create(payload)
             webhooks.insert(created, at: 0)
-            draftName = ""
             draftURL = ""
-            draftSecret = ""
-            draftIsActive = true
-            draftEvents = []
+            draftNotificationEmails = ""
             return true
         } catch {
             logger.warning("Webhook create failed: \(error.localizedDescription)")
@@ -178,5 +191,40 @@ final class WebhooksState {
             logger.warning("Webhook delete failed: \(error.localizedDescription)")
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    func selectResource(_ resource: String) {
+        draftResource = resource
+        draftAction = supportedActionsForDraftResource.first ?? ""
+    }
+
+    private func normalizeDraftSelection() {
+        if draftResource.isEmpty || !supportedResources.contains(draftResource) {
+            draftResource = supportedResources.first ?? ""
+        }
+        let actions = supportedActionsForDraftResource
+        if draftAction.isEmpty || !actions.contains(draftAction) {
+            draftAction = actions.first ?? ""
+        }
+    }
+
+    private func parsedNotificationEmails() -> [String]? {
+        let emails = draftNotificationEmails
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return emails.isEmpty ? nil : emails
+    }
+
+    private static func isSupportedWebhookURL(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              let host = components.host,
+              !host.isEmpty else {
+            return false
+        }
+        return true
     }
 }

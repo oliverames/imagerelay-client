@@ -76,9 +76,9 @@ public struct Collection: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
-/// A file's membership in a collection. Returned from `GET /collections/{id}/items.json`
-/// or similar. The shape is intentionally minimal — full file metadata is fetched
-/// separately via `RemoteFileDetail` when the user opens a collection's contents.
+/// A file's membership in a collection. Returned from the live
+/// `GET /collections/{id}/files.json` endpoint. The shape is intentionally minimal:
+/// full file metadata is fetched separately via `RemoteFileDetail` when needed.
 public struct CollectionItem: Codable, Sendable, Identifiable, Hashable {
     public let id: Int
     public let fileID: Int
@@ -93,6 +93,7 @@ public struct CollectionItem: Codable, Sendable, Identifiable, Hashable {
         case fileID = "file_id"
         case fileName = "filename"
         case fileNameAlt = "file_name"
+        case name
         case position
         case addedOn = "added_on"
     }
@@ -100,9 +101,10 @@ public struct CollectionItem: Codable, Sendable, Identifiable, Hashable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
-        fileID = try c.decode(Int.self, forKey: .fileID)
+        fileID = try c.decodeIfPresent(Int.self, forKey: .fileID) ?? id
         fileName = try c.decodeIfPresent(String.self, forKey: .fileName)
             ?? c.decodeIfPresent(String.self, forKey: .fileNameAlt)
+            ?? c.decodeIfPresent(String.self, forKey: .name)
         position = try c.decodeIfPresent(Int.self, forKey: .position)
         addedOn = try c.decodeIfPresent(String.self, forKey: .addedOn)
     }
@@ -125,7 +127,8 @@ public struct CollectionItem: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
-/// POST body for adding files to a collection. Used at `POST /collections/{id}/items`.
+/// Legacy POST body for older collection-membership endpoints. The live client updates
+/// membership with `CollectionUpdate`.
 public struct CollectionItemAdd: Codable, Sendable {
     public let fileIDs: [Int]
 
@@ -135,5 +138,28 @@ public struct CollectionItemAdd: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case fileIDs = "file_ids"
+    }
+}
+
+/// PUT body for `PUT /collections/{id}`. The API expects `asset_ids` as a comma-separated
+/// list while the rest of the client works with integer file IDs.
+public struct CollectionUpdate: Codable, Sendable {
+    public let name: String
+    public let assetIDs: [Int]
+
+    public init(name: String, assetIDs: [Int]) {
+        self.name = name
+        self.assetIDs = assetIDs
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case assetIDs = "asset_ids"
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(assetIDs.map(String.init).joined(separator: ","), forKey: .assetIDs)
     }
 }

@@ -62,18 +62,26 @@ currently uses or intentionally leaves out.
   fields are sent as text values; the server validates per-type and may reject malformed input.
 - Upload links
   `GET /upload_links.json` lists existing links, `POST /upload_links.json` creates a new
-  link with name/folder/expiry/max-files/password, `DELETE /upload_links/{id}.json` revokes.
-  Used by the Upload Links Settings tab.
+  link with purpose/folder/expiry/max-files/password, `DELETE /upload_links/{id}.json`
+  revokes. The model decodes the live `uid` and `upload_link_url` aliases. Used by the
+  Upload Links Settings tab.
 - Collections
-  `GET /collections.json` lists collections, `GET /collections/{id}/items.json` lists members,
-  `POST /collections/{id}/items.json` adds files, `DELETE /collections/{id}/items/{file_id}.json`
-  removes files. Used by the Collections browser window.
+  `GET /collections.json` lists collections, `GET /collections/{id}/files.json` lists members,
+  and `PUT /collections/{id}.json` updates membership with comma-separated `asset_ids`.
+  Used by the Collections browser window.
 - Products (read-only)
-  `GET /products.json` lists products. Used by the Products browser window.
+  `GET /products.json` lists products when the account has product-catalog API access. Used by
+  the Products browser window, with a specific entitlement message for 401/403 product responses.
 - Webhook administration
-  `GET /webhooks.json`, `POST /webhooks.json`, `DELETE /webhooks/{id}.json`. Used by the
-  Webhooks admin window. Some accounts require an admin-tier API key for these endpoints;
-  the UI surfaces 403 responses with a recovery hint.
+  `GET /webhooks.json`, `GET /webhooks/supported.json`, `POST /webhooks.json`,
+  `DELETE /webhooks/{id}.json`. The create body uses the live `resource`/`action` contract.
+  Used by the Webhooks admin window. Some accounts require an admin-tier API key for these
+  endpoints; the UI surfaces permission responses with a recovery hint.
+- API directory (read-only)
+  `GET /file_types.json`, `GET /keyword_sets.json`, `GET /keyword_sets/{id}/keywords.json`,
+  `GET /users/me`, `GET /users.json`, `GET /folder_links.json`, `GET /quick_links.json`, and
+  `GET /webhooks/supported.json` are available from the API Directory window. Section-level
+  errors are isolated so one permission-gated endpoint does not hide the rest of the directory.
 
 ## Not Yet Implemented
 
@@ -84,19 +92,14 @@ currently uses or intentionally leaves out.
   subscribed desktop clients via Server-Sent Events. Tracked as Phase 7 of 1.1.
 - OAuth-based auth flows
   The client currently assumes API-key style access through configured credentials.
-- File type / template administration
-  `GET /file_types.json` and per-template field schemas not yet consumed; the metadata
-  editor sends custom fields as text values without per-type validation.
-- Keyword administration
-  `GET /keywords.json` model is in place but the keyword autocomplete UI hookup ships in
-  beta 4.
-- User administration
-  `GET /users.json` not consumed yet.
+- File type, keyword, user, folder-link, and quick-link write administration
+  The 1.1 API Directory covers these endpoints read-only. Creating, updating, and deleting
+  these administrative objects remains in the Image Relay web app for now.
 - Synced files / multi-folder asset memberships
   See "Partially Supported" below — multi-folder downloads work, but creating new
   multi-folder memberships through the dedicated synced-file API doesn't.
 - Upload by URL
-- Duplicate file, folder links, and public sharing link management
+- Duplicate file and public sharing link write management
 - Catalog endpoints beyond product list
 
 ## Important Edge-Case Decisions

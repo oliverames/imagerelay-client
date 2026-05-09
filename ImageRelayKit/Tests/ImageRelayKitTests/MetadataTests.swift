@@ -184,13 +184,34 @@ struct UploadLinkTests {
         #expect(links[1].folderID == nil)
     }
 
+    @Test("Decode live UploadLink payload aliases")
+    func decodeLiveUploadLinkPayloadAliases() throws {
+        let json = """
+        {
+            "id": 64299,
+            "uid": "abc123",
+            "upload_link_url": "https://app.imagerelay.com/upload/abc123",
+            "purpose": "Contributor drop",
+            "folder_id": 2907644,
+            "expires_on": null,
+            "created_at": "2026-05-09T15:09:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let link = try JSONDecoder.imageRelay.decode(UploadLink.self, from: json)
+        #expect(link.token == "abc123")
+        #expect(link.url == "https://app.imagerelay.com/upload/abc123")
+        #expect(link.name == "Contributor drop")
+        #expect(link.createdOn == "2026-05-09T15:09:00Z")
+    }
+
     @Test("UploadLinkCreate omits unset optional fields")
     func uploadLinkCreateOmitsOptionals() throws {
         let create = UploadLinkCreate(name: "Drop A", folderID: 200)
         let json = try JSONEncoder.imageRelay.encode(create)
         let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
 
-        #expect(dict["name"] as? String == "Drop A")
+        #expect(dict["purpose"] as? String == "Drop A")
         #expect(dict["folder_id"] as? Int == 200)
         #expect(dict["expires_on"] == nil)
         #expect(dict["max_files"] == nil)
