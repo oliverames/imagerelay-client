@@ -90,11 +90,13 @@ final class MetadataEditingService {
         do {
             let api = try makeClient()
             do {
-                let response: KeywordListResponse = try await api.get(
+                // Walk every page so autocomplete sees the full keyword
+                // vocabulary even on libraries with thousands of keywords.
+                let keywords: [Keyword] = try await api.getAllPages(
                     "/keywords.json",
                     query: ["per_page": "200"]
                 )
-                return response.keywords
+                return keywords
             } catch {
                 // Fall through to per-set aggregation.
                 logger.debug("Unscoped /keywords.json failed; falling back to per-set fetch.")
@@ -113,28 +115,6 @@ final class MetadataEditingService {
             logger.warning("Keyword suggestion fetch failed: \(error.localizedDescription)")
             return []
         }
-    }
-
-    /// Tolerant decoder for `/keywords.json` — accepts either `{"keywords": [...]}`
-    /// or a bare array, matching the existing pattern other services use.
-    private struct KeywordListResponse: Decodable, Sendable {
-        let keywords: [Keyword]
-
-        init(from decoder: any Decoder) throws {
-            if let container = try? decoder.container(keyedBy: CodingKeys.self),
-               let array = try container.decodeIfPresent([Keyword].self, forKey: .keywords) {
-                keywords = array
-                return
-            }
-            var unkeyed = try decoder.unkeyedContainer()
-            var collected: [Keyword] = []
-            while !unkeyed.isAtEnd {
-                collected.append(try unkeyed.decode(Keyword.self))
-            }
-            keywords = collected
-        }
-
-        enum CodingKeys: String, CodingKey { case keywords }
     }
 
     /// Resolves a Finder URL inside the File Provider domain to its `TrackedItem`.
