@@ -26,8 +26,10 @@ final class WebhooksService {
 
     func list() async throws -> [Webhook] {
         let api = try makeClient()
-        let response: ListResponse = try await api.get("/webhooks.json")
-        return response.webhooks ?? []
+        // Paginate so the admin view shows every webhook — the API caps a
+        // single page at ~100. `supported()` stays on `.get` because it
+        // returns a fixed server enumeration.
+        return try await api.getAllPages("/webhooks.json")
     }
 
     func supported() async throws -> [SupportedWebhook] {
@@ -64,26 +66,6 @@ final class WebhooksService {
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else { return .default }
         return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-    }
-
-    private struct ListResponse: Decodable, Sendable {
-        let webhooks: [Webhook]?
-
-        init(from decoder: any Decoder) throws {
-            if let container = try? decoder.container(keyedBy: CodingKeys.self),
-               let array = try container.decodeIfPresent([Webhook].self, forKey: .webhooks) {
-                webhooks = array
-                return
-            }
-            var unkeyed = try decoder.unkeyedContainer()
-            var collected: [Webhook] = []
-            while !unkeyed.isAtEnd {
-                collected.append(try unkeyed.decode(Webhook.self))
-            }
-            webhooks = collected
-        }
-
-        enum CodingKeys: String, CodingKey { case webhooks }
     }
 
     private struct CreateResponse: Decodable, Sendable {

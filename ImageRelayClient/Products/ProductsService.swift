@@ -22,8 +22,9 @@ final class ProductsService {
 
     func list() async throws -> [Product] {
         let api = try makeClient()
-        let response: ListResponse = try await api.get("/products.json")
-        return response.products ?? []
+        // Paginate so accounts with large product catalogs see every entry —
+        // the API caps a single page at ~100.
+        return try await api.getAllPages("/products.json")
     }
 
     private func makeClient() throws -> APIClient {
@@ -43,25 +44,6 @@ final class ProductsService {
         return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
     }
 
-    private struct ListResponse: Decodable, Sendable {
-        let products: [Product]?
-
-        init(from decoder: any Decoder) throws {
-            if let container = try? decoder.container(keyedBy: CodingKeys.self),
-               let array = try container.decodeIfPresent([Product].self, forKey: .products) {
-                products = array
-                return
-            }
-            var unkeyed = try decoder.unkeyedContainer()
-            var collected: [Product] = []
-            while !unkeyed.isAtEnd {
-                collected.append(try unkeyed.decode(Product.self))
-            }
-            products = collected
-        }
-
-        enum CodingKeys: String, CodingKey { case products }
-    }
 }
 
 @Observable @MainActor

@@ -31,8 +31,11 @@ final class CollectionsService {
 
     func items(in collection: Collection) async throws -> [CollectionItem] {
         let api = try makeClient()
-        let response: ItemsResponse = try await api.get("/collections/\(collection.id)/files.json")
-        return response.items ?? []
+        // Walk every page so addItems/removeItem don't compute their union/diff
+        // against a truncated view — the API caps a single page at ~100 items
+        // and we PUT the full asset_ids set back, which would otherwise drop
+        // members beyond the first page on every write.
+        return try await api.getAllPages("/collections/\(collection.id)/files.json")
     }
 
     func addItems(_ fileIDs: [Int], to collection: Collection) async throws {
@@ -92,26 +95,6 @@ final class CollectionsService {
         }
 
         enum CodingKeys: String, CodingKey { case collections }
-    }
-
-    private struct ItemsResponse: Decodable, Sendable {
-        let items: [CollectionItem]?
-
-        init(from decoder: any Decoder) throws {
-            if let container = try? decoder.container(keyedBy: CodingKeys.self) {
-                items = try container.decodeIfPresent([CollectionItem].self, forKey: .items)
-                    ?? container.decodeIfPresent([CollectionItem].self, forKey: .files)
-                return
-            }
-            var unkeyed = try decoder.unkeyedContainer()
-            var collected: [CollectionItem] = []
-            while !unkeyed.isAtEnd {
-                collected.append(try unkeyed.decode(CollectionItem.self))
-            }
-            items = collected
-        }
-
-        enum CodingKeys: String, CodingKey { case items, files }
     }
 }
 

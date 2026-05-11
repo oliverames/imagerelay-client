@@ -30,21 +30,26 @@ final class LibraryAdminService {
     }
 
     // MARK: - Read
+    //
+    // List endpoints walk every page so admin views render the full library
+    // (the API caps a single page at ~100 items). `currentUser` is a single
+    // object and `supportedWebhooks` is a fixed server enumeration, so both
+    // stay on `.get`.
 
     func fileTypes() async throws -> [FileType] {
-        try await makeClient().get("/file_types.json")
+        try await makeClient().getAllPages("/file_types.json")
     }
 
     func keywordSets() async throws -> [KeywordSet] {
-        try await makeClient().get("/keyword_sets.json")
+        try await makeClient().getAllPages("/keyword_sets.json")
     }
 
     func keywords(in set: KeywordSet) async throws -> [Keyword] {
-        try await makeClient().get("/keyword_sets/\(set.id)/keywords.json", query: ["page": "1"])
+        try await makeClient().getAllPages("/keyword_sets/\(set.id)/keywords.json")
     }
 
     func users() async throws -> [ImageRelayUser] {
-        try await makeClient().get("/users.json")
+        try await makeClient().getAllPages("/users.json")
     }
 
     func currentUser() async throws -> ImageRelayUser {
@@ -52,11 +57,11 @@ final class LibraryAdminService {
     }
 
     func folderLinks() async throws -> [FolderLink] {
-        try await makeClient().get("/folder_links.json")
+        try await makeClient().getAllPages("/folder_links.json")
     }
 
     func quickLinks() async throws -> [QuickLink] {
-        try await makeClient().get("/quick_links.json")
+        try await makeClient().getAllPages("/quick_links.json")
     }
 
     func supportedWebhooks() async throws -> [SupportedWebhook] {
