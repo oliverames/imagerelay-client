@@ -1,5 +1,140 @@
 # Worklog
 
+## 2026-05-11 - 1.1.0-beta.5: metadata polish + Library Admin CRUD + Homebrew
+
+**What changed**: Bundled three pieces into one beta. (1) Phase 1 polish on the
+metadata editor. (2) Phase 6 Library Admin CRUD, building on the existing
+read-only API Directory rather than scaffolding parallel feature folders.
+(3) Homebrew Cask support backed by a new public tap repo.
+
+Phase 1 polish:
+
+- SQLite metadata cache with a 5-minute TTL. New `metadata_cache` table via
+  a v5 migration in `SyncDatabase`; cache key is the asset ID, value is the
+  full `RemoteFileDetail` JSON so adding fields doesn't require a schema
+  bump. `MetadataEditingService.fetchDetail` consults the cache before
+  hitting the network; both fetch and save write through.
+- Multi-select editor with Finder-style semantics. `MetadataEditorState`
+  rewritten to handle 1..N targets. Description and custom fields use
+  common-fields-only ("Multiple values" placeholder when files differ;
+  blank means "don't touch"). Keywords use union semantics with an
+  explicit warning hint that saving replaces every selected file's
+  keyword set. Fetch fans out via `TaskGroup`; save fans out in parallel
+  and surfaces per-file failures in a banner. `MenuBarView` passes all
+  Finder-selected URLs (was previously taking only the first).
+- Keyword autocomplete suggestion chips. `MetadataEditingService.fetchAllKeywords`
+  tries unscoped `/keywords.json` first, falls back to aggregating via
+  keyword sets, and returns empty silently on either failure so the
+  chips degrade rather than block the editor. Chips ranked by `usage_count`
+  descending, ties broken alphabetically.
+
+Phase 6 Library Admin CRUD:
+
+- File types: create + edit (name/description) + delete. Terms stay
+  read-only this beta.
+- Keyword sets: create + delete. Per-set keyword create + delete. Flat,
+  no reordering.
+- Users: invite (email + optional first/last/login) + delete. Role
+  editing intentionally deferred until `permission_id` semantics are
+  documented in the kit — a wrong value could lock real users out.
+- All CRUD goes through new tolerant response wrappers (`FileTypeResponse`,
+  `KeywordSetResponse`, `KeywordResponse`, `UserResponse`) that accept
+  either `{"resource": {...}}` or a bare object, matching the
+  `WebhooksService` pattern. Models added in `LibraryAdmin.swift` and
+  `Keyword.swift`: `FileTypeCreate`, `FileTypeUpdate`, `KeywordSetCreate`,
+  `KeywordCreate`, `UserInvite`. View additions live in
+  `LibraryAdminView.swift` as three private tab sub-structs
+  (`FileTypesTab`, `KeywordsTab`, `UsersTab`) plus shared sheet helpers;
+  the existing Links and Events tabs are unchanged.
+
+Homebrew Cask:
+
+- `Casks/image-relay.rb` pinned at v1.0.1 stable. `depends_on macos: ">= :tahoe"`
+  (symbol verified against installed Homebrew at
+  `/opt/homebrew/Library/Homebrew/macos_version.rb`). DMG SHA-256
+  reverified against the live GitHub asset:
+  `664603ddd14849ce27ca73bae6fc088347ccb9f167584230d386225051bdaf3f`.
+- `scripts/update-cask.sh` rewrites the cask version + SHA from a built
+  DMG and short-circuits any version containing `-beta`, `-rc`, or
+  `-alpha` so beta releases never bump the stable cask.
+- `scripts/sync-cask-to-tap.sh` clones, updates, commits, and pushes
+  `Casks/image-relay.rb` to `oliverames/homebrew-tap`. Idempotent — bails
+  early when the destination cask is already byte-identical.
+- Wired into `scripts/build-developer-id-release.sh`: after notarization,
+  `update-cask.sh` runs automatically and reports the result without
+  failing the release on a cask-update error.
+- README gained a Homebrew install section (`brew tap oliverames/tap`
+  followed by `brew install --cask image-relay`) above the manual DMG
+  install path.
+
+Out of scope by user directive: Phase 7 consumer webhook relay
+(Cloudflare Worker + SSE). The user said "I don't want to ever
+implement that" on 2026-05-11; captured as a durable memory.
+
+**Decisions made**:
+
+- Extend `LibraryAdminView` rather than scaffold three parallel admin
+  folders. The 5-tab read-only diagnostic was already there with a
+  resilient 8-fan-out parallel load + `sectionErrors` map; the CRUD
+  inherits all of that for free.
+- Keyword multi-select semantics: union with warning hint (Finder Tags
+  parity). The next-smallest alternative (two-section "On all" / "On
+  some" UI) was considered and deferred until usage demands it.
+- Cache TTL of 5 minutes. Long enough to amortize multi-select repeats,
+  short enough to surface server-side edits the next time the editor
+  opens.
+- One bundled commit (`b670f1e`) covering all three pieces, per user
+  preference for fewer larger commits over many small ones for this
+  cycle.
+- Cask deliberately tracks stable only. Beta channel stays on Sparkle.
+
+**Verification**:
+
+- macOS Debug build clean (signing disabled).
+- iOS Simulator build (`iPhone 17e`) clean, confirming the new
+  `LibraryAdminService` CRUD additions compile on the iOS target that
+  shares the file via `Project.yml`.
+- `swift test` from `ImageRelayKit/`: 90/90 passing across 16 suites.
+  The v5 migration ran successfully against in-memory and on-disk
+  databases.
+- Cask SHA reverified against `curl`-downloaded v1.0.1 DMG.
+- `:tahoe` symbol confirmed valid in installed Homebrew.
+- Sync to tap succeeded; tap commit `9ecc46a` contains
+  `Casks/image-relay.rb` at v1.0.1.
+
+**Left off at**:
+
+- Beta 5 committed as `b670f1e` on `main` but not pushed. User held on
+  both the push and the release-script invocation so they can pick the
+  timing.
+- Release build (`scripts/build-developer-id-release.sh --version
+  1.1.0-beta.5 --smoke-install`) is the next step. Smoke install will
+  replace `/Applications/Image Relay.app` in place.
+- GitHub release publish via `gh release create v1.1.0-beta.5
+  build/releases/1.1.0-beta.5/ImageRelayClient-1.1.0-beta.5.dmg
+  --prerelease` after notarization completes.
+- Live API smoke against the Image Relay account will be the gating
+  step before 1.1.0 stable. Particularly: multi-select metadata edit
+  on real assets, and the Phase 6 CRUD endpoints whose request shapes
+  are inferred (the response wrappers are tolerant; the request
+  payloads assume `{file_type: {...}}` style wrapping which the API
+  may need to be flat).
+
+**Open questions**:
+
+- Does the live Image Relay API accept the wrapped `{file_type: {...}}`
+  POST/PUT body for file-type CRUD, or does it want a flat
+  `{name, description}`? The existing `FileMetadataUpdate` sends flat;
+  for consistency, flat may be safer here too. Adjustable in
+  `LibraryAdminService` if 422s surface during smoke.
+- Unscoped `/keywords.json` endpoint existence remains unverified
+  against the live deployment. Worst case the autocomplete chips don't
+  populate; not a release blocker.
+- iOS real-device smoke against the live account still pending from
+  the prior session.
+
+---
+
 ## 2026-05-09 - iOS port scaffold: ImageRelayClientiOS + FileProviderExtensioniOS
 
 **What changed**: First iOS targets land in this repo. `ImageRelayKit` is now
