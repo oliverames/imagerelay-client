@@ -341,6 +341,70 @@ struct APIClientTests {
         #expect(requestCount == 2)
     }
 
+    @Test("getAllPages handles wrapper-keyed responses without pagination metadata")
+    func getAllPagesWrappedKeyNoPagination() async throws {
+        // Defensive: some endpoints return `{"folders": [...]}` without any
+        // pagination key. Previously this threw "Unexpected paginated response
+        // format"; now it should extract the array and stop after one page
+        // (since the array length is below the per_page heuristic).
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            #expect(requestCount == 1, "Should not page beyond the first request when payload is small")
+            let json = """
+            {
+              "folders": [
+                {"id":1,"name":"Root","parent_id":null,"path":"/Root","updated_on":null,"child_count":0}
+              ]
+            }
+            """
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, json.data(using: .utf8)!)
+        }
+
+        let client = makeClient()
+        let folders: [RemoteFolder] = try await client.getAllPages("/folders")
+        #expect(folders.map(\.id) == [1])
+        #expect(requestCount == 1)
+    }
+
+    @Test("getAllPages pages a wrapper-keyed response when it fills per_page")
+    func getAllPagesWrappedKeyFollowsPerPageHeuristic() async throws {
+        // If a wrapper-keyed response has exactly per_page items, the heuristic
+        // assumes there may be a next page. Fetch until the page count drops.
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            let foldersJSON: String
+            switch requestCount {
+            case 1:
+                // perPage default is 100; provide exactly 100 entries to trigger another fetch.
+                let entries = (1...100).map {
+                    "{\"id\":\($0),\"name\":\"F\($0)\",\"parent_id\":null,\"path\":\"/F\($0)\",\"updated_on\":null,\"child_count\":0}"
+                }.joined(separator: ",")
+                foldersJSON = "{\"folders\": [\(entries)]}"
+            case 2:
+                foldersJSON = "{\"folders\": [{\"id\":101,\"name\":\"F101\",\"parent_id\":null,\"path\":\"/F101\",\"updated_on\":null,\"child_count\":0}]}"
+            default:
+                Issue.record("Unexpected extra request")
+                foldersJSON = "{\"folders\": []}"
+            }
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, foldersJSON.data(using: .utf8)!)
+        }
+
+        let client = makeClient()
+        let folders: [RemoteFolder] = try await client.getAllPages("/folders")
+        #expect(folders.count == 101)
+        #expect(requestCount == 2)
+    }
+
     @Test("404 throws notFound")
     func handles404() async {
         MockURLProtocol.requestHandler = { request in

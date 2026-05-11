@@ -130,6 +130,61 @@ struct SyncDatabaseTests {
         #expect(try db.item(for: "file-4") != nil)
     }
 
+    @Test("subtreeIdentifiers returns root plus full descendant tree")
+    func subtreeIdentifiersWalksFullTree() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-1", parentIdentifier: "root",
+            remoteID: 1, itemType: .folder, name: "Parent",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-2", parentIdentifier: "folder-1",
+            remoteID: 2, itemType: .folder, name: "Child",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-3", parentIdentifier: "folder-2",
+            remoteID: 3, itemType: .file, name: "nested.txt",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-4", parentIdentifier: "root",
+            remoteID: 4, itemType: .file, name: "sibling.txt",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        let subtree = try db.subtreeIdentifiers(rootedAt: "folder-1")
+        #expect(Set(subtree) == ["folder-1", "folder-2", "file-3"])
+        #expect(!subtree.contains("file-4"))
+    }
+
+    @Test("subtreeIdentifiers includes root even when no tracked record exists")
+    func subtreeIdentifiersIncludesSyntheticRoot() throws {
+        let db = try makeDB()
+
+        // Caller passes an identifier the DB hasn't seen yet (e.g., a selected
+        // folder that has never been enumerated). The query should still return
+        // the root and any children rooted at it (none in this case).
+        let subtree = try db.subtreeIdentifiers(rootedAt: "folder-999")
+        #expect(subtree == ["folder-999"])
+    }
+
+    @Test("subtreeIdentifiers returns only root when no children exist")
+    func subtreeIdentifiersLeafOnly() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "file-7", parentIdentifier: "root",
+            remoteID: 7, itemType: .file, name: "lone.txt",
+            size: 1, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        let subtree = try db.subtreeIdentifiers(rootedAt: "file-7")
+        #expect(subtree == ["file-7"])
+    }
+
     @Test("Save and load sync anchor")
     func syncAnchor() throws {
         let db = try makeDB()

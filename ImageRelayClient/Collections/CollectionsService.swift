@@ -14,11 +14,14 @@ final class CollectionsService {
 
     enum ServiceError: LocalizedError {
         case notConfigured
+        case unexpectedResponse
 
         var errorDescription: String? {
             switch self {
             case .notConfigured:
                 return "Image Relay is not configured. Open Settings → General to add your API key."
+            case .unexpectedResponse:
+                return "Image Relay returned a response the client didn't recognize."
             }
         }
     }
@@ -27,6 +30,19 @@ final class CollectionsService {
         let api = try makeClient()
         let response: ListResponse = try await api.get("/collections.json")
         return response.collections ?? []
+    }
+
+    func create(name: String) async throws -> Collection {
+        let api = try makeClient()
+        let response: CollectionResponse = try await api.post(
+            "/collections.json",
+            body: CollectionCreate(name: name)
+        )
+        return try response.unwrapped()
+    }
+
+    func delete(_ collection: Collection) async throws {
+        try await makeClient().delete("/collections/\(collection.id).json")
     }
 
     func items(in collection: Collection) async throws -> [CollectionItem] {
@@ -38,16 +54,27 @@ final class CollectionsService {
         return try await api.getAllPages("/collections/\(collection.id)/files.json")
     }
 
+    /// Adds files to a collection using the delta endpoint, not PUT-the-whole-set.
+    /// The previous implementation fetched the full membership, unioned the new
+    /// IDs, and PUT the result back — a TOCTOU race that silently lost any
+    /// concurrent additions made between the read and the write. The delta POST
+    /// is server-side append-only, so two clients adding different files no
+    /// longer overwrite each other.
     func addItems(_ fileIDs: [Int], to collection: Collection) async throws {
+        guard !fileIDs.isEmpty else { return }
         let api = try makeClient()
-        let existing = try await items(in: collection).map(\.fileID)
-        let nextIDs = Array(Set(existing + fileIDs)).sorted()
-        try await api.put(
-            "/collections/\(collection.id).json",
-            body: CollectionUpdate(name: collection.name, assetIDs: nextIDs)
+        try await api.post(
+            "/collections/\(collection.id)/files.json",
+            body: CollectionItemAdd(fileIDs: fileIDs)
         )
     }
 
+    /// Removes a file from a collection. The API doesn't (currently) expose a
+    /// delta DELETE for collection membership, so we PUT the recomputed asset
+    /// set back. Concurrent edits between the GET and the PUT here can still
+    /// be lost — additions made by another client during this window get
+    /// overwritten. If/when Image Relay exposes
+    /// `DELETE /collections/{id}/files/{file_id}.json`, switch to that.
     func removeItem(fileID: Int, from collection: Collection) async throws {
         let api = try makeClient()
         let remainingIDs = try await items(in: collection)
@@ -96,6 +123,28 @@ final class CollectionsService {
 
         enum CodingKeys: String, CodingKey { case collections }
     }
+
+    /// Accepts either `{"collection": {...}}` or a bare object, matching the
+    /// tolerant pattern LibraryAdminService uses for its wrappers.
+    private struct CollectionResponse: Decodable, Sendable {
+        let collection: Collection?
+
+        init(from decoder: any Decoder) throws {
+            if let c = try? decoder.container(keyedBy: CodingKeys.self),
+               let value = try c.decodeIfPresent(Collection.self, forKey: .collection) {
+                collection = value
+                return
+            }
+            collection = try? Collection(from: decoder)
+        }
+
+        func unwrapped() throws -> Collection {
+            guard let collection else { throw ServiceError.unexpectedResponse }
+            return collection
+        }
+
+        enum CodingKeys: String, CodingKey { case collection }
+    }
 }
 
 @Observable @MainActor
@@ -119,6 +168,9 @@ final class CollectionsState {
     var itemsByCollectionID: [Int: [CollectionItem]] = [:]
     var itemsLoadingFor: Set<Int> = []
     var itemsErrorByCollectionID: [Int: String] = [:]
+
+    /// Surfaced to create/delete sheets so they can show error text without flipping `phase`.
+    var lastActionError: String?
 
     var selectedCollection: Collection? {
         guard let selectedID else { return nil }
@@ -173,6 +225,45 @@ final class CollectionsState {
         } catch {
             logger.warning("Add items to collection failed: \(error.localizedDescription)")
             itemsErrorByCollectionID[collection.id] = error.localizedDescription
+        }
+    }
+
+    // MARK: - Create / Delete actions
+
+    @discardableResult
+    func createCollection(name: String) async -> Bool {
+        await performAction(label: "Create collection") {
+            let created = try await self.service.create(name: name)
+            self.collections.insert(created, at: 0)
+            if self.selectedID == nil { self.selectedID = created.id }
+        }
+    }
+
+    @discardableResult
+    func deleteCollection(_ collection: Collection) async -> Bool {
+        await performAction(label: "Delete collection") {
+            try await self.service.delete(collection)
+            self.collections.removeAll { $0.id == collection.id }
+            self.itemsByCollectionID.removeValue(forKey: collection.id)
+            self.itemsErrorByCollectionID.removeValue(forKey: collection.id)
+            if self.selectedID == collection.id {
+                self.selectedID = self.collections.first?.id
+            }
+        }
+    }
+
+    private func performAction(
+        label: String,
+        operation: () async throws -> Void
+    ) async -> Bool {
+        lastActionError = nil
+        do {
+            try await operation()
+            return true
+        } catch {
+            logger.warning("\(label) failed: \(error.localizedDescription)")
+            lastActionError = error.localizedDescription
+            return false
         }
     }
 }

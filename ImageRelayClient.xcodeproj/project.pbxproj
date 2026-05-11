@@ -14,9 +14,12 @@
 		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
 		1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */; };
 		1EFBDC3067A3706986893FA3 /* ProductsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */; };
+		24BEB7C0CB875FE2BDC28583 /* EnumeratorDataLossTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */; };
+		25DD667F825D909ED3798728 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
 		2E30D35C36D48061B8D97767 /* LibraryAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */; };
+		304E4872CBAF1A530C31812B /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5214AA13DEAEE7F7687D4000 /* Enumerator.swift */; };
 		312468E3E4801ED595A2E2E8 /* FilesGatewayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09905997BC489A37591154DE /* FilesGatewayView.swift */; };
 		3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F41FA6140E7852A9DBB0B4E /* FileProviderItem.swift */; };
 		3529DE22EE5EB98132A64A5B /* MetadataEditingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EBFD21DED0779DC0B30930 /* MetadataEditingService.swift */; };
@@ -33,10 +36,12 @@
 		712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */; };
 		74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */; };
 		75DE4CDC04A5F462BA38C431 /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
+		771B118B1B769C84723C4175 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
 		786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */; };
 		787E887F51E8D73C62824E81 /* ProductsListiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */; };
 		7A7EA3E4B08D42807AF4FD3A /* APIDirectoryiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */; };
 		83FCA1A5E566EE87F8AF27BD /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1F29EDBF47C83AC5414A490E /* ImageRelayKit */; };
+		8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
 		894EBEA3886CDD2B030EA09C /* FileProviderDomainController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */; };
 		8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8F8F64B8B4FC610E865DC1B5 /* WebhooksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 336DBC3887926D6E12C41EB1 /* WebhooksService.swift */; };
@@ -44,11 +49,14 @@
 		9370F6959D4C6228C61F6A4C /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
 		960B40F8B168A16893E05254 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
 		99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354821ECFF0127BC8CC280A1 /* Extension.swift */; };
+		9AA24C58E66241965C7637BF /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
+		9BC429DCAF85E390B3EC318C /* EnumeratorMockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1571B39D4D69A523AB9F63B6 /* EnumeratorMockURLProtocol.swift */; };
 		9C4B41F66ECE7702D346898E /* FoldersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */; };
 		9FFC6D0E1823F299FA694432 /* SettingsiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145F672001C655C841754CED /* SettingsiOSView.swift */; };
 		A3679080BADF744F9E4DCAC9 /* LibraryAdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F073384C166485C57856B16A /* LibraryAdminService.swift */; };
 		A74837C0585C2FB2C67074BF /* LibraryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */; };
 		A82E8ADB3A29C40B4E00E94D /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB249F188A4072D000A1BBDB /* App.swift */; };
+		B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
 		BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
@@ -60,6 +68,7 @@
 		DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5214AA13DEAEE7F7687D4000 /* Enumerator.swift */; };
 		DE4D78A483B3275786907ADA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46B76A4D571BB9BA19CDE4B /* App.swift */; };
 		E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6B484F18C4C86D49798D03D6 /* ImageRelayKit */; };
+		E490E1FBEEDD9CF4D06756BC /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 605A842907034C3D0729CACD /* ImageRelayKit */; };
 		F7E97E14C2C6166EDA091B50 /* UploadLinksState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */; };
 		F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43BFF79E08904BFEC78A777 /* Enumerator.swift */; };
 		F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0CA6FB5CB8A04A06B32540E /* RootView.swift */; };
@@ -112,6 +121,7 @@
 		10E8B32366DC8A4264C5216C /* ImageRelayClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ImageRelayClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		145F672001C655C841754CED /* SettingsiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsiOSView.swift; sourceTree = "<group>"; };
 		1509C71F6AC6940B444DBEE6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1571B39D4D69A523AB9F63B6 /* EnumeratorMockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnumeratorMockURLProtocol.swift; sourceTree = "<group>"; };
 		17C9E794EFF5B724521F1FA5 /* LibraryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryHomeView.swift; sourceTree = "<group>"; };
 		1907D94A32A3AE0968238BFE /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
@@ -123,6 +133,7 @@
 		336DBC3887926D6E12C41EB1 /* WebhooksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhooksService.swift; sourceTree = "<group>"; };
 		354821ECFF0127BC8CC280A1 /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		413441CD471A316A1D63A161 /* FileProviderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FileProviderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnumeratorDataLossTests.swift; sourceTree = "<group>"; };
 		4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FileProviderExtensioniOS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4ACFCF895BE3EF6017459B2B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsListiOSView.swift; sourceTree = "<group>"; };
@@ -165,6 +176,7 @@
 		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
 		F073384C166485C57856B16A /* LibraryAdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminService.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FileProviderExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStore.swift; sourceTree = "<group>"; };
 		FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -176,6 +188,14 @@
 			files = (
 				B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */,
 				5E176CE222C64F1164385243 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6C3FA3B0ABF3365368C8BD20 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E490E1FBEEDD9CF4D06756BC /* ImageRelayKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -224,6 +244,15 @@
 				E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */,
 			);
 			path = LibraryAdmin;
+			sourceTree = "<group>";
+		};
+		0F0AA21D952360693AB8C27C /* FileProviderExtensionTests */ = {
+			isa = PBXGroup;
+			children = (
+				41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */,
+				1571B39D4D69A523AB9F63B6 /* EnumeratorMockURLProtocol.swift */,
+			);
+			path = FileProviderExtensionTests;
 			sourceTree = "<group>";
 		};
 		1337FB025DB622C6D770D76F /* FileProviderExtension */ = {
@@ -345,6 +374,7 @@
 			children = (
 				1337FB025DB622C6D770D76F /* FileProviderExtension */,
 				B2E7E1FC294B17D53B2849F7 /* FileProviderExtensioniOS */,
+				0F0AA21D952360693AB8C27C /* FileProviderExtensionTests */,
 				CF9CEB146B013A57E60F8BED /* ImageRelayClient */,
 				7834F907CC79F2CCAC3F004E /* ImageRelayClientiOS */,
 				6F1461F0AB0F2B619A85BB1B /* Packages */,
@@ -401,6 +431,7 @@
 			children = (
 				413441CD471A316A1D63A161 /* FileProviderExtension.appex */,
 				4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */,
+				F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */,
 				10E8B32366DC8A4264C5216C /* ImageRelayClient.app */,
 				CF5682F14039E5F3EC1D8C28 /* ImageRelayClientiOS.app */,
 			);
@@ -493,6 +524,26 @@
 			productReference = CF5682F14039E5F3EC1D8C28 /* ImageRelayClientiOS.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EC24EBE7C40603ED435970EA /* FileProviderExtensionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 34CD1833815563FB1BB63A16 /* Build configuration list for PBXNativeTarget "FileProviderExtensionTests" */;
+			buildPhases = (
+				A37786B344D807B38617F9F4 /* Sources */,
+				639A30B15AA01811A46C4425 /* Resources */,
+				6C3FA3B0ABF3365368C8BD20 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FileProviderExtensionTests;
+			packageProductDependencies = (
+				605A842907034C3D0729CACD /* ImageRelayKit */,
+			);
+			productName = FileProviderExtensionTests;
+			productReference = F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -513,6 +564,10 @@
 						DevelopmentTeam = PV3W52NDZ3;
 					};
 					D512C549A59A501AD83404A2 = {
+						DevelopmentTeam = PV3W52NDZ3;
+						ProvisioningStyle = Automatic;
+					};
+					EC24EBE7C40603ED435970EA = {
 						DevelopmentTeam = PV3W52NDZ3;
 						ProvisioningStyle = Automatic;
 					};
@@ -537,6 +592,7 @@
 			projectRoot = "";
 			targets = (
 				7753FDCBBDB77346A54BDEFC /* FileProviderExtension */,
+				EC24EBE7C40603ED435970EA /* FileProviderExtensionTests */,
 				426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */,
 				7D99ADACA8F4377D63E996E2 /* ImageRelayClient */,
 				D512C549A59A501AD83404A2 /* ImageRelayClientiOS */,
@@ -545,6 +601,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		639A30B15AA01811A46C4425 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				25DD667F825D909ED3798728 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7879B424A9E93E1EC23F945C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -619,6 +683,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A37786B344D807B38617F9F4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9AA24C58E66241965C7637BF /* APIErrorMapping.swift in Sources */,
+				304E4872CBAF1A530C31812B /* Enumerator.swift in Sources */,
+				24BEB7C0CB875FE2BDC28583 /* EnumeratorDataLossTests.swift in Sources */,
+				9BC429DCAF85E390B3EC318C /* EnumeratorMockURLProtocol.swift in Sources */,
+				771B118B1B769C84723C4175 /* Extension.swift in Sources */,
+				8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */,
+				B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E12B8BEEF537913FBD4635D8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -689,7 +767,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 22;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -711,7 +789,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.5";
+				MARKETING_VERSION = "1.1.0-beta.6";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -792,7 +870,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 22;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -808,7 +886,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.5";
+				MARKETING_VERSION = "1.1.0-beta.6";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -838,6 +916,27 @@
 			};
 			name = Release;
 		};
+		70DC528E1262C34BD81E57AD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FileProviderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider.tests";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
 		7B119EF210D5339E7183EB4B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -857,6 +956,27 @@
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D53743A03601F9554C0AAAA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FileProviderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider.tests";
+				SDKROOT = macosx;
 			};
 			name = Release;
 		};
@@ -954,6 +1074,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		34CD1833815563FB1BB63A16 /* Build configuration list for PBXNativeTarget "FileProviderExtensionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70DC528E1262C34BD81E57AD /* Debug */,
+				D53743A03601F9554C0AAAA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		556F196425422EA1A67872D8 /* Build configuration list for PBXNativeTarget "ImageRelayClientiOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1012,6 +1141,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		1F29EDBF47C83AC5414A490E /* ImageRelayKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ImageRelayKit;
+		};
+		605A842907034C3D0729CACD /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
 		};

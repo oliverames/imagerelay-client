@@ -50,6 +50,17 @@
                ReferencedContainer = "container:ImageRelayKit">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "EC24EBE7C40603ED435970EA"
+               BuildableName = "FileProviderExtensionTests.xctest"
+               BlueprintName = "FileProviderExtensionTests"
+               ReferencedContainer = "container:ImageRelayClient.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

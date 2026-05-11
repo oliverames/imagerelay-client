@@ -147,6 +147,33 @@ public final class SyncDatabase: Sendable {
         }
     }
 
+    /// Returns every tracked identifier in the local subtree rooted at `identifier`,
+    /// including the root itself. Walks the parent/child relationships in a single
+    /// recursive CTE — preferred over N+1 calls to `children(of:)` when the caller
+    /// just wants identifiers (e.g. computing a "protected" set for deletion-detection).
+    /// The root is included even if no tracked record exists for it, so callers can
+    /// pass a synthetic identifier (such as a still-selected folder ID) without
+    /// pre-checking.
+    public func subtreeIdentifiers(rootedAt identifier: String) throws -> [String] {
+        try writer.read { db in
+            let rows = try String.fetchAll(
+                db,
+                sql: """
+                WITH RECURSIVE subtree(identifier) AS (
+                    VALUES (?)
+                    UNION ALL
+                    SELECT tracked_items.identifier
+                    FROM tracked_items
+                    JOIN subtree ON tracked_items.parentIdentifier = subtree.identifier
+                )
+                SELECT identifier FROM subtree
+                """,
+                arguments: [identifier]
+            )
+            return rows
+        }
+    }
+
     public func resetTrackedState() throws {
         try writer.write { db in
             try db.execute(sql: "DELETE FROM sync_anchors")

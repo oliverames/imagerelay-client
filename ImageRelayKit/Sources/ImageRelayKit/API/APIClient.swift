@@ -308,9 +308,30 @@ public actor APIClient {
         let jsonObject = try JSONSerialization.jsonObject(with: data)
 
         if let body = jsonObject as? [String: Any], body["pagination"] != nil {
-            let items = try decodeItemsFromPaginatedObject(type, body: body)
+            let (items, _) = try decodeItemsFromPaginatedObject(type, body: body)
             let pageInfo = try decodePageInfo(from: body["pagination"])
             return (items, pageInfo?.hasNextPage ?? false)
+        }
+
+        // Defensive fallback: `{"key": [...]}` shape without explicit pagination
+        // metadata. Treat it the same as a bare array: extract the first array
+        // value and fall back to the page-size heuristic. This handles smaller
+        // list endpoints that wrap their result in a single named array but
+        // omit pagination because the response always fits in one page.
+        //
+        // Risk: if a server returns exactly `perPage` items but does NOT honor
+        // the `page` query parameter, the heuristic will tell `getAllPages`
+        // there are more pages and the loop fetches the same payload again.
+        // We log a warning so this surfaces in production diagnostics if a real
+        // endpoint ever takes this branch — the path is currently defensive
+        // for a theoretical case (no production endpoint observed using this
+        // shape) and the warning is the canary for "this is no longer theoretical".
+        if let body = jsonObject as? [String: Any] {
+            let (items, count) = try decodeItemsFromPaginatedObject(type, body: body)
+            logger.warning(
+                "getAllPages took the unkeyed-wrapper fallback for \(body.keys.sorted().joined(separator: ","), privacy: .public); count=\(count, privacy: .public), perPage=\(perPage, privacy: .public). If pagination is unsupported on this endpoint the loop will re-fetch."
+            )
+            return (items, count >= perPage)
         }
 
         if let body = jsonObject as? [Any] {
@@ -330,14 +351,15 @@ public actor APIClient {
     private func decodeItemsFromPaginatedObject<T: Decodable>(
         _ type: T.Type,
         body: [String: Any]
-    ) throws -> T {
-        guard let itemsJSON = body.first(where: { $0.key != "pagination" && $0.value is [Any] })?.value else {
+    ) throws -> (items: T, count: Int) {
+        guard let entry = body.first(where: { $0.key != "pagination" && $0.value is [Any] }) else {
             let emptyItems = try JSONSerialization.data(withJSONObject: [])
-            return try JSONDecoder.imageRelay.decode(type, from: emptyItems)
+            return (try JSONDecoder.imageRelay.decode(type, from: emptyItems), 0)
         }
 
-        let itemsData = try JSONSerialization.data(withJSONObject: itemsJSON)
-        return try JSONDecoder.imageRelay.decode(type, from: itemsData)
+        let itemsArray = entry.value as? [Any] ?? []
+        let itemsData = try JSONSerialization.data(withJSONObject: entry.value)
+        return (try JSONDecoder.imageRelay.decode(type, from: itemsData), itemsArray.count)
     }
 
     private func decodePageInfo(from value: Any?) throws -> Pagination.PageInfo? {

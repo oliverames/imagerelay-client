@@ -18,8 +18,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: PV3W52NDZ3
-    MARKETING_VERSION: "1.1.0-beta.5"
-    CURRENT_PROJECT_VERSION: "21"
+    MARKETING_VERSION: "1.1.0-beta.6"
+    CURRENT_PROJECT_VERSION: "22"
     ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
@@ -33,6 +33,7 @@ schemes:
       config: Debug
       targets:
         - package: ImageRelayKit/ImageRelayKitTests
+        - FileProviderExtensionTests
     archive:
       config: Release
 
@@ -126,6 +127,31 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
           PROVISIONING_PROFILE_SPECIFIER: "ImageRelayClient FileProviderExtension Developer ID"
+
+  FileProviderExtensionTests:
+    # Standalone unit-test bundle for FileProviderExtension classes. We compile
+    # the extension's sources directly into the test target rather than linking
+    # the extension binary — extensions are not built with `-enable-testing`
+    # for distribution, and depending on the extension target as a build product
+    # also drags in its provisioning profile requirements (the extension is
+    # codeSign: false / embed-only inside the host app). The trade-off: source
+    # changes here must mirror any path changes in the FileProviderExtension
+    # `sources:` block above.
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: FileProviderExtensionTests
+      - path: FileProviderExtension
+    dependencies:
+      - package: ImageRelayKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.fileprovider.tests
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_ALLOWED: NO
 
   ImageRelayClientiOS:
     type: application

@@ -68,6 +68,19 @@ final class LibraryAdminService {
         try await makeClient().get("/webhooks/supported.json")
     }
 
+    func permissionGroups() async throws -> [PermissionGroup] {
+        // The `/permission_groups.json` payload is small enough that paging is
+        // unnecessary, and the wrapper may be `{"permission_groups": [...]}`
+        // without pagination metadata — a shape `getAllPages` won't decode.
+        let api = try makeClient()
+        let response: PermissionGroupListResponse = try await api.get("/permission_groups.json")
+        return response.values
+    }
+
+    func invitedUsers() async throws -> [InvitedUser] {
+        try await makeClient().getAllPages("/invited_users.json")
+    }
+
     // MARK: - File Type CRUD
 
     func createFileType(_ payload: FileTypeCreate) async throws -> FileType {
@@ -111,6 +124,15 @@ final class LibraryAdminService {
         try await makeClient().delete("/keyword_sets/\(setID)/keywords/\(keywordID).json")
     }
 
+    func renameKeyword(setID: Int, keywordID: Int, name: String) async throws -> Keyword {
+        let api = try makeClient()
+        let response: KeywordResponse = try await api.put(
+            "/keyword_sets/\(setID)/keywords/\(keywordID).json",
+            body: KeywordUpdate(name: name)
+        )
+        return try response.unwrapped()
+    }
+
     // MARK: - User CRUD
 
     func inviteUser(_ payload: UserInvite) async throws -> ImageRelayUser {
@@ -121,6 +143,61 @@ final class LibraryAdminService {
 
     func deleteUser(id: Int) async throws {
         try await makeClient().delete("/users/\(id).json")
+    }
+
+    func user(id: Int) async throws -> ImageRelayUser {
+        try await makeClient().get("/users/\(id).json")
+    }
+
+    func searchUsers(query: String) async throws -> [ImageRelayUser] {
+        // The Image Relay docs show `/users/search` accepting separate
+        // `first_name`, `last_name`, and `email` query parameters, while the
+        // internal API contract this client targets passes a single `query`
+        // parameter. If the server returns 400 or empty arrays for a
+        // non-empty query, verify against live traffic and adjust here.
+        let api = try makeClient()
+        let response: UserListResponse = try await api.get(
+            "/users/search.json",
+            query: ["query": query]
+        )
+        return response.values
+    }
+
+    func updateUserPermissionGroup(userID: Int, permissionGroupID: Int) async throws {
+        try await makeClient().put(
+            "/users/\(userID)/permission_group.json",
+            body: PermissionGroupAssignment(permissionGroupID: permissionGroupID)
+        )
+    }
+
+    // MARK: - Invited User CRUD
+
+    func inviteNewUser(_ payload: InvitedUserCreate) async throws -> InvitedUser {
+        let api = try makeClient()
+        let response: InvitedUserResponse = try await api.post(
+            "/invited_users.json",
+            body: payload
+        )
+        return try response.unwrapped()
+    }
+
+    func deleteInvitedUser(id: Int) async throws {
+        try await makeClient().delete("/invited_users/\(id).json")
+    }
+
+    // MARK: - Folder Link CRUD
+
+    func createFolderLink(_ payload: FolderLinkCreate) async throws -> FolderLink {
+        let api = try makeClient()
+        let response: FolderLinkResponse = try await api.post(
+            "/folder_links.json",
+            body: payload
+        )
+        return try response.unwrapped()
+    }
+
+    func deleteFolderLink(id: Int) async throws {
+        try await makeClient().delete("/folder_links/\(id).json")
     }
 
     // MARK: - Client wiring
@@ -225,6 +302,94 @@ final class LibraryAdminService {
 
         enum CodingKeys: String, CodingKey { case user }
     }
+
+    private struct InvitedUserResponse: Decodable, Sendable {
+        let invitedUser: InvitedUser?
+
+        init(from decoder: any Decoder) throws {
+            if let c = try? decoder.container(keyedBy: CodingKeys.self),
+               let value = try c.decodeIfPresent(InvitedUser.self, forKey: .invitedUser) {
+                invitedUser = value
+                return
+            }
+            invitedUser = try? InvitedUser(from: decoder)
+        }
+
+        func unwrapped() throws -> InvitedUser {
+            guard let invitedUser else { throw ServiceError.unexpectedResponse }
+            return invitedUser
+        }
+
+        enum CodingKeys: String, CodingKey { case invitedUser = "invited_user" }
+    }
+
+    private struct FolderLinkResponse: Decodable, Sendable {
+        let folderLink: FolderLink?
+
+        init(from decoder: any Decoder) throws {
+            if let c = try? decoder.container(keyedBy: CodingKeys.self),
+               let value = try c.decodeIfPresent(FolderLink.self, forKey: .folderLink) {
+                folderLink = value
+                return
+            }
+            folderLink = try? FolderLink(from: decoder)
+        }
+
+        func unwrapped() throws -> FolderLink {
+            guard let folderLink else { throw ServiceError.unexpectedResponse }
+            return folderLink
+        }
+
+        enum CodingKeys: String, CodingKey { case folderLink = "folder_link" }
+    }
+
+    /// Accepts either `{"permission_groups": [...]}` or a bare `[...]`.
+    /// Permission groups are small enough we don't bother with pagination here.
+    /// The bare-array decode in the fallback branch throws on failure so a
+    /// schema mismatch surfaces as an error instead of an empty list.
+    private struct PermissionGroupListResponse: Decodable, Sendable {
+        let values: [PermissionGroup]
+
+        init(from decoder: any Decoder) throws {
+            if let c = try? decoder.container(keyedBy: CodingKeys.self),
+               let array = try c.decodeIfPresent([PermissionGroup].self, forKey: .permissionGroups) {
+                values = array
+                return
+            }
+            values = try [PermissionGroup](from: decoder)
+        }
+
+        enum CodingKeys: String, CodingKey { case permissionGroups = "permission_groups" }
+    }
+
+    /// Accepts either `{"users": [...]}` or a bare `[...]` so `searchUsers`
+    /// matches whichever envelope the server emits. Fallback decode throws on
+    /// failure so the caller gets a real error rather than empty results.
+    private struct UserListResponse: Decodable, Sendable {
+        let values: [ImageRelayUser]
+
+        init(from decoder: any Decoder) throws {
+            if let c = try? decoder.container(keyedBy: CodingKeys.self),
+               let array = try c.decodeIfPresent([ImageRelayUser].self, forKey: .users) {
+                values = array
+                return
+            }
+            values = try [ImageRelayUser](from: decoder)
+        }
+
+        enum CodingKeys: String, CodingKey { case users }
+    }
+
+    /// PUT body for `PUT /users/{id}/permission_group.json`. Kept private
+    /// because it is only used internally by `updateUserPermissionGroup` and
+    /// isn't part of the public model surface.
+    private struct PermissionGroupAssignment: Encodable, Sendable {
+        let permissionGroupID: Int
+
+        enum CodingKeys: String, CodingKey {
+            case permissionGroupID = "permission_group_id"
+        }
+    }
 }
 
 @Observable @MainActor
@@ -252,6 +417,8 @@ final class LibraryAdminState {
     var folderLinks: [FolderLink] = []
     var quickLinks: [QuickLink] = []
     var supportedWebhooks: [SupportedWebhook] = []
+    var permissionGroups: [PermissionGroup] = []
+    var invitedUsers: [InvitedUser] = []
 
     /// Surfaced to admin sheets so they can show error text without phase-flipping.
     var lastActionError: String?
@@ -261,7 +428,7 @@ final class LibraryAdminState {
         sectionErrors = [:]
         keywordsBySetID = [:]
 
-        // Fan out the seven top-level fetches in parallel. Keyword sets must complete
+        // Fan out the nine top-level fetches in parallel. Keyword sets must complete
         // before per-set keyword fetches start, so those happen in a second pass.
         async let aFileTypes: Result<[FileType], Error> = capturing { try await service.fileTypes() }
         async let aKeywordSets: Result<[KeywordSet], Error> = capturing { try await service.keywordSets() }
@@ -270,6 +437,8 @@ final class LibraryAdminState {
         async let aFolderLinks: Result<[FolderLink], Error> = capturing { try await service.folderLinks() }
         async let aQuickLinks: Result<[QuickLink], Error> = capturing { try await service.quickLinks() }
         async let aSupported: Result<[SupportedWebhook], Error> = capturing { try await service.supportedWebhooks() }
+        async let aPermissionGroups: Result<[PermissionGroup], Error> = capturing { try await service.permissionGroups() }
+        async let aInvitedUsers: Result<[InvitedUser], Error> = capturing { try await service.invitedUsers() }
 
         ingest("File Types", await aFileTypes) { fileTypes = $0 }
         ingest("Keyword Sets", await aKeywordSets) { keywordSets = $0 }
@@ -278,6 +447,8 @@ final class LibraryAdminState {
         ingest("Folder Links", await aFolderLinks) { folderLinks = $0 }
         ingest("Quick Links", await aQuickLinks) { quickLinks = $0 }
         ingest("Supported Webhooks", await aSupported) { supportedWebhooks = $0 }
+        ingest("Permission Groups", await aPermissionGroups) { permissionGroups = $0 }
+        ingest("Invited Users", await aInvitedUsers) { invitedUsers = $0 }
 
         if !keywordSets.isEmpty {
             await withTaskGroup(of: (KeywordSet, Result<[Keyword], Error>).self) { group in
@@ -296,7 +467,7 @@ final class LibraryAdminState {
             }
         }
 
-        let topLevelSections = 7 + keywordSets.count
+        let topLevelSections = 9 + keywordSets.count
         phase = sectionErrors.count >= topLevelSections
             ? .failed("Couldn't load Image Relay API directory.")
             : .loaded
@@ -379,6 +550,22 @@ final class LibraryAdminState {
         }
     }
 
+    @discardableResult
+    func renameKeyword(setID: Int, keyword: Keyword, name: String) async -> Bool {
+        await performAction(label: "Rename keyword") {
+            let updated = try await self.service.renameKeyword(
+                setID: setID,
+                keywordID: keyword.id,
+                name: name
+            )
+            var existing = self.keywordsBySetID[setID] ?? []
+            if let index = existing.firstIndex(where: { $0.id == updated.id }) {
+                existing[index] = updated
+                self.keywordsBySetID[setID] = existing
+            }
+        }
+    }
+
     // MARK: - User actions
 
     @discardableResult
@@ -394,6 +581,66 @@ final class LibraryAdminState {
         await performAction(label: "Delete user") {
             try await self.service.deleteUser(id: user.id)
             self.users.removeAll { $0.id == user.id }
+        }
+    }
+
+    @discardableResult
+    func updateUserPermissionGroup(user: ImageRelayUser, groupID: Int) async -> Bool {
+        await performAction(label: "Update permission group") {
+            try await self.service.updateUserPermissionGroup(
+                userID: user.id,
+                permissionGroupID: groupID
+            )
+            // The PUT endpoint returns nothing meaningful, so reflect the new
+            // assignment locally by replacing the in-memory user record. The
+            // memberwise init carries every other field through unchanged.
+            if let index = self.users.firstIndex(where: { $0.id == user.id }) {
+                self.users[index] = ImageRelayUser(
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    login: user.login,
+                    company: user.company,
+                    permissionID: groupID
+                )
+            }
+        }
+    }
+
+    // MARK: - Invited User actions
+
+    @discardableResult
+    func inviteNewUser(_ payload: InvitedUserCreate) async -> Bool {
+        await performAction(label: "Invite new user") {
+            let created = try await self.service.inviteNewUser(payload)
+            self.invitedUsers.insert(created, at: 0)
+        }
+    }
+
+    @discardableResult
+    func deleteInvitedUser(_ user: InvitedUser) async -> Bool {
+        await performAction(label: "Delete invited user") {
+            try await self.service.deleteInvitedUser(id: user.id)
+            self.invitedUsers.removeAll { $0.id == user.id }
+        }
+    }
+
+    // MARK: - Folder Link actions
+
+    @discardableResult
+    func createFolderLink(_ payload: FolderLinkCreate) async -> Bool {
+        await performAction(label: "Create folder link") {
+            let created = try await self.service.createFolderLink(payload)
+            self.folderLinks.insert(created, at: 0)
+        }
+    }
+
+    @discardableResult
+    func deleteFolderLink(_ link: FolderLink) async -> Bool {
+        await performAction(label: "Delete folder link") {
+            try await self.service.deleteFolderLink(id: link.id)
+            self.folderLinks.removeAll { $0.id == link.id }
         }
     }
 
