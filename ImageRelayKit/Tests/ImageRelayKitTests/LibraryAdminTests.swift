@@ -100,4 +100,102 @@ struct LibraryAdminTests {
         #expect(link.url.absoluteString == "https://app.imagerelay.com/quick/xyz")
         #expect(link.purpose == "Download")
     }
+
+    @Test("Decode PermissionGroup minimal payload")
+    func decodePermissionGroup() throws {
+        let json = """
+        {"id": 7, "name": "Administrators"}
+        """.data(using: .utf8)!
+
+        let group = try JSONDecoder.imageRelay.decode(PermissionGroup.self, from: json)
+        #expect(group.id == 7)
+        #expect(group.name == "Administrators")
+    }
+
+    @Test("Decode InvitedUser with permission_group_id alias")
+    func decodeInvitedUserGroupAlias() throws {
+        let json = """
+        {
+            "id": 4002,
+            "email": "guest@example.com",
+            "first_name": "Guest",
+            "last_name": "User",
+            "permission_group_id": 12
+        }
+        """.data(using: .utf8)!
+
+        let invited = try JSONDecoder.imageRelay.decode(InvitedUser.self, from: json)
+        #expect(invited.id == 4002)
+        #expect(invited.email == "guest@example.com")
+        #expect(invited.firstName == "Guest")
+        #expect(invited.lastName == "User")
+        #expect(invited.permissionID == 12)
+    }
+
+    @Test("Decode minimal InvitedUser missing optional fields")
+    func decodeInvitedUserMinimal() throws {
+        let json = """
+        {"id": 9, "email": "pending@example.com"}
+        """.data(using: .utf8)!
+
+        let invited = try JSONDecoder.imageRelay.decode(InvitedUser.self, from: json)
+        #expect(invited.id == 9)
+        #expect(invited.email == "pending@example.com")
+        #expect(invited.firstName == nil)
+        #expect(invited.lastName == nil)
+        #expect(invited.permissionID == nil)
+    }
+
+    @Test("InvitedUserCreate omits nil optional fields")
+    func encodeInvitedUserCreate() throws {
+        let payload = InvitedUserCreate(
+            email: "new@example.com",
+            firstName: "New",
+            lastName: nil,
+            permissionID: 3
+        )
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["email"] as? String == "new@example.com")
+        #expect(dict["first_name"] as? String == "New")
+        #expect(dict["permission_id"] as? Int == 3)
+        #expect(dict["last_name"] == nil)
+    }
+
+    @Test("KeywordUpdate encodes name field")
+    func encodeKeywordUpdate() throws {
+        let payload = KeywordUpdate(name: "LOGO-V2")
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["name"] as? String == "LOGO-V2")
+        #expect(dict.count == 1)
+    }
+
+    @Test("FolderLinkCreate encodes all fields and omits nil optionals")
+    func encodeFolderLinkCreate() throws {
+        let payload = FolderLinkCreate(
+            folderID: 2907644,
+            purpose: "Review",
+            allowsDownload: true,
+            expiresOn: "2026-12-31"
+        )
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["folder_id"] as? Int == 2907644)
+        #expect(dict["purpose"] as? String == "Review")
+        #expect(dict["allows_download"] as? Bool == true)
+        #expect(dict["expires_on"] as? String == "2026-12-31")
+    }
+
+    @Test("FolderLinkCreate omits nil optional fields")
+    func encodeFolderLinkCreateMinimal() throws {
+        let payload = FolderLinkCreate(folderID: 100)
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["folder_id"] as? Int == 100)
+        #expect(dict["purpose"] == nil)
+        #expect(dict["allows_download"] == nil)
+        #expect(dict["expires_on"] == nil)
+        #expect(dict.count == 1)
+    }
 }

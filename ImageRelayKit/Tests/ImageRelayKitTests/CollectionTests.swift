@@ -118,4 +118,13 @@ struct CollectionTests {
         #expect(dict["name"] as? String == "Spring")
         #expect(dict["asset_ids"] as? String == "3,5,8")
     }
+
+    @Test("CollectionCreate encodes name only")
+    func encodeCollectionCreate() throws {
+        let payload = CollectionCreate(name: "Winter 2026")
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["name"] as? String == "Winter 2026")
+        #expect(dict.count == 1)
+    }
 }

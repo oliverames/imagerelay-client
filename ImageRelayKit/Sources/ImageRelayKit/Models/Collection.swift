@@ -127,6 +127,20 @@ public struct CollectionItem: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// POST body for `POST /collections.json`. Only `name` is required; the server
+/// accepts an optional comma-separated `asset_ids` field for initial members,
+/// but the client uses `CollectionsService.addItems` for that flow instead so
+/// the create path stays minimal.
+public struct CollectionCreate: Codable, Sendable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+
+    enum CodingKeys: String, CodingKey { case name }
+}
+
 /// Legacy POST body for older collection-membership endpoints. The live client updates
 /// membership with `CollectionUpdate`.
 public struct CollectionItemAdd: Codable, Sendable {

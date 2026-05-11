@@ -116,9 +116,9 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         async let filesTask: [RemoteFile] = isFilteredRoot
             ? []
             : api.getAllPages("/folders/\(folderID)/files.json", query: ["recursive": "false"])
-        let folders = try await foldersTask
+        let (folders, unverifiedRootFolderIDs) = try await foldersTask
         let files = try await filesTask
-        logger.info("Fetched \(folders.count, privacy: .public) folders and \(files.count, privacy: .public) files for \(self.containerIdentifier.rawValue, privacy: .public)")
+        logger.info("Fetched \(folders.count, privacy: .public) folders and \(files.count, privacy: .public) files for \(self.containerIdentifier.rawValue, privacy: .public), unverified roots: \(unverifiedRootFolderIDs.count, privacy: .public)")
 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
@@ -160,9 +160,19 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         // NOTE: DB cleanup is intentionally deferred to enumerateChanges, which is the
         // only caller that reports deletions to File Provider. Cleaning up here would
         // silently consume the event before the framework is told about it.
+        //
+        // Items rooted at an "unverified" selected folder are protected: those folders
+        // either 404'd or reported a parent we don't expect, so we can't distinguish
+        // a transient API miss from a genuine remote deletion. Skipping their tracked
+        // subtree avoids mass-deleting the user's view on a single API hiccup.
+        let protectedIdentifiers = try protectedIdentifiers(for: unverifiedRootFolderIDs)
         var deletedIdentifiers: [NSFileProviderItemIdentifier] = []
         let trackedChildren = try db.children(of: containerIdentifier.rawValue)
         for tracked in trackedChildren where !visibleIdentifiers.contains(tracked.identifier) {
+            if protectedIdentifiers.contains(tracked.identifier) {
+                logger.info("Skipping deletion of unverified selected folder subtree: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                continue
+            }
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
@@ -182,8 +192,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     /// deletions inside already-visible folders propagate into Finder.
     private func fetchWorkingSetItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
         let rootFolderID = try await resolveRootFolderID()
-        let rootFolders = try await workingSetRootFolders(parentID: rootFolderID)
-        logger.info("Fetching working set from \(rootFolders.count, privacy: .public) root folders")
+        let (rootFolders, unverifiedRootFolderIDs) = try await workingSetRootFolders(parentID: rootFolderID)
+        logger.info("Fetching working set from \(rootFolders.count, privacy: .public) root folders, unverified roots: \(unverifiedRootFolderIDs.count, privacy: .public)")
 
         var items: [NSFileProviderItem] = []
         var visibleIdentifiers = Set<String>()
@@ -199,9 +209,18 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
         logger.info("Fetched \(items.count, privacy: .public) working-set items")
 
+        // Same protection as fetchItems: items rooted at an unverified selected folder
+        // are kept around to avoid mass-deletion from a single API miss. The blast
+        // radius here is larger (db.allItems() spans the whole subtree), so the gate
+        // matters even more.
+        let protectedIdentifiers = try protectedIdentifiers(for: unverifiedRootFolderIDs)
         var deletedIdentifiers: [NSFileProviderItemIdentifier] = []
         var queuedDeletions = Set<String>()
         for tracked in try db.allItems() where !visibleIdentifiers.contains(tracked.identifier) {
+            if protectedIdentifiers.contains(tracked.identifier) {
+                logger.info("Working-set skipping deletion of unverified selected folder subtree: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                continue
+            }
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree where queuedDeletions.insert(identifier).inserted {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
@@ -210,6 +229,20 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         return (items, deletedIdentifiers)
+    }
+
+    /// Expands `unverifiedSelectedFolderIDs` into the union of their local subtrees.
+    /// Empty input short-circuits to an empty set, the common (no-error) path.
+    private func protectedIdentifiers(for unverifiedSelectedFolderIDs: Set<Int>) throws -> Set<String> {
+        guard !unverifiedSelectedFolderIDs.isEmpty else { return [] }
+        var protected = Set<String>()
+        for folderID in unverifiedSelectedFolderIDs {
+            let rootIdentifier = ItemIdentifier.folder(folderID).rawValue
+            for id in try db.subtreeIdentifiers(rootedAt: rootIdentifier) {
+                protected.insert(id)
+            }
+        }
+        return protected
     }
 
     private func appendFolderTree(
@@ -266,33 +299,49 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return identifiers
     }
 
-    private func childFolders(of folderID: Int) async throws -> [RemoteFolder] {
+    private func childFolders(of folderID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {
         if containerIdentifier == .rootContainer && !config.selectedFolderIDs.isEmpty {
             return try await selectedRootFolders(parentID: folderID)
         }
-        return try await listChildFolders(parentID: folderID)
+        let folders = try await listChildFolders(parentID: folderID)
+        return (folders, [])
     }
 
-    private func workingSetRootFolders(parentID: Int) async throws -> [RemoteFolder] {
+    private func workingSetRootFolders(parentID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {
         if !config.selectedFolderIDs.isEmpty {
             return try await selectedRootFolders(parentID: parentID)
         }
-        return try await listChildFolders(parentID: parentID)
+        let folders = try await listChildFolders(parentID: parentID)
+        return (folders, [])
     }
 
-    private func selectedRootFolders(parentID: Int) async throws -> [RemoteFolder] {
+    /// Returns the resolved selected root folders plus the set of selected folder
+    /// IDs we could not verify on this pass. A folder is "unverified" if its
+    /// `GET /folders/{id}.json` returned 404 (server says missing — could be
+    /// transient or permanent) OR if its remote `parent_id` does not match the
+    /// expected `parentID` (folder moved on the server). Callers use the
+    /// unverified set to suppress mass-deletion of those folders' tracked
+    /// subtrees in File Provider's view; a single API miss must not erase the
+    /// user's local view of their selection.
+    private func selectedRootFolders(parentID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {
         var folders: [RemoteFolder] = []
+        var unverified: Set<Int> = []
         for selectedFolderID in config.selectedFolderIDs {
             do {
                 let folder: RemoteFolder = try await api.get("/folders/\(selectedFolderID).json")
                 if folder.parentID == parentID {
                     folders.append(folder)
+                } else {
+                    unverified.insert(selectedFolderID)
+                    logger.warning("Selected folder parent mismatch (expected \(parentID, privacy: .public), got \(folder.parentID ?? -1, privacy: .public)): \(selectedFolderID, privacy: .public)")
                 }
             } catch APIError.notFound {
-                logger.warning("Selected folder no longer exists: \(selectedFolderID, privacy: .public)")
+                unverified.insert(selectedFolderID)
+                logger.warning("Selected folder unverified (404): \(selectedFolderID, privacy: .public)")
             }
         }
-        return folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let sorted = folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return (sorted, unverified)
     }
 
     private func listChildFolders(parentID: Int) async throws -> [RemoteFolder] {
