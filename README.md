@@ -156,23 +156,24 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB automatically.
 
 ```sh
-# Run the unit test suite (90 tests across 16 suites)
+# Run the unit test suite (110 tests across 18 suites:
+# 106 ImageRelayKitTests + 4 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# SwiftPM-only fallback for ImageRelayKit
+# SwiftPM-only fallback for ImageRelayKit (kit-level tests only)
 swift test --package-path ImageRelayKit
 
 # Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.1.0-beta.4
+scripts/run-release-candidate-checks.sh 1.1.0-beta.6
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0-beta.4
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0-beta.6
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.1.0-beta.4 --smoke-install
+scripts/build-developer-id-release.sh --version 1.1.0-beta.6 --smoke-install
 ```
 
 ## Known Limitations
