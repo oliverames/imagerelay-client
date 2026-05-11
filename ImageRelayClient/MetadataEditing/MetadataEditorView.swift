@@ -21,27 +21,24 @@ struct MetadataEditorView: View {
 
             footer
         }
-        .frame(minWidth: 480, minHeight: 420)
+        .frame(minWidth: 520, minHeight: 460)
+        .task { await state.loadSuggestionsIfNeeded() }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "info.circle")
+            Image(systemName: state.isMultiSelect ? "square.stack.fill" : "info.circle")
                 .font(.title2)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.displayedFileName ?? "Edit Metadata")
+                Text(headerTitle)
                     .font(.headline)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                if case .loaded(let detail) = state.phase {
-                    Text("Asset ID \(detail.id)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if case .saved(let detail) = state.phase {
-                    Text("Asset ID \(detail.id)")
+                if let subtitle = state.headerSubtitle {
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -56,6 +53,16 @@ struct MetadataEditorView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
+    }
+
+    private var headerTitle: String {
+        if let name = state.displayedFileName {
+            if state.isMultiSelect {
+                return "\(state.targetCount) Selected Files"
+            }
+            return name
+        }
+        return "Edit Metadata"
     }
 
     @ViewBuilder
@@ -82,7 +89,7 @@ struct MetadataEditorView: View {
                 .foregroundStyle(.tertiary)
             Text("Nothing loaded")
                 .font(.headline)
-            Text("Select a file in Finder, then choose Edit Metadata for Selected from the menu bar.")
+            Text("Select one or more files in Finder, then choose Edit Metadata for Selected from the menu bar.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -94,7 +101,9 @@ struct MetadataEditorView: View {
     private var loadingState: some View {
         VStack(spacing: 8) {
             ProgressView()
-            Text("Fetching metadata...")
+            Text(state.isMultiSelect
+                 ? "Fetching metadata for \(state.targetCount) files..."
+                 : "Fetching metadata...")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -105,66 +114,177 @@ struct MetadataEditorView: View {
     @ViewBuilder
     private var form: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if case .saved = state.phase {
-                Label("Saved", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.callout)
+            savedBanner
+            failuresBanner
+
+            if state.isMultiSelect {
+                multiSelectHint
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Description")
-                    .font(.subheadline.bold())
-                TextEditor(text: $state.descriptionDraft)
-                    .frame(minHeight: 80)
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .disabled(state.isBusy)
-            }
+            descriptionSection
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Keywords")
-                    .font(.subheadline.bold())
-                TextField("Comma-separated keywords", text: $state.keywordsDraft)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(state.isBusy)
-                Text("Separate keywords with commas. Example: spring, hero, campaign.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            keywordsSection
 
-            if let detail = currentDetail(), !detail.customFields.isEmpty {
-                Divider()
-                customFieldsSection(detail.customFields)
-            }
-        }
-    }
-
-    private func currentDetail() -> RemoteFileDetail? {
-        switch state.phase {
-        case .loaded(let detail), .saving(let detail), .saved(let detail):
-            return detail
-        default:
-            return nil
-        }
-    }
-
-    private func customFieldsSection(_ fields: [RemoteFileDetail.CustomField]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Custom Fields")
-                .font(.subheadline.bold())
-            Text("Editing constrained-type fields (dropdowns, dates) sends the value as text — the server may reject malformed input.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            ForEach(fields, id: \.stableID) { field in
-                customFieldRow(field)
-            }
+            customFieldsSection
         }
     }
 
     @ViewBuilder
+    private var savedBanner: some View {
+        if case .saved(_, let failures) = state.phase, failures.isEmpty {
+            Label(
+                state.isMultiSelect ? "Saved across \(state.targetCount) files" : "Saved",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+            .font(.callout)
+        }
+    }
+
+    @ViewBuilder
+    private var failuresBanner: some View {
+        if case .saved(_, let failures) = state.phase, !failures.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("\(failures.count) of \(state.targetCount) didn't save", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.callout)
+                ForEach(failures) { failure in
+                    Text("• \(failure.fileName): \(failure.message)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(10)
+            .background(.orange.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var multiSelectHint: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "square.stack")
+                .foregroundStyle(.secondary)
+            Text("Editing \(state.targetCount) files. Empty fields with a “Multiple values” note will not be touched on save. **Keywords show the union across all selected files; saving replaces every file's keywords with this set.**")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Description")
+                    .font(.subheadline.bold())
+                if state.descriptionHasMixedValues {
+                    Text("Multiple values — leave blank to keep each file's description")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+            TextEditor(text: $state.descriptionDraft)
+                .frame(minHeight: 80)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .disabled(state.isBusy)
+        }
+    }
+
+    private var keywordsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Keywords")
+                .font(.subheadline.bold())
+            TextField("Comma-separated keywords", text: $state.keywordsDraft)
+                .textFieldStyle(.roundedBorder)
+                .disabled(state.isBusy)
+            Text("Separate keywords with commas. Example: spring, hero, campaign.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            suggestionChips
+        }
+    }
+
+    @ViewBuilder
+    private var suggestionChips: some View {
+        let topSuggestions = Array(state.keywordSuggestions.prefix(24))
+        if !topSuggestions.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Suggestions")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(topSuggestions) { keyword in
+                            keywordChip(keyword)
+                        }
+                    }
+                }
+                .frame(maxHeight: 32)
+            }
+        }
+    }
+
+    private func keywordChip(_ keyword: Keyword) -> some View {
+        let selected = state.isKeywordSelected(keyword.name)
+        return Button {
+            state.toggleKeyword(keyword.name)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.caption)
+                Text(keyword.name)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(selected ? AnyShapeStyle(Color.accentColor.opacity(0.18)) : AnyShapeStyle(.secondary.opacity(0.10)))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(state.isBusy)
+        .help(keyword.usageCount.map { "Used \($0) times" } ?? keyword.name)
+    }
+
+    @ViewBuilder
+    private var customFieldsSection: some View {
+        let aggregatedFields = aggregatedCustomFields()
+        if !aggregatedFields.isEmpty {
+            Divider()
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Custom Fields")
+                    .font(.subheadline.bold())
+                Text("Editing constrained-type fields (dropdowns, dates) sends the value as text — the server may reject malformed input.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(aggregatedFields, id: \.stableID) { field in
+                    customFieldRow(field)
+                }
+            }
+        }
+    }
+
+    /// One representative `CustomField` per stableID across all selected files,
+    /// so the form renders a stable list even with multi-select.
+    private func aggregatedCustomFields() -> [RemoteFileDetail.CustomField] {
+        var seen: Set<String> = []
+        var result: [RemoteFileDetail.CustomField] = []
+        for detail in state.currentDetails() {
+            for field in detail.customFields where !seen.contains(field.stableID) {
+                seen.insert(field.stableID)
+                result.append(field)
+            }
+        }
+        return result
+    }
+
+    @ViewBuilder
     private func customFieldRow(_ field: RemoteFileDetail.CustomField) -> some View {
+        let isMixed = state.customFieldHasMixedValues[field.stableID] ?? false
+
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(field.name)
@@ -182,15 +302,23 @@ struct MetadataEditorView: View {
             .frame(width: 140, alignment: .leading)
             .padding(.top, 4)
 
-            TextField(
-                "—",
-                text: Binding(
-                    get: { state.customFieldDrafts[field.stableID] ?? "" },
-                    set: { state.customFieldDrafts[field.stableID] = $0 }
+            VStack(alignment: .leading, spacing: 2) {
+                TextField(
+                    isMixed ? "Multiple values" : "—",
+                    text: Binding(
+                        get: { state.customFieldDrafts[field.stableID] ?? "" },
+                        set: { state.customFieldDrafts[field.stableID] = $0 }
+                    )
                 )
-            )
-            .textFieldStyle(.roundedBorder)
-            .disabled(state.isBusy)
+                .textFieldStyle(.roundedBorder)
+                .disabled(state.isBusy)
+
+                if isMixed {
+                    Text("Leave blank to keep each file's value")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
         }
     }
 

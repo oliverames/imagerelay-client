@@ -89,6 +89,14 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v5") { db in
+            try db.create(table: "metadata_cache") { t in
+                t.primaryKey("assetID", .integer).notNull()
+                t.column("detail", .text).notNull()
+                t.column("fetchedAt", .datetime).notNull()
+            }
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -275,6 +283,55 @@ public final class SyncDatabase: Sendable {
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
                 arguments: ["sync_progress", json]
+            )
+        }
+    }
+
+    // MARK: - Metadata Cache
+
+    /// Returns the cached metadata snapshot for the given asset, regardless of age.
+    /// Callers decide whether to honor it via `CachedMetadata.isStale(maxAge:)`.
+    /// Returns nil on miss or when the cached blob fails to decode (treated as a miss).
+    public func cachedMetadata(assetID: Int) throws -> CachedMetadata? {
+        try writer.read { db in
+            guard let row = try Row.fetchOne(
+                db,
+                sql: "SELECT detail, fetchedAt FROM metadata_cache WHERE assetID = ?",
+                arguments: [assetID]
+            ) else { return nil }
+
+            let detailJSON: String = row["detail"]
+            let fetchedAt: Date = row["fetchedAt"]
+            guard let data = detailJSON.data(using: .utf8),
+                  let detail = try? JSONDecoder.imageRelay.decode(RemoteFileDetail.self, from: data) else {
+                return nil
+            }
+            return CachedMetadata(detail: detail, fetchedAt: fetchedAt)
+        }
+    }
+
+    public func storeMetadata(_ entry: CachedMetadata) throws {
+        let data = try JSONEncoder.imageRelay.encode(entry.detail)
+        let json = String(decoding: data, as: UTF8.self)
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO metadata_cache (assetID, detail, fetchedAt)
+                VALUES (?, ?, ?)
+                ON CONFLICT(assetID) DO UPDATE SET
+                    detail = excluded.detail,
+                    fetchedAt = excluded.fetchedAt
+                """,
+                arguments: [entry.assetID, json, entry.fetchedAt]
+            )
+        }
+    }
+
+    public func evictMetadata(assetID: Int) throws {
+        try writer.write { db in
+            try db.execute(
+                sql: "DELETE FROM metadata_cache WHERE assetID = ?",
+                arguments: [assetID]
             )
         }
     }

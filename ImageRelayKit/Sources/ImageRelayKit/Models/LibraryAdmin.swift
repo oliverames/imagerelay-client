@@ -130,6 +130,95 @@ public struct ImageRelayUser: Decodable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// POST body for `POST /file_types.json`.
+public struct FileTypeCreate: Codable, Sendable {
+    public let name: String
+    public let description: String?
+
+    public init(name: String, description: String? = nil) {
+        self.name = name
+        self.description = description
+    }
+
+    enum CodingKeys: String, CodingKey { case name, description }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(description, forKey: .description)
+    }
+}
+
+/// PUT body for `PUT /file_types/{id}.json`. Nil fields are omitted so the
+/// server only updates what the user actually edited.
+public struct FileTypeUpdate: Codable, Sendable {
+    public let name: String?
+    public let description: String?
+
+    public init(name: String? = nil, description: String? = nil) {
+        self.name = name
+        self.description = description
+    }
+
+    enum CodingKeys: String, CodingKey { case name, description }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(description, forKey: .description)
+    }
+
+    public var hasChanges: Bool {
+        name != nil || description != nil
+    }
+}
+
+/// POST body for `POST /users.json`. Email is required; the rest are optional
+/// because Image Relay defaults company / permission settings server-side.
+public struct UserInvite: Codable, Sendable {
+    public let email: String
+    public let firstName: String?
+    public let lastName: String?
+    public let login: String?
+    public let company: String?
+    public let permissionID: Int?
+
+    public init(
+        email: String,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        login: String? = nil,
+        company: String? = nil,
+        permissionID: Int? = nil
+    ) {
+        self.email = email
+        self.firstName = firstName
+        self.lastName = lastName
+        self.login = login
+        self.company = company
+        self.permissionID = permissionID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case email
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case login
+        case company
+        case permissionID = "permission_id"
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(email, forKey: .email)
+        try c.encodeIfPresent(firstName, forKey: .firstName)
+        try c.encodeIfPresent(lastName, forKey: .lastName)
+        try c.encodeIfPresent(login, forKey: .login)
+        try c.encodeIfPresent(company, forKey: .company)
+        try c.encodeIfPresent(permissionID, forKey: .permissionID)
+    }
+}
+
 public struct FolderLink: Decodable, Sendable, Identifiable, Hashable {
     public let id: Int
     public let uid: String?

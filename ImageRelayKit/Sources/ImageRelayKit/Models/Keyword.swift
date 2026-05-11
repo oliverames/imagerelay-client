@@ -55,3 +55,36 @@ public struct KeywordSet: Codable, Sendable, Identifiable, Hashable {
         self.updatedOn = updatedOn
     }
 }
+
+/// POST body for `POST /keyword_sets.json`.
+public struct KeywordSetCreate: Codable, Sendable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+
+    enum CodingKeys: String, CodingKey { case name }
+}
+
+/// POST body for `POST /keyword_sets/{setID}/keywords.json`.
+public struct KeywordCreate: Codable, Sendable {
+    public let name: String
+    public let keywordSetID: Int
+
+    public init(name: String, keywordSetID: Int) {
+        self.name = name
+        self.keywordSetID = keywordSetID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case keywordSetID = "keyword_set_id"
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(keywordSetID, forKey: .keywordSetID)
+    }
+}

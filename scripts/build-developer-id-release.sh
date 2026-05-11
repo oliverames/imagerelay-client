@@ -536,6 +536,18 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   fi
 fi
 
+# Update Casks/image-relay.rb for stable releases. The updater short-circuits
+# pre-release versions (-beta, -rc, -alpha) so beta builds don't bump the
+# stable cask. Failures here are warnings; the release artifacts are still valid.
+CASK_UPDATED=0
+if [[ -x "$ROOT_DIR/scripts/update-cask.sh" ]]; then
+  if "$ROOT_DIR/scripts/update-cask.sh" --version "$VERSION" --dmg "$DMG_PATH"; then
+    CASK_UPDATED=1
+  else
+    echo "Warning: scripts/update-cask.sh exited non-zero; the Cask was not updated." >&2
+  fi
+fi
+
 cat <<EOF
 
 Release artifacts created successfully.
@@ -544,3 +556,11 @@ Temporary staging directory: $STAGE_DIR
 DMG: $DMG_PATH
 Appcast: $APPCAST_PATH
 EOF
+
+if [[ "$CASK_UPDATED" -eq 1 ]]; then
+  cat <<'EOF'
+
+Casks/image-relay.rb updated for this stable release. Commit it and run
+scripts/sync-cask-to-tap.sh to publish to the public Homebrew tap.
+EOF
+fi
