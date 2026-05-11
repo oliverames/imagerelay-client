@@ -42,6 +42,17 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **macOS 26 (Tahoe) required.** The app uses File Provider APIs introduced in macOS 26.
 
+### Install with Homebrew (recommended)
+
+```sh
+brew tap oliverames/tap
+brew install --cask image-relay
+```
+
+`brew upgrade --cask image-relay` pulls every new stable release. Beta builds ride the in-app Sparkle update channel and are not exposed through Homebrew.
+
+### Manual DMG install
+
 1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
 2. Open the DMG and drag **Image Relay** to Applications
 3. Launch Image Relay — the menu bar icon appears

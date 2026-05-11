@@ -237,60 +237,84 @@ struct MenuBarView: View {
 
     private func editMetadataForSelected() async {
         let reader = FinderSelectionReader()
-        let presentEditor: (Int, String) -> Void = { remoteID, name in
+        let presentEditor: ([MetadataEditorState.Target]) -> Void = { targets in
             openWindow(id: "metadata-editor")
             NSApp.activate(ignoringOtherApps: true)
-            Task { await metadataEditor.load(remoteID: remoteID, fileName: name) }
+            Task { await metadataEditor.load(targets: targets) }
         }
 
         do {
             let urls = try reader.readSelection()
-            guard let firstURL = urls.first else { return }
-            if let item = await metadataEditingService.trackedItem(for: firstURL),
-               item.itemType == .file {
-                presentEditor(item.remoteID, item.name)
+            guard !urls.isEmpty else { return }
+            let targets = await resolveTargets(for: urls)
+            if !targets.isEmpty {
+                presentEditor(targets)
                 return
             }
-            await openManualPicker(presentEditor: presentEditor, fallbackMessage: "The selected item isn't an Image Relay file. Pick a file from the dialog instead.")
+            await openManualPicker(
+                presentEditor: presentEditor,
+                fallbackMessage: "The selected items aren't Image Relay files. Pick a file from the dialog instead."
+            )
         } catch FinderSelectionReader.SelectionError.notAuthorized {
             // User declined or hasn't granted Automation permission. Fall back to a file picker
             // so the feature stays usable without the entitlement granted.
             await openManualPicker(presentEditor: presentEditor, fallbackMessage: nil)
         } catch FinderSelectionReader.SelectionError.noSelection {
-            await openManualPicker(presentEditor: presentEditor, fallbackMessage: "Nothing was selected in Finder. Pick a file from the dialog instead.")
+            await openManualPicker(
+                presentEditor: presentEditor,
+                fallbackMessage: "Nothing was selected in Finder. Pick a file from the dialog instead."
+            )
         } catch {
             openWindow(id: "metadata-editor")
             NSApp.activate(ignoringOtherApps: true)
             metadataEditor.phase = .failed(
                 message: error.localizedDescription,
-                remoteID: nil
+                remoteIDs: []
             )
         }
     }
 
+    /// Maps Finder selection URLs to tracked-item targets, dropping anything that
+    /// isn't an Image Relay file. Order preserves the Finder selection order.
+    private func resolveTargets(for urls: [URL]) async -> [MetadataEditorState.Target] {
+        var targets: [MetadataEditorState.Target] = []
+        for url in urls {
+            if let item = await metadataEditingService.trackedItem(for: url),
+               item.itemType == .file {
+                targets.append(MetadataEditorState.Target(
+                    remoteID: item.remoteID,
+                    fileName: item.name
+                ))
+            }
+        }
+        return targets
+    }
+
     private func openManualPicker(
-        presentEditor: @escaping (Int, String) -> Void,
+        presentEditor: @escaping ([MetadataEditorState.Target]) -> Void,
         fallbackMessage: String?
     ) async {
         let panel = NSOpenPanel()
-        panel.message = fallbackMessage ?? "Pick an Image Relay file to edit its metadata."
+        panel.message = fallbackMessage ?? "Pick one or more Image Relay files to edit their metadata."
         panel.prompt = "Edit Metadata"
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.directoryURL = defaultPickerDirectory()
 
-        guard panel.runModal() == .OK, let pickedURL = panel.url else { return }
+        guard panel.runModal() == .OK else { return }
+        let pickedURLs = panel.urls
+        guard !pickedURLs.isEmpty else { return }
 
-        if let item = await metadataEditingService.trackedItem(for: pickedURL),
-           item.itemType == .file {
-            presentEditor(item.remoteID, item.name)
+        let targets = await resolveTargets(for: pickedURLs)
+        if !targets.isEmpty {
+            presentEditor(targets)
         } else {
             openWindow(id: "metadata-editor")
             NSApp.activate(ignoringOtherApps: true)
             metadataEditor.phase = .failed(
-                message: "That file isn't tracked by Image Relay yet. Wait for the next sync, or try selecting a different file.",
-                remoteID: nil
+                message: "None of those files are tracked by Image Relay yet. Wait for the next sync, or try selecting different files.",
+                remoteIDs: []
             )
         }
     }

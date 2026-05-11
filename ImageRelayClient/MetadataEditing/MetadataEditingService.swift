@@ -39,9 +39,25 @@ final class MetadataEditingService {
         }
     }
 
-    func fetchDetail(remoteID: Int) async throws -> RemoteFileDetail {
+    /// Default time-to-live for cached metadata. Tuned to "long enough for a
+    /// multi-select session" while still surfacing recent server-side edits
+    /// when the user reopens the editor minutes later.
+    static let defaultCacheTTL: TimeInterval = 300
+
+    func fetchDetail(
+        remoteID: Int,
+        maxCacheAge: TimeInterval? = defaultCacheTTL
+    ) async throws -> RemoteFileDetail {
+        if let maxCacheAge,
+           let cached = try? openDatabase()?.cachedMetadata(assetID: remoteID),
+           !cached.isStale(maxAge: maxCacheAge) {
+            return cached.detail
+        }
+
         let api = try makeClient()
-        return try await api.get("/files/\(remoteID).json")
+        let detail: RemoteFileDetail = try await api.get("/files/\(remoteID).json")
+        cacheMetadata(detail)
+        return detail
     }
 
     func updateMetadata(
@@ -51,9 +67,74 @@ final class MetadataEditingService {
         guard update.hasChanges else { throw ServiceError.noChanges }
         let api = try makeClient()
         let saved: RemoteFileDetail = try await api.put("/files/\(remoteID).json", body: update)
+        cacheMetadata(saved)
         await bumpMetadataVersion(remoteID: remoteID)
         await signalAffectedContainer(for: remoteID)
         return saved
+    }
+
+    private func cacheMetadata(_ detail: RemoteFileDetail) {
+        guard let db = openDatabase() else { return }
+        do {
+            try db.storeMetadata(CachedMetadata(detail: detail))
+        } catch {
+            logger.warning("Couldn't cache metadata for \(detail.id): \(error.localizedDescription)")
+        }
+    }
+
+    /// Fetches keywords for autocomplete suggestions in the metadata editor.
+    /// Tries the unscoped `/keywords.json` first; if the deployment doesn't
+    /// expose that endpoint, falls back to aggregating via keyword sets. Returns
+    /// an empty array on any failure so the UI degrades gracefully (no chips).
+    func fetchAllKeywords() async -> [Keyword] {
+        do {
+            let api = try makeClient()
+            do {
+                let response: KeywordListResponse = try await api.get(
+                    "/keywords.json",
+                    query: ["per_page": "200"]
+                )
+                return response.keywords
+            } catch {
+                // Fall through to per-set aggregation.
+                logger.debug("Unscoped /keywords.json failed; falling back to per-set fetch.")
+            }
+
+            let admin = LibraryAdminService()
+            let sets = (try? await admin.keywordSets()) ?? []
+            var collected: [Keyword] = []
+            for set in sets {
+                if let keywords = try? await admin.keywords(in: set) {
+                    collected.append(contentsOf: keywords)
+                }
+            }
+            return collected
+        } catch {
+            logger.warning("Keyword suggestion fetch failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    /// Tolerant decoder for `/keywords.json` — accepts either `{"keywords": [...]}`
+    /// or a bare array, matching the existing pattern other services use.
+    private struct KeywordListResponse: Decodable, Sendable {
+        let keywords: [Keyword]
+
+        init(from decoder: any Decoder) throws {
+            if let container = try? decoder.container(keyedBy: CodingKeys.self),
+               let array = try container.decodeIfPresent([Keyword].self, forKey: .keywords) {
+                keywords = array
+                return
+            }
+            var unkeyed = try decoder.unkeyedContainer()
+            var collected: [Keyword] = []
+            while !unkeyed.isAtEnd {
+                collected.append(try unkeyed.decode(Keyword.self))
+            }
+            keywords = collected
+        }
+
+        enum CodingKeys: String, CodingKey { case keywords }
     }
 
     /// Resolves a Finder URL inside the File Provider domain to its `TrackedItem`.
