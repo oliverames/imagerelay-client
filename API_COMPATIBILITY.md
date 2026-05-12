@@ -66,9 +66,12 @@ currently uses or intentionally leaves out.
   revokes. The model decodes the live `uid` and `upload_link_url` aliases. Used by the
   Upload Links Settings tab.
 - Collections
-  `GET /collections.json` lists collections, `GET /collections/{id}/files.json` lists members,
-  and `PUT /collections/{id}.json` updates membership with comma-separated `asset_ids`.
-  Used by the Collections browser window.
+  `GET /collections.json` lists collections, `POST /collections.json` creates one,
+  `DELETE /collections/{id}.json` deletes it, `GET /collections/{id}/files.json` lists
+  members, and `PUT /collections/{id}.json` appends to membership with comma-separated
+  `asset_ids`. The PUT endpoint uses **delta-add** semantics on the live v2 API:
+  IDs in the body are appended, IDs already present become no-ops, and omitted IDs are
+  NOT removed. Used by the Collections browser window.
 - Products (read-only)
   `GET /products.json` lists products when the account has product-catalog API access. Used by
   the Products browser window, with a specific entitlement message for 401/403 product responses.
@@ -79,9 +82,22 @@ currently uses or intentionally leaves out.
   endpoints; the UI surfaces permission responses with a recovery hint.
 - API directory (read-only)
   `GET /file_types.json`, `GET /keyword_sets.json`, `GET /keyword_sets/{id}/keywords.json`,
-  `GET /users/me`, `GET /users.json`, `GET /folder_links.json`, `GET /quick_links.json`, and
-  `GET /webhooks/supported.json` are available from the API Directory window. Section-level
-  errors are isolated so one permission-gated endpoint does not hide the rest of the directory.
+  `GET /users/me`, `GET /users.json`, `GET /folder_links.json`, `GET /quick_links.json`,
+  `GET /permissions.json`, `GET /invited_users.json`, and `GET /webhooks/supported.json` are
+  available from the API Directory window. Section-level errors are isolated so one
+  permission-gated endpoint does not hide the rest of the directory. Permission groups live
+  at `/permissions.json` (NOT `/permission_groups.json`, which 404s on the live API).
+
+- Library administration writes
+  `POST /keyword_sets.json` + `DELETE`, `POST /keyword_sets/{id}/keywords.json` + `PUT`
+  (rename) + `DELETE`, `POST /folder_links.json` + `DELETE`, `POST /invited_users.json` +
+  `DELETE`, `POST /users.json` (invite), `DELETE /users/{id}.json`, and
+  `PUT /users/{id}/permission_group.json`. Used by the Library Admin window.
+
+- User search
+  `GET /users/search.json?q={query}`. The live v2 API filters with `?q=` only; the
+  documented `?first_name=`, `?last_name=`, and `?email=` parameters are silently ignored
+  and return the full user list.
 
 ## Not Yet Implemented
 
@@ -92,9 +108,13 @@ currently uses or intentionally leaves out.
   subscribed desktop clients via Server-Sent Events. Tracked as Phase 7 of 1.1.
 - OAuth-based auth flows
   The client currently assumes API-key style access through configured credentials.
-- File type, keyword, user, folder-link, and quick-link write administration
-  The 1.1 API Directory covers these endpoints read-only. Creating, updating, and deleting
-  these administrative objects remains in the Image Relay web app for now.
+- Collection item removal
+  The Image Relay v2 API has no working endpoint for removing an individual file from a
+  collection. Probed paths (`DELETE /collections/{id}/files/{file_id}.json`,
+  `DELETE /collections/{id}/files.json`, `PATCH`/`PUT` variants) all return 404, and
+  `PUT /collections/{id}.json` is delta-add (omitting IDs does NOT drop them). Users must
+  remove items from the web app, or delete and recreate the collection. Tracked as a
+  request to Image Relay support.
 - Synced files / multi-folder asset memberships
   See "Partially Supported" below — multi-folder downloads work, but creating new
   multi-folder memberships through the dedicated synced-file API doesn't.

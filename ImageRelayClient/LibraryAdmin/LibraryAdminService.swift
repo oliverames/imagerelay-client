@@ -69,11 +69,12 @@ final class LibraryAdminService {
     }
 
     func permissionGroups() async throws -> [PermissionGroup] {
-        // The `/permission_groups.json` payload is small enough that paging is
-        // unnecessary, and the wrapper may be `{"permission_groups": [...]}`
-        // without pagination metadata — a shape `getAllPages` won't decode.
+        // Endpoint is `/permissions.json` on the live v2 API, NOT
+        // `/permission_groups.json` (the latter returns 404). Response is a
+        // bare array; the decoder also accepts a `{"permission_groups": [...]}`
+        // wrapper in case other deployments use that shape.
         let api = try makeClient()
-        let response: PermissionGroupListResponse = try await api.get("/permission_groups.json")
+        let response: PermissionGroupListResponse = try await api.get("/permissions.json")
         return response.values
     }
 
@@ -150,15 +151,14 @@ final class LibraryAdminService {
     }
 
     func searchUsers(query: String) async throws -> [ImageRelayUser] {
-        // The Image Relay docs show `/users/search` accepting separate
-        // `first_name`, `last_name`, and `email` query parameters, while the
-        // internal API contract this client targets passes a single `query`
-        // parameter. If the server returns 400 or empty arrays for a
-        // non-empty query, verify against live traffic and adjust here.
+        // The live v2 API accepts `?q=...` (verified 2026-05-12). The public
+        // docs document separate `first_name` / `last_name` / `email` params
+        // but the server silently ignores those — passing them returns the
+        // full user list. `?q=` is the only working filter parameter.
         let api = try makeClient()
         let response: UserListResponse = try await api.get(
             "/users/search.json",
-            query: ["query": query]
+            query: ["q": query]
         )
         return response.values
     }

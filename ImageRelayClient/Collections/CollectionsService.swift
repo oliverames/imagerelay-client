@@ -15,6 +15,7 @@ final class CollectionsService {
     enum ServiceError: LocalizedError {
         case notConfigured
         case unexpectedResponse
+        case removeNotSupported
 
         var errorDescription: String? {
             switch self {
@@ -22,6 +23,8 @@ final class CollectionsService {
                 return "Image Relay is not configured. Open Settings → General to add your API key."
             case .unexpectedResponse:
                 return "Image Relay returned a response the client didn't recognize."
+            case .removeNotSupported:
+                return "Removing individual files from a collection isn't supported by the Image Relay API. Use the web app to remove items, or delete and recreate the collection."
             }
         }
     }
@@ -47,43 +50,35 @@ final class CollectionsService {
 
     func items(in collection: Collection) async throws -> [CollectionItem] {
         let api = try makeClient()
-        // Walk every page so addItems/removeItem don't compute their union/diff
-        // against a truncated view — the API caps a single page at ~100 items
-        // and we PUT the full asset_ids set back, which would otherwise drop
-        // members beyond the first page on every write.
         return try await api.getAllPages("/collections/\(collection.id)/files.json")
     }
 
-    /// Adds files to a collection using the delta endpoint, not PUT-the-whole-set.
-    /// The previous implementation fetched the full membership, unioned the new
-    /// IDs, and PUT the result back — a TOCTOU race that silently lost any
-    /// concurrent additions made between the read and the write. The delta POST
-    /// is server-side append-only, so two clients adding different files no
-    /// longer overwrite each other.
+    /// Adds files to a collection by PUTting the new asset IDs at
+    /// `PUT /collections/{id}.json`. The endpoint's `asset_ids` field is
+    /// **delta-add** on the live v2 API (verified 2026-05-12): IDs already in
+    /// the collection are no-ops, new IDs get appended, and IDs absent from the
+    /// body are left alone — the PUT does not replace membership. This means
+    /// we don't read membership first, so there's no TOCTOU window. (The earlier
+    /// `POST /collections/{id}/files.json` path introduced in beta 6 returned
+    /// 404 in production; that endpoint does not exist on v2.)
     func addItems(_ fileIDs: [Int], to collection: Collection) async throws {
         guard !fileIDs.isEmpty else { return }
         let api = try makeClient()
-        try await api.post(
-            "/collections/\(collection.id)/files.json",
-            body: CollectionItemAdd(fileIDs: fileIDs)
+        try await api.put(
+            "/collections/\(collection.id).json",
+            body: CollectionUpdate(name: collection.name, assetIDs: fileIDs)
         )
     }
 
-    /// Removes a file from a collection. The API doesn't (currently) expose a
-    /// delta DELETE for collection membership, so we PUT the recomputed asset
-    /// set back. Concurrent edits between the GET and the PUT here can still
-    /// be lost — additions made by another client during this window get
-    /// overwritten. If/when Image Relay exposes
-    /// `DELETE /collections/{id}/files/{file_id}.json`, switch to that.
+    /// Removing an individual file from a collection has no working endpoint on
+    /// the v2 API. We probed every plausible path (DELETE/PATCH/POST under
+    /// `/collections/{id}/...`) — they all return 404, and `PUT` is delta-add
+    /// (omitted IDs are not removed). Until Image Relay exposes a delete path,
+    /// the only way to drop items is to delete the collection and recreate it
+    /// without the unwanted asset.
     func removeItem(fileID: Int, from collection: Collection) async throws {
-        let api = try makeClient()
-        let remainingIDs = try await items(in: collection)
-            .map(\.fileID)
-            .filter { $0 != fileID }
-        try await api.put(
-            "/collections/\(collection.id).json",
-            body: CollectionUpdate(name: collection.name, assetIDs: remainingIDs)
-        )
+        _ = (fileID, collection)
+        throw ServiceError.removeNotSupported
     }
 
     private func makeClient() throws -> APIClient {

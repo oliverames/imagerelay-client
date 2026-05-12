@@ -141,22 +141,11 @@ public struct CollectionCreate: Codable, Sendable {
     enum CodingKeys: String, CodingKey { case name }
 }
 
-/// Legacy POST body for older collection-membership endpoints. The live client updates
-/// membership with `CollectionUpdate`.
-public struct CollectionItemAdd: Codable, Sendable {
-    public let fileIDs: [Int]
-
-    public init(fileIDs: [Int]) {
-        self.fileIDs = fileIDs
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case fileIDs = "file_ids"
-    }
-}
-
-/// PUT body for `PUT /collections/{id}`. The API expects `asset_ids` as a comma-separated
-/// list while the rest of the client works with integer file IDs.
+/// PUT body for `PUT /collections/{id}.json`. The API expects `asset_ids` as
+/// a comma-separated string and uses **delta-add** semantics: IDs in the body
+/// are appended to membership, and IDs already present become no-ops. Omitting
+/// an ID does NOT remove it — the v2 API does not expose a delete path for
+/// individual collection items.
 public struct CollectionUpdate: Codable, Sendable {
     public let name: String
     public let assetIDs: [Int]

@@ -1,5 +1,33 @@
 # Worklog
 
+## 2026-05-12 - 1.1.0-beta.7: live-API reconciliation (4 ship blockers fixed)
+
+**What changed**: Full live-account verification of every beta 6 admin endpoint surfaced four production bugs in beta 6 that this beta fixes. Beta 6 shipped with shape inference for the new admin endpoints rather than live validation; running each one against the BCBSVT account on the v2 API turned up four contract mismatches, all of which silently no-op'd or 404'd in beta 6.
+
+1. **Collections `addItems` was 404ing in production.** Beta 6's "delta POST" path (`POST /collections/{id}/files.json`) does not exist on v2 — every request returned 404 HTML. Fixed by switching `CollectionsService.addItems` to `PUT /collections/{id}.json` with comma-separated `asset_ids` and the existing `CollectionUpdate` payload. Live testing showed PUT has **delta-add semantics** on this endpoint (IDs in the body get appended; IDs already present become no-ops; omitting an ID does NOT remove it), so the additive write requires no read-modify-write step and therefore has no TOCTOU window. The misleading inline comments from beta 6 (claiming PUT replaces, claiming POST is the delta path) have been rewritten to match observed behavior. `CollectionItemAdd` struct deleted from `ImageRelayKit/Models/Collection.swift` — it was only used by the broken POST path.
+
+2. **Collections `removeItem` was silently no-op'ing in production.** Because the v2 PUT is delta-add (not replace, as beta 6 and earlier assumed), the existing "fetch full membership, filter out the target ID, PUT the result back" implementation never actually removed anything. Probed every plausible delete shape against a live test collection: `DELETE /collections/{id}/files/{file_id}.json`, `DELETE /collections/{id}/files.json` with a body, `PATCH` variants, `POST /collections/{id}/remove.json`, query-param removal forms. All return 404 or silently no-op. `DELETE /collections/{id}.json` regardless of query params deletes the whole collection. Conclusion: v2 has no working endpoint to remove an individual file from a Collection. Fix: `CollectionsService.removeItem` now throws a clear `ServiceError.removeNotSupported`, and the minus-circle button has been removed from `CollectionsBrowserView`. Users drop items via the web app for now. Drafted a support email to [email protected] requesting a delta DELETE endpoint, parked at `~/Documents/drafts/2026-05-12-imagerelay-collections-api.md`.
+
+3. **Permission Groups feature was 404ing in production.** Beta 6 hits `/permission_groups.json` which returns HTML 404. The correct endpoint on v2 is `/permissions.json` (response: bare array of `{id, name, created_on, updated_on, role_type}` — exactly the shape `PermissionGroup` already decodes). Fixed `LibraryAdminService.permissionGroups()` to call the right path; the tolerant `PermissionGroupListResponse` decoder already accepted both bare-array and wrapper shapes, so no model changes needed.
+
+4. **`searchUsers` was silently returning the full user list.** Beta 6 sends `?query=...` per the task contract; the public Image Relay docs document `?first_name=&last_name=&email=`. Live testing showed both are silently ignored — the server returns the full unfiltered list for either. The actual working parameter is `?q=...` (no docs reference it). Fixed `LibraryAdminService.searchUsers` to use `?q=` and rewrote the inline comment to reflect what's actually observed. `?q=ames` correctly returns just my own user record; the previous client returned all 33 BCBSVT users for every search.
+
+**Verification**: 109 tests pass in two bundles. 105 ImageRelayKitTests (beta 6's `encodeCollectionItemAdd` test removed alongside the type it covered; all other tests still green). 4 FileProviderExtensionTests. Both `xcodebuild test -scheme ImageRelayClient` (macOS) and `xcodebuild build -scheme ImageRelayClientiOS` (iOS Simulator) succeed. Live verification used a 1Password-sourced API key, scoped destructive operations to `[TEST]`-prefixed temp resources with immediate cleanup. Probe scripts archived at `/tmp/imagerelay-smoke/probe[1-11].py` for reproducibility.
+
+**Decisions made**:
+
+- Cut beta 7 rather than promoting straight to 1.1.0 stable. The original plan (per project_release_state memory) was "smoke-test beta 6, then bump to 1.1.0." Surfacing four broken endpoints in beta 6 means the same plan now produces a stable release with known regressions; ship-stable-anyway isn't honoring "do the verification" — it's hand-waving it. Beta 7 is the verification.
+- The `removeItem` UI control is hidden entirely rather than disabled-with-tooltip. A disabled button creates friction without communicating *why*; better to omit the affordance and document the API limitation in `API_COMPATIBILITY.md`. When Image Relay exposes a delete path the button comes back.
+- Beta 6's `getAllPages` unkeyed-wrapper canary is intentionally kept. None of the new admin endpoints take this shape (they all return bare arrays without pagination metadata, which falls through to the existing bare-array branch, not the new defensive one). The canary still has value if some future endpoint takes the wrapped-no-pagination shape; cost is one extra `if let body = jsonObject as? [String: Any]` branch.
+- `searchUsers` keeps its server-side filter via `?q=` rather than falling back to client-side filter over the bare `/users.json` list. Both work for BCBSVT's 33-user account; for larger accounts a client-side filter trades responsiveness for over-the-wire payload, so the server filter wins.
+
+**Open questions**:
+
+- Stable cut still pending until beta 7 is smoke-tested against the live account end-to-end (the four fixes were verified at the API layer; the macOS UI surface invoking them needs a manual pass).
+- iOS real-device smoke against the live account remains untested. iOS is read-only so the four fixed write paths don't apply there; the iOS app does compile clean against the changed shared services.
+
+---
+
 ## 2026-05-11 - 1.1.0-beta.6: API extensions + sync data-loss protection + FileProvider tests
 
 **What changed**: Three substantive pieces bundled into one beta cut.
