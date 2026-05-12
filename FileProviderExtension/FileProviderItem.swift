@@ -14,6 +14,13 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
     private let _capabilities: NSFileProviderItemCapabilities
     var capabilities: NSFileProviderItemCapabilities { _capabilities }
 
+    /// On-demand cloud behavior for files: download on first read, keep cached until
+    /// disk pressure or user-initiated "Remove Download," and pull server updates
+    /// eagerly for already-materialized files so the local copy never goes stale.
+    /// Folders return `.inherited` (the macOS default; root inherits `.downloadLazily`).
+    private let _contentPolicy: NSFileProviderContentPolicy
+    var contentPolicy: NSFileProviderContentPolicy { _contentPolicy }
+
     /// Create a synthetic item for File Provider special containers.
     init(containerIdentifier: NSFileProviderItemIdentifier, filename: String) {
         self.itemIdentifier = containerIdentifier
@@ -27,6 +34,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         )
         self.contentModificationDate = nil
         self._capabilities = [.allowsReading, .allowsAddingSubItems]
+        self._contentPolicy = .inherited
         super.init()
     }
 
@@ -48,10 +56,12 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             self.contentType = .folder
             self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
                                   .allowsDeleting, .allowsAddingSubItems]
+            self._contentPolicy = .inherited
         } else {
             self.contentType = UTType(filenameExtension: URL(fileURLWithPath: trackedItem.name).pathExtension) ?? .data
             self._capabilities = [.allowsReading, .allowsWriting,
                                   .allowsReparenting, .allowsDeleting]
+            self._contentPolicy = .downloadLazily
         }
         super.init()
     }
@@ -77,6 +87,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         self.contentModificationDate = folder.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
                               .allowsDeleting, .allowsAddingSubItems]
+        self._contentPolicy = .inherited
         super.init()
     }
 
@@ -100,6 +111,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         self.contentModificationDate = file.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting,
                               .allowsReparenting, .allowsDeleting]
+        self._contentPolicy = .downloadLazily
         super.init()
     }
 }
