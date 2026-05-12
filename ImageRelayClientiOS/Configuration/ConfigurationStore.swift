@@ -50,7 +50,14 @@ final class ConfigurationStore {
         var next = snapshot
         next.apiKey = draftAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedRoot = draftRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
-        next.remoteRootFolderID = trimmedRoot.isEmpty ? nil : Int(trimmedRoot)
+        // "root" is the literal Image Relay URL uses at the top of the library.
+        // Treat it as a synonym for blank so the extension resolves it via
+        // /folders/root.json on demand instead of choking on a non-numeric value.
+        if trimmedRoot.isEmpty || trimmedRoot.caseInsensitiveCompare("root") == .orderedSame {
+            next.remoteRootFolderID = nil
+        } else {
+            next.remoteRootFolderID = Int(trimmedRoot)
+        }
         next.syncUpload = false
         next.userAgent = "ImageRelayClient/1.1 (iOS)"
 
