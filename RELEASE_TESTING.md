@@ -108,6 +108,25 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Confirm the exported folder contains `manifest.json`, `system.json`, `config.json`, `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt`.
 - Confirm `config.json` contains only sanitized configuration and never includes the API key value.
 
+## Collections (1.1 betas)
+
+- Open the menu bar item, choose Collections.
+- Confirm the existing collections list loads.
+- Click New Collection, enter a clearly-test name like `[TEST] release`, confirm it appears.
+- Select an asset from the Files browser, drag or use the action menu to add it to the test collection. Confirm it appears in the collection's file list.
+- Confirm there is no "Remove" / minus-circle button next to individual items (removal is not supported by the v2 API — verified 2026-05-12).
+- Delete the test collection. Confirm it disappears from the list immediately and from the web UI on refresh.
+
+## Library Admin (1.1 betas)
+
+- Open Library Admin from Settings.
+- Confirm the File Types, Keyword Sets, Users, Folder Links, Quick Links, Permission Groups, and Invited Users sections all populate without "Not found" errors.
+- Confirm Permission Groups loads (hits `/permissions.json`, NOT `/permission_groups.json`).
+- In Users, type a substring like a colleague's last name into the search box. Confirm the list filters server-side via `?q=`. Empty search returns all users.
+- Create a `[TEST]` keyword set. Add a `[TEST]` keyword. Rename the keyword. Delete the keyword. Delete the keyword set. Confirm each step round-trips against the web UI.
+- Create a folder link on a known-safe folder, copy the URL, delete the folder link. Confirm the URL stops working after the delete propagates.
+- Skip Invited User Create and User Permission-Group Update during smoke tests — both produce side effects (real invitation emails, real permission changes) on real users.
+
 ## Release Automation
 
 - Run `scripts/run-release-candidate-checks.sh 1.0.0` on a macOS 26 machine with Xcode 26.

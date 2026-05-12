@@ -216,16 +216,9 @@ private struct CollectionDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button {
-                                Task {
-                                    await state.removeItem(fileID: item.fileID, from: collection)
-                                }
-                            } label: {
-                                Image(systemName: "minus.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.red)
-                            .help("Remove from collection")
+                            // Removal isn't exposed: the Image Relay v2 API
+                            // has no delta DELETE for collection membership.
+                            // Users can drop items via the web app.
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)

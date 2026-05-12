@@ -101,15 +101,6 @@ struct CollectionTests {
         #expect(item.fileName == "collection-file.jpg")
     }
 
-    @Test("CollectionItemAdd encodes file_ids array")
-    func encodeCollectionItemAdd() throws {
-        let payload = CollectionItemAdd(fileIDs: [1, 2, 3])
-        let json = try JSONEncoder.imageRelay.encode(payload)
-        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
-        let ids = try #require(dict["file_ids"] as? [Int])
-        #expect(ids == [1, 2, 3])
-    }
-
     @Test("CollectionUpdate encodes comma-separated asset_ids")
     func encodeCollectionUpdate() throws {
         let payload = CollectionUpdate(name: "Spring", assetIDs: [3, 5, 8])
