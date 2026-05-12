@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-05-12 - 1.1.0-beta.8: accept "root" as Root Folder ID
+
+**What changed**: The macOS Settings panel rejected `root` as a Root Folder ID with the error "Must be a positive integer (e.g. 12345)". Image Relay's web UI uses `.../folders/root` at the top of the library, so a user landing at the actual library root and copying the URL segment back into Settings hit a dead end. Fix: treat `root` (case-insensitive, trimmed) as a synonym for an empty value in `GeneralSettingsView.rootFolderIDValid` and in the save path, so it persists as `remoteRootFolderID = nil`. The macOS extension's existing `Enumerator.resolveRootFolderID` already falls back to `GET /folders/root.json` when the config value is `nil`, so the path is end-to-end: typing `root` now produces the same behavior as the user hitting the library root in the web UI. Footer help text rewritten to "Leave blank or enter **root** to sync your account's entire library." Validation error rewritten to "Enter a positive integer (e.g. 12345), \"root\", or leave blank".
+
+`ImageRelayClientiOS/Configuration/ConfigurationStore.swift` was updated in parallel so iOS users typing `root` end up at the same `nil` configuration state instead of falling through `Int(trimmedRoot)` to a silently-rejected save. The iOS Enumerator still requires a numeric ID, so a `root` save on iOS produces the same `.notAuthenticated` error as a blank save — that's unchanged, not a new regression. Adding async root-resolution to the iOS extension is a parallel improvement deliberately deferred; this beta is scoped to the macOS UX bug in the screenshot.
+
+**Verification**: All 109 tests pass (105 ImageRelayKitTests + 4 FileProviderExtensionTests). `scripts/build-developer-id-release.sh --version 1.1.0-beta.8 --smoke-install` produced a notarized, stapled DMG at `build/releases/1.1.0-beta.8/ImageRelayClient-1.1.0-beta.8.dmg` (SHA256 `0afce04791755d50c36868cd097aa47ec99e7bfbbad71a45d72aa7bc23d1b252`), replaced `/Applications/Image Relay.app`, and confirmed the FileProvider extension bundle is registered. Notarization: ticket `4756a1e7-c236-4894-8298-9c4847ce0744`, status Accepted.
+
+**Decisions made**:
+
+- `root` aliases to `nil` rather than being stored as a literal sentinel string. `AppConfiguration.remoteRootFolderID` stays a nullable `Int`, no JSON schema change, no migration, no test churn. The only knowledge of the alias lives in the UI input layer.
+- After a `root` save the field re-renders as blank (because `config.remoteRootFolderID == nil`). This is a minor surprise but better than the alternative of conflating "user explicitly chose root" with "user hasn't set anything yet." The footer text mentioning `root` as a synonym keeps the affordance discoverable.
+- iOS Enumerator auto-resolution (mirroring `Enumerator.resolveRootFolderID` from the macOS extension) was considered and deliberately deferred. The iOS extension's `resolveFolderID` is currently a synchronous static; adding an API roundtrip there means threading the API client through and making the call site async. Worth doing, but it's a separate scope from the macOS Settings bug.
+
+---
+
 ## 2026-05-12 - 1.1.0-beta.7: live-API reconciliation (4 ship blockers fixed)
 
 **What changed**: Full live-account verification of every beta 6 admin endpoint surfaced four production bugs in beta 6 that this beta fixes. Beta 6 shipped with shape inference for the new admin endpoints rather than live validation; running each one against the BCBSVT account on the v2 API turned up four contract mismatches, all of which silently no-op'd or 404'd in beta 6.

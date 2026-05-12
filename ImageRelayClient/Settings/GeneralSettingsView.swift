@@ -15,8 +15,14 @@ struct GeneralSettingsView: View {
     private var container: URL? { AppConfiguration.containerURL() }
 
     // Folder IDs must be positive integers. Empty is allowed for defaultFileTypeID.
+    // "root" (case-insensitive) is a synonym for empty -- the URL .../folders/root
+    // is what Image Relay's web UI shows at the top of the library, and we
+    // auto-resolve the numeric ID via /folders/root.json on first use.
     private var rootFolderIDValid: Bool {
-        remoteRootFolderID.isEmpty || Int(remoteRootFolderID).map { $0 > 0 } == true
+        let trimmed = remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if trimmed.caseInsensitiveCompare("root") == .orderedSame { return true }
+        return Int(trimmed).map { $0 > 0 } == true
     }
 
     private var defaultFileTypeIDValid: Bool {
@@ -63,7 +69,7 @@ struct GeneralSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     TextField("Root Folder ID", text: $remoteRootFolderID)
                     if !rootFolderIDValid {
-                        Text("Must be a positive integer (e.g. 12345)")
+                        Text("Enter a positive integer (e.g. 12345), \"root\", or leave blank")
                             .font(.caption)
                             .foregroundStyle(.red)
                     }
@@ -89,7 +95,7 @@ struct GeneralSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
-                    Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**.")
+                    Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
                     Text("Default File Type ID is required for uploading new files.")
                     if uploadNeedsDefaultFileType {
                         Label("Uploads are enabled, so new Finder files will fail until a Default File Type ID is set.", systemImage: "exclamationmark.triangle.fill")
@@ -137,7 +143,12 @@ struct GeneralSettingsView: View {
         guard let container, !hasValidationError else { return }
         var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         config.apiKey = apiKey
-        config.remoteRootFolderID = remoteRootFolderID.isEmpty ? nil : Int(remoteRootFolderID)
+        let trimmedRoot = remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedRoot.isEmpty || trimmedRoot.caseInsensitiveCompare("root") == .orderedSame {
+            config.remoteRootFolderID = nil
+        } else {
+            config.remoteRootFolderID = Int(trimmedRoot)
+        }
         config.defaultFileTypeID = defaultFileTypeID.isEmpty ? nil : Int(defaultFileTypeID)
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
