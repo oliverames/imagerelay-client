@@ -1,5 +1,27 @@
 # Worklog
 
+## 2026-05-12 - 1.1.0-beta.9: explicit on-demand `contentPolicy` on FileProviderItem
+
+**What changed**: The macOS extension was already producing the iCloud-style on-demand cloud-storage experience by default — files appear in Finder via metadata-only enumeration, contents fetch lazily via `Extension.fetchContents`, the system manages cache eviction automatically, and per-file remote updates are pulled in the background. All of that is the macOS 13+ default behavior for `NSFileProviderReplicatedExtension`-based providers when no `NSFileProviderItemProtocol.contentPolicy` is set: the root inherits `.downloadLazily` and every descendant inherits from there. Beta 9 makes that behavior explicit per item type so a future SDK default change cannot silently flip it.
+
+`FileProviderItem` now declares a `contentPolicy` property:
+- **File items** (from `RemoteFile` and from `TrackedItem` where `itemType != .folder`): `.downloadLazily`. Files download on first read, stay cached until the user runs "Remove Download" or the system reclaims under disk pressure, and remote content updates for already-materialized files are downloaded eagerly so a locally-cached asset stays in sync with the server-side version.
+- **Folder items** and the synthetic `.rootContainer` / `.workingSet` / `.trashContainer` items: `.inherited`. Folders don't have content; inheritance from the macOS root (`.downloadLazily`) is the right semantic.
+
+The SDK header (`MacOSX26.4.sdk/.../NSFileProviderItem.h`) describes `.downloadLazily` as "Download this item lazily if it is dataless. Download remote content updates eagerly if this file is not dataless. Allow eviction on low disk pressure and other triggers" — that's exactly the iCloud Drive / Dropbox model. For a DAM where marketing replaces brand photos centrally, the "refresh already-cached files eagerly" half is more valuable than the `.downloadLazilyAndEvictOnRemoteUpdate` variant's "evict on remote update and re-fetch on next read" semantic, because user opens stay fast.
+
+Three new `FileProviderItemTests` pin the choices so a future refactor that drops the explicit policy fails CI rather than silently regressing.
+
+**Verification**: 112 tests pass (105 ImageRelayKitTests + 4 FileProviderExtensionTests existing + 3 new `FileProviderItem content policy` tests). `scripts/build-developer-id-release.sh --version 1.1.0-beta.9 --smoke-install` produced a notarized, stapled DMG; the smoke install confirmed the FileProvider extension bundle registered.
+
+**Decisions made**:
+
+- `.downloadLazily` (the macOS root default) over `.downloadLazilyAndEvictOnRemoteUpdate` (the iOS root default). For a DAM, the "background-refresh already-materialized files" behavior of `.downloadLazily` keeps frequently-accessed assets fresh without an extra cold-fetch round trip when the user re-opens a recently-updated photo. The "evict on remote update" variant would mean every server-side update forces a stale-then-empty-then-refetch cycle, which is worse UX even though it's marginally better for bandwidth. Bandwidth is cheaper than user-perceived staleness in a creative workflow.
+- iOS extension `FileProviderItem` would be the parallel place to do this, but the iOS extension is stateless and doesn't use `FileProviderItem` in the same shape; per-platform divergence kept. iOS's default `.downloadLazilyAndEvictOnRemoteUpdate` is correct for a mobile read-only browser anyway.
+- Set the policy explicitly per init rather than as a computed property reading from a static map. The class is initialized in several paths (`TrackedItem`, `RemoteFile`, `RemoteFolder`, synthetic containers), each of which already has access to the type information it needs to pick the right policy. Threading a shared lookup table through would be more abstraction for no behavior benefit.
+
+---
+
 ## 2026-05-12 - 1.1.0-beta.8: accept "root" as Root Folder ID
 
 **What changed**: The macOS Settings panel rejected `root` as a Root Folder ID with the error "Must be a positive integer (e.g. 12345)". Image Relay's web UI uses `.../folders/root` at the top of the library, so a user landing at the actual library root and copying the URL segment back into Settings hit a dead end. Fix: treat `root` (case-insensitive, trimmed) as a synonym for an empty value in `GeneralSettingsView.rootFolderIDValid` and in the save path, so it persists as `remoteRootFolderID = nil`. The macOS extension's existing `Enumerator.resolveRootFolderID` already falls back to `GET /folders/root.json` when the config value is `nil`, so the path is end-to-end: typing `root` now produces the same behavior as the user hitting the library root in the web UI. Footer help text rewritten to "Leave blank or enter **root** to sync your account's entire library." Validation error rewritten to "Enter a positive integer (e.g. 12345), \"root\", or leave blank".

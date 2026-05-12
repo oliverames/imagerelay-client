@@ -58,6 +58,7 @@
 		A82E8ADB3A29C40B4E00E94D /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB249F188A4072D000A1BBDB /* App.swift */; };
 		B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
+		BE0F2FF21949D0E2DA83F925 /* FileProviderItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE92E3AF49009DE57F012E1 /* FileProviderItemTests.swift */; };
 		BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
 		C31A658171BDF0414EE6A18D /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */; };
@@ -173,6 +174,7 @@
 		DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIDirectoryiOSView.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
 		E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminView.swift; sourceTree = "<group>"; };
+		EAE92E3AF49009DE57F012E1 /* FileProviderItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItemTests.swift; sourceTree = "<group>"; };
 		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
 		F073384C166485C57856B16A /* LibraryAdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminService.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -251,6 +253,7 @@
 			children = (
 				41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */,
 				1571B39D4D69A523AB9F63B6 /* EnumeratorMockURLProtocol.swift */,
+				EAE92E3AF49009DE57F012E1 /* FileProviderItemTests.swift */,
 			);
 			path = FileProviderExtensionTests;
 			sourceTree = "<group>";
@@ -693,6 +696,7 @@
 				9BC429DCAF85E390B3EC318C /* EnumeratorMockURLProtocol.swift in Sources */,
 				771B118B1B769C84723C4175 /* Extension.swift in Sources */,
 				8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */,
+				BE0F2FF21949D0E2DA83F925 /* FileProviderItemTests.swift in Sources */,
 				B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -767,7 +771,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -789,7 +793,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.8";
+				MARKETING_VERSION = "1.1.0-beta.9";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -870,7 +874,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -886,7 +890,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = "1.1.0-beta.8";
+				MARKETING_VERSION = "1.1.0-beta.9";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
