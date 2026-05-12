@@ -54,7 +54,7 @@ currently uses or intentionally leaves out.
   Implemented through polling the folder and file listing endpoints. The client records the
   last successful pull and next scheduled pull, but it does not yet integrate webhooks.
 
-## Implemented in 1.1 betas
+## Implemented in 1.1
 
 - File metadata editing
   `GET /files/{id}.json` returns description, keyword list, and any custom file-type fields;

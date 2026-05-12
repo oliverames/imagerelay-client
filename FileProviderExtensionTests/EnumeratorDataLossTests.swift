@@ -288,6 +288,59 @@ struct EnumeratorDataLossTests {
                 "Successfully-fetched selected folder must not be reported deleted")
     }
 
+    @Test("Full enumeration preserves deletion evidence for the change pass")
+    func fullEnumerationDoesNotConsumeDeletionEvidence() async throws {
+        let fx = try makeFixture()
+        let staleFolderID = 55555
+        let staleIdentifier = ItemIdentifier.folder(staleFolderID).rawValue
+        try fx.db.upsertItem(TrackedItem(
+            identifier: staleIdentifier,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            remoteID: staleFolderID,
+            itemType: .folder,
+            name: "Stale",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/folders/\(fx.selectedFolderID).json") {
+                let json = """
+                {"id": \(fx.selectedFolderID), "name": "Selected", "parent_id": \(fx.rootFolderID), "child_count": 0}
+                """
+                let response = HTTPURLResponse(
+                    url: request.url!, statusCode: 200,
+                    httpVersion: nil, headerFields: nil
+                )!
+                return (response, Data(json.utf8))
+            }
+
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("[]".utf8))
+        }
+
+        let enumerationObserver = FakeEnumerationObserver()
+        await enumerationObserver.runEnumerateItems(on: fx.enumerator)
+
+        #expect(try fx.db.item(for: staleIdentifier) != nil,
+                "Full enumeration must not delete tracked rows before File Provider receives a deletion event")
+
+        let changeObserver = FakeChangeObserver()
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        await changeObserver.runEnumerateChanges(on: fx.enumerator, from: initialAnchor)
+
+        let reportedIdentifiers = Set(changeObserver.deletedIdentifiers.map(\.rawValue))
+        #expect(reportedIdentifiers.contains(staleIdentifier),
+                "Change enumeration should still report the stale item after a full enumeration")
+        #expect(try fx.db.item(for: staleIdentifier) == nil,
+                "Change enumeration should clean the tracked row after reporting the deletion")
+    }
+
     struct Fixture {
         let db: SyncDatabase
         let enumerator: Enumerator
@@ -317,7 +370,7 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
 
     func didUpdate(_ updatedItems: [NSFileProviderItemProtocol]) {
         lock.withLock {
-            _updatedItems.append(contentsOf: updatedItems.compactMap { $0 as? NSFileProviderItem })
+            _updatedItems.append(contentsOf: updatedItems)
         }
     }
 
@@ -352,6 +405,50 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
         await withCheckedContinuation { cont in
             lock.withLock { continuation = cont }
             enumerator.enumerateChanges(for: self, from: anchor)
+        }
+    }
+}
+
+/// Captures completion for `enumerateItems`, which has no deletion callback.
+/// These tests use it to make sure a full enumeration does not mutate away the
+/// database state needed by the later change enumeration.
+final class FakeEnumerationObserver: NSObject, NSFileProviderEnumerationObserver, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _items: [NSFileProviderItem] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    var items: [NSFileProviderItem] {
+        lock.withLock { _items }
+    }
+
+    func didEnumerate(_ updatedItems: [NSFileProviderItemProtocol]) {
+        lock.withLock {
+            _items.append(contentsOf: updatedItems)
+        }
+    }
+
+    func finishEnumerating(upTo nextPage: NSFileProviderPage?) {
+        resumeContinuation()
+    }
+
+    func finishEnumeratingWithError(_ error: any Error) {
+        resumeContinuation()
+    }
+
+    private func resumeContinuation() {
+        let stored = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            let value = continuation
+            continuation = nil
+            return value
+        }
+        stored?.resume()
+    }
+
+    func runEnumerateItems(on enumerator: Enumerator) async {
+        await withCheckedContinuation { cont in
+            lock.withLock { continuation = cont }
+            let initialPage = NSFileProviderPage(rawValue: NSFileProviderPage.initialPageSortedByName as Data)
+            enumerator.enumerateItems(for: self, startingAt: initialPage)
         }
     }
 }
