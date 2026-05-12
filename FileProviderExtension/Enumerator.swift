@@ -30,17 +30,9 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     ) {
         Task {
             do {
-                let (items, deletedIdentifiers) = try await fetchItems()
+                let (items, _) = try await fetchItems()
                 self.logger.info("Enumerated \(items.count) items for \(self.containerIdentifier.rawValue, privacy: .public)")
                 observer.didEnumerate(items)
-
-                if !deletedIdentifiers.isEmpty {
-                    self.logger.info("Cleaning \(deletedIdentifiers.count, privacy: .public) stale tracked items after full enumeration for \(self.containerIdentifier.rawValue, privacy: .public)")
-                    for identifier in deletedIdentifiers {
-                        try? self.db.deleteItem(identifier.rawValue)
-                    }
-                }
-
                 observer.finishEnumerating(upTo: nil)
             } catch {
                 self.logger.error("Enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")

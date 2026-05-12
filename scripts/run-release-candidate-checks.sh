@@ -42,6 +42,13 @@ xcodebuild build \
   -destination 'platform=macOS' \
   CODE_SIGNING_ALLOWED=NO
 
+echo "Running unsigned iOS simulator build..."
+xcodebuild build \
+  -project ImageRelayClient.xcodeproj \
+  -scheme ImageRelayClientiOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  CODE_SIGNING_ALLOWED=NO
+
 if [[ "$RUN_LIVE_SYNC" == "1" ]]; then
   echo "Running live sync matrix..."
   scripts/run-live-sync-matrix.sh

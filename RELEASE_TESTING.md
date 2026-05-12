@@ -108,7 +108,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Confirm the exported folder contains `manifest.json`, `system.json`, `config.json`, `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt`.
 - Confirm `config.json` contains only sanitized configuration and never includes the API key value.
 
-## Collections (1.1 betas)
+## Collections (1.1)
 
 - Open the menu bar item, choose Collections.
 - Confirm the existing collections list loads.
@@ -117,7 +117,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Confirm there is no "Remove" / minus-circle button next to individual items (removal is not supported by the v2 API — verified 2026-05-12).
 - Delete the test collection. Confirm it disappears from the list immediately and from the web UI on refresh.
 
-## Library Admin (1.1 betas)
+## Library Admin (1.1)
 
 - Open Library Admin from Settings.
 - Confirm the File Types, Keyword Sets, Users, Folder Links, Quick Links, Permission Groups, and Invited Users sections all populate without "Not found" errors.
@@ -129,7 +129,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Release Automation
 
-- Run `scripts/run-release-candidate-checks.sh 1.0.0` on a macOS 26 machine with Xcode 26.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.0.0`.
-- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.0.0`.
+- Run `scripts/run-release-candidate-checks.sh 1.1.0` on a macOS 26 machine with Xcode 26.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.1.0`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

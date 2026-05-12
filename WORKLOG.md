@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-05-12 - 1.1.0 stable release preparation
+
+**What changed**: Promoted the project from `1.1.0-beta.9` to stable `1.1.0` with build `26`. Refreshed public docs so the README, release testing checklist, and API compatibility matrix describe the official 1.1 surface instead of stale beta examples. Fixed a File Provider deletion-evidence bug where `enumerateItems` could clean stale tracked rows before `enumerateChanges` had reported deletions to Finder. The 1.1 release includes Finder-aware metadata editing, Upload Links, Collections, Products, Webhooks, API Directory, Library Admin write tools, live-API endpoint corrections, explicit File Provider on-demand content policy, and the previous 1.0 sync hardening.
+
+**Verification baseline**: `scripts/run-release-candidate-checks.sh 1.1.0` passed before the stable bump, covering patch whitespace, 105 ImageRelayKit package tests, Xcode project regeneration, the macOS `ImageRelayClient` test scheme, and an unsigned macOS build. `xcodebuild build -project ImageRelayClient.xcodeproj -scheme ImageRelayClientiOS -destination 'platform=iOS Simulator,name=iPhone 17e' CODE_SIGNING_ALLOWED=NO` also passed. The release-candidate script now includes that iOS simulator build so future release gates cover both host apps.
+
+**Left off at**: Release preparation is verified and ready for signed packaging, but the official 1.1.0 release has NOT been cut yet. The first packaging attempt was blocked before archive creation because the system resolver could not resolve normal hostnames for Python/pip/curl; Go-based tools (`op`, `gh`) worked with `GODEBUG=netdns=go`, and `xcrun notarytool history` reached Apple successfully with the 1Password App Store Connect key.
+
+**Open questions**: Still open: run `scripts/build-developer-id-release.sh --version 1.1.0 --smoke-install` with a clean Python dependency path, perform the computer-controlled UI smoke pass, publish the `v1.1.0` GitHub release assets/appcast, verify anonymous appcast and DMG reachability, let `scripts/update-cask.sh` update the stable Cask from the final DMG SHA, commit/push the release artifacts/metadata, and sync the public Homebrew tap if desired.
+
+---
+
 ## 2026-05-12 - 1.1.0-beta.9: explicit on-demand `contentPolicy` on FileProviderItem
 
 **What changed**: The macOS extension was already producing the iCloud-style on-demand cloud-storage experience by default — files appear in Finder via metadata-only enumeration, contents fetch lazily via `Extension.fetchContents`, the system manages cache eviction automatically, and per-file remote updates are pulled in the background. All of that is the macOS 13+ default behavior for `NSFileProviderReplicatedExtension`-based providers when no `NSFileProviderItemProtocol.contentPolicy` is set: the root inherits `.downloadLazily` and every descendant inherits from there. Beta 9 makes that behavior explicit per item type so a future SDK default change cannot silently flip it.
@@ -733,5 +745,3 @@ When folders are selected, files are fetched from each selected folder directly 
 - Should subfolder metadata be cached in the database to avoid re-fetching on every sync pass?
 - Should the file fetching strategy change to fetch from each top-level subfolder individually (parallel) rather than from root?
 - The editable install (.pth file) doesn't work with Python 3.14 on an iCloud path with spaces. Is this a Python bug or setuptools issue?
-
----
