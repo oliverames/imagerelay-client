@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-05-13 - 1.1.0 stable release shipped
+
+**What changed**: Completed the official 1.1.0 release closeout from the stable release candidate. Fixed Finder-advertised File Provider capabilities so files expose rename support and folders expose rename/reparent support in line with the implemented `modifyItem` behavior. Centralized current User-Agent defaults at `ImageRelayClient/1.1.0`, migrated legacy built-in defaults to `ImageRelayClient/1.1.0 (macOS)` while preserving custom values, and updated macOS, iOS, and shared service call sites. Cleaned up release-build warnings, refreshed release-testing docs, updated the stable cask to the final DMG SHA, published the GitHub release, and synced `oliverames/homebrew-tap`.
+
+**Decisions made**: Treat built-in 1.0/1.1 User-Agent values as migratable defaults, but preserve user-customized values exactly. Expose Finder capabilities only for operations the File Provider already implements, rather than advertising broad delete/upload behavior from the item model. Kept the release host on the source repo (`oliverames/imagerelay-client`) because anonymous GitHub asset validation passed there.
+
+**Left off at**: `v1.1.0` is pushed and published with signed, notarized, stapled assets. Public anonymous appcast and DMG downloads were verified, and the public DMG checksum matched `48853da0fd62b44b3f211e372cd5281d093224142757d5a106c9452a3a51f847`. Homebrew tap commit `80a2706` updates `image-relay` to 1.1.0.
+
+**Open questions**: Still open: rotate the App Store Connect API key when convenient because an earlier repo-local copy was treated as exposed. No new 1.1.0 release blockers remain.
+
+---
+
 ## 2026-05-12 - 1.1.0 stable release preparation
 
 **What changed**: Promoted the project from `1.1.0-beta.9` to stable `1.1.0` with build `26`. Refreshed public docs so the README, release testing checklist, and API compatibility matrix describe the official 1.1 surface instead of stale beta examples. Fixed a File Provider deletion-evidence bug where `enumerateItems` could clean stale tracked rows before `enumerateChanges` had reported deletions to Finder. The 1.1 release includes Finder-aware metadata editing, Upload Links, Collections, Products, Webhooks, API Directory, Library Admin write tools, live-API endpoint corrections, explicit File Provider on-demand content policy, and the previous 1.0 sync hardening.
