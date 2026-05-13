@@ -17,13 +17,13 @@ struct SettingsiOSView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
 
-                TextField("Root folder ID", text: $configuration.draftRootFolderID, prompt: Text("e.g. 2907644"))
+                TextField("Root folder ID", text: $configuration.draftRootFolderID, prompt: Text("root or 2907644"))
                     .keyboardType(.numberPad)
                     .autocorrectionDisabled()
             } header: {
                 Text("Account")
             } footer: {
-                Text("The root folder ID is the numeric ID of the folder you want to expose in Files.")
+                Text("Use root or leave this blank to expose the account root, or enter a numeric folder ID.")
             }
 
             Section("Sync") {

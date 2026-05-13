@@ -18,7 +18,7 @@ final class ConfigurationStore {
     /// `refresh()` populates it from Keychain.
     var draftAPIKey: String = ""
 
-    /// Editable mirror of `remoteRootFolderID`. Empty string means "unset".
+    /// Editable mirror of `remoteRootFolderID`. Empty string/root means account root.
     var draftRootFolderID: String = ""
 
     /// Last error message, if any, from `save()` or `refresh()`.
@@ -28,7 +28,7 @@ final class ConfigurationStore {
         let loaded = load()
         snapshot = loaded
         draftAPIKey = loaded.apiKey
-        draftRootFolderID = loaded.remoteRootFolderID.map(String.init) ?? ""
+        draftRootFolderID = loaded.remoteRootFolderID.map(String.init) ?? (loaded.apiKey.isEmpty ? "" : "root")
     }
 
     /// Outcome of a save attempt. `materialChange` is true when the API key

@@ -184,6 +184,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     /// deletions inside already-visible folders propagate into Finder.
     private func fetchWorkingSetItems() async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
         let rootFolderID = try await resolveRootFolderID()
+
+        if config.selectedFolderIDs.isEmpty {
+            return try await fetchShallowWorkingSetItems(rootFolderID: rootFolderID)
+        }
+
         let (rootFolders, unverifiedRootFolderIDs) = try await workingSetRootFolders(parentID: rootFolderID)
         logger.info("Fetching working set from \(rootFolders.count, privacy: .public) root folders, unverified roots: \(unverifiedRootFolderIDs.count, privacy: .public)")
 
@@ -221,6 +226,48 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         return (items, deletedIdentifiers)
+    }
+
+    /// In account-root mode, the selected scope is the whole Image Relay library.
+    /// Recursively crawling that entire tree for the working set can be slow and
+    /// brittle, and direct folder enumeration already hydrates each folder as the
+    /// user opens it. Keep the global feed shallow so root-level changes propagate
+    /// without blocking Finder on a full-account traversal.
+    private func fetchShallowWorkingSetItems(rootFolderID: Int) async throws -> ([NSFileProviderItem], [NSFileProviderItemIdentifier]) {
+        async let foldersTask = listChildFolders(parentID: rootFolderID)
+        async let filesTask: [RemoteFile] = api.getAllPages(
+            "/folders/\(rootFolderID)/files.json",
+            query: ["recursive": "false"]
+        )
+        let folders = try await foldersTask
+        let files = try await filesTask
+
+        var items: [NSFileProviderItem] = []
+
+        for folder in folders {
+            let identifier = ItemIdentifier.folder(folder.id).rawValue
+            let existingItem = try db.item(for: identifier)
+            items.append(FileProviderItem(folder: folder, parentItemIdentifier: .rootContainer))
+
+            try db.upsertItem(.makeFolder(from: folder, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
+            if existingItem == nil {
+                try? db.logActivity(action: .discovered, itemName: folder.name, itemType: .folder)
+            }
+        }
+
+        for file in files where !file.isDeleted {
+            let identifier = ItemIdentifier.file(file.id).rawValue
+            let existingItem = try db.item(for: identifier)
+            items.append(FileProviderItem(file: file, parentItemIdentifier: .rootContainer))
+
+            try db.upsertItem(.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
+            if existingItem == nil {
+                try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
+            }
+        }
+
+        logger.info("Fetched shallow account-root working-set items: \(items.count, privacy: .public)")
+        return (items, [])
     }
 
     /// Expands `unverifiedSelectedFolderIDs` into the union of their local subtrees.

@@ -84,7 +84,7 @@ public struct AppConfiguration: Codable, Sendable {
     }
 
     public var isConfigured: Bool {
-        !apiKey.isEmpty && remoteRootFolderID != nil
+        !apiKey.isEmpty
     }
 
     public var baseURL: URL {

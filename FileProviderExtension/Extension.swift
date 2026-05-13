@@ -206,7 +206,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                let parentFolderID = try self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
+                let parentFolderID = try await self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
                 self.beginOperation()
                 defer { self.incrementProgress() }
@@ -390,7 +390,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         guard let fileTypeID = config.defaultFileTypeID else {
                             throw ExtensionError.missingDefaultFileTypeID
                         }
-                        let parentFolderID = try self.resolveParentFolderID(item.parentItemIdentifier)
+                        let parentFolderID = try await self.resolveParentFolderID(item.parentItemIdentifier)
                         let fileData = try Data(contentsOf: contentURL)
                         _ = try await self.uploadNewFile(
                             name: conflictName,
@@ -413,7 +413,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
                     self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let fileData = try Data(contentsOf: contentURL)
-                    let parentFolderID = try self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                    let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
 
                     try await self.replaceFileContents(remoteID: remoteID, name: item.filename, data: fileData)
                     try await self.waitForRemoteFileSize(
@@ -433,7 +433,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if itemID.isFile, changedFields.contains(.filename) {
-                    let parentFolderID = try self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                    let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
                     if !changedFields.contains(.contents) {
                         self.updateProgress(state: .syncing, phase: "Renaming file", currentItem: tracked.name)
                         try await self.renameFileByVersion(
@@ -455,9 +455,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 if !itemID.isFile,
                    changedFields.contains(.filename) || changedFields.contains(.parentItemIdentifier) {
-                    let oldParentID = try self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                    let oldParentID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
                     let newParentID = changedFields.contains(.parentItemIdentifier)
-                        ? try self.resolveParentFolderID(item.parentItemIdentifier)
+                        ? try await self.resolveParentFolderID(item.parentItemIdentifier)
                         : nil
                     let expectedParentID = newParentID ?? oldParentID
                     self.updateProgress(state: .syncing, phase: "Updating folder", currentItem: tracked.name)
@@ -488,8 +488,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if changedFields.contains(.parentItemIdentifier), itemID.isFile {
-                    let oldParentID = try self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
-                    let newParentID = try self.resolveParentFolderID(item.parentItemIdentifier)
+                    let oldParentID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                    let newParentID = try await self.resolveParentFolderID(item.parentItemIdentifier)
                     try await api.post(
                         "/files/\(remoteID)/move.json",
                         body: MoveRequest(folder_ids: [String(newParentID)])
@@ -663,13 +663,19 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     private func deleteTrackedItem(itemID: ItemIdentifier, remoteID: Int, tracked: TrackedItem?) async throws {
         do {
             if itemID.isFile {
-                let parentFolderID = try tracked.map {
-                    try self.resolveParentFolderID(NSFileProviderItemIdentifier($0.parentIdentifier))
+                let parentFolderID: Int?
+                if let tracked {
+                    parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                } else {
+                    parentFolderID = nil
                 }
                 try await self.deleteRemoteFile(remoteID: remoteID, parentFolderID: parentFolderID)
             } else {
-                let parentFolderID = try tracked.map {
-                    try self.resolveParentFolderID(NSFileProviderItemIdentifier($0.parentIdentifier))
+                let parentFolderID: Int?
+                if let tracked {
+                    parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+                } else {
+                    parentFolderID = nil
                 }
                 try await self.deleteRemoteFolder(remoteID: remoteID, parentFolderID: parentFolderID)
             }
@@ -921,17 +927,22 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         throw lastError ?? APIError.invalidResponse
     }
 
-    private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) throws -> Int {
+    private func resolveParentFolderID(_ identifier: NSFileProviderItemIdentifier) async throws -> Int {
         if identifier == .rootContainer || identifier == .workingSet {
-            guard let remoteRootFolderID = config.remoteRootFolderID else {
-                throw ExtensionError.missingRootFolderID
-            }
-            return remoteRootFolderID
+            return try await resolveRootFolderID()
         }
         guard let folderID = ItemIdentifier(rawValue: identifier.rawValue)?.numericID else {
             throw ExtensionError.invalidParentIdentifier(identifier.rawValue)
         }
         return folderID
+    }
+
+    private func resolveRootFolderID() async throws -> Int {
+        if let remoteRootFolderID = config.remoteRootFolderID {
+            return remoteRootFolderID
+        }
+        let root: RemoteFolder = try await api.get("/folders/root.json")
+        return root.id
     }
 
     private func signalLocalMutation(
