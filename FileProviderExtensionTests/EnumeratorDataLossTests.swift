@@ -513,6 +513,86 @@ struct EnumeratorDataLossTests {
                 "Shallow account-root working set must not delete previously seen descendants")
     }
 
+    @Test("Network failure during folder enumeration returns cached placeholders")
+    func networkFailureEnumeratesCachedFolderChildren() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let folderID = 1924001
+        let childFolderID = 1924042
+        let containerIdentifier = NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
+        let childIdentifier = ItemIdentifier.folder(childFolderID).rawValue
+
+        try db.upsertItem(TrackedItem(
+            identifier: childIdentifier,
+            parentIdentifier: containerIdentifier.rawValue,
+            remoteID: childFolderID,
+            itemType: .folder,
+            name: "Blue Cross Photos",
+            size: 0,
+            contentVersion: "cached-content",
+            metadataVersion: "cached-metadata"
+        ))
+
+        let config = AppConfiguration(
+            apiKey: "test-key",
+            remoteRootFolderID: nil,
+            defaultFileTypeID: 1,
+            pollIntervalSeconds: 60,
+            syncUpload: true,
+            syncDownload: true,
+            userAgent: "TestAgent/1.0"
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: sessionConfig,
+            rateLimiter: RateLimiter(maxRequests: 1000, period: 1.0),
+            maxRetries: 0,
+            maxRetryDelay: 0
+        )
+        let enumerator = Enumerator(
+            containerIdentifier: containerIdentifier,
+            api: api,
+            db: db,
+            config: config
+        )
+
+        EnumeratorMockURLProtocol.requestHandler = { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+
+        let observer = FakeEnumerationObserver()
+        await observer.runEnumerateItems(on: enumerator)
+
+        #expect(observer.errors.isEmpty,
+                "Transient network failures should not surface to Finder when cached children exist")
+        #expect(observer.items.map(\.itemIdentifier.rawValue) == [childIdentifier],
+                "Folder enumeration should fall back to cached children")
+    }
+
+    @Test("Network failure during change enumeration keeps cached state")
+    func networkFailureChangeEnumerationFinishesWithoutDeletingCachedRows() async throws {
+        let fx = try makeFixture()
+
+        EnumeratorMockURLProtocol.requestHandler = { _ in
+            throw URLError(.networkConnectionLost)
+        }
+
+        let observer = FakeChangeObserver()
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        await observer.runEnumerateChanges(on: fx.enumerator, from: initialAnchor)
+
+        #expect(observer.errors.isEmpty,
+                "Transient network failures should finish cleanly so File Provider keeps its cached view")
+        #expect(observer.deletedIdentifiers.isEmpty,
+                "No remote deletions should be inferred from a transient network failure")
+        #expect(try fx.db.item(for: fx.selectedIdentifier) != nil)
+        #expect(try fx.db.item(for: fx.descendantFolderIdentifier) != nil)
+        #expect(try fx.db.item(for: fx.descendantFileIdentifier) != nil)
+    }
+
     struct Fixture {
         let db: SyncDatabase
         let enumerator: Enumerator
@@ -530,6 +610,7 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
     private let lock = NSLock()
     private var _deletedIdentifiers: [NSFileProviderItemIdentifier] = []
     private var _updatedItems: [NSFileProviderItem] = []
+    private var _errors: [any Error] = []
     private var continuation: CheckedContinuation<Void, Never>?
 
     var deletedIdentifiers: [NSFileProviderItemIdentifier] {
@@ -538,6 +619,10 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
 
     var updatedItems: [NSFileProviderItem] {
         lock.withLock { _updatedItems }
+    }
+
+    var errors: [any Error] {
+        lock.withLock { _errors }
     }
 
     func didUpdate(_ updatedItems: [NSFileProviderItemProtocol]) {
@@ -557,6 +642,9 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
     }
 
     func finishEnumeratingWithError(_ error: any Error) {
+        lock.withLock {
+            _errors.append(error)
+        }
         resumeContinuation()
     }
 
@@ -587,10 +675,15 @@ final class FakeChangeObserver: NSObject, NSFileProviderChangeObserver, @uncheck
 final class FakeEnumerationObserver: NSObject, NSFileProviderEnumerationObserver, @unchecked Sendable {
     private let lock = NSLock()
     private var _items: [NSFileProviderItem] = []
+    private var _errors: [any Error] = []
     private var continuation: CheckedContinuation<Void, Never>?
 
     var items: [NSFileProviderItem] {
         lock.withLock { _items }
+    }
+
+    var errors: [any Error] {
+        lock.withLock { _errors }
     }
 
     func didEnumerate(_ updatedItems: [NSFileProviderItemProtocol]) {
@@ -604,6 +697,9 @@ final class FakeEnumerationObserver: NSObject, NSFileProviderEnumerationObserver
     }
 
     func finishEnumeratingWithError(_ error: any Error) {
+        lock.withLock {
+            _errors.append(error)
+        }
         resumeContinuation()
     }
 
