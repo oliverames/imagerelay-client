@@ -5,8 +5,8 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 ## First Launch
 
 - Open the downloaded DMG and verify macOS allows the app to launch without Gatekeeper warnings beyond the standard first-open confirmation.
-- Drag ImageRelay Client to Applications.
-- Launch ImageRelay Client from Applications.
+- Drag Image Relay to Applications.
+- Launch Image Relay from Applications.
 - Confirm the menu bar icon appears.
 - Open the menu bar item and confirm Settings opens.
 - Confirm Check for Updates is present in the menu bar item.
@@ -130,6 +130,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 ## Release Automation
 
 - Run `scripts/run-release-candidate-checks.sh 1.1.0` on a macOS 26 machine with Xcode 26.
+- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.1.0.
 - For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0`.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.1.0`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

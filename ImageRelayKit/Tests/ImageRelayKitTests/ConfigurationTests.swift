@@ -40,6 +40,7 @@ struct ConfigurationTests {
         #expect(loaded.remoteRootFolderID == 123)
         #expect(loaded.defaultFileTypeID == 456)
         #expect(loaded.pollIntervalSeconds == 60)
+        #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
     }
 
     @Test("apiKey is absent from the saved JSON file")
@@ -123,6 +124,7 @@ struct ConfigurationTests {
         #expect(config.pollIntervalSeconds == 60)
         #expect(config.syncUpload == true)
         #expect(config.syncDownload == true)
+        #expect(config.userAgent == AppConfiguration.currentMacUserAgent)
     }
 
     @Test("Load returns default when file missing")
@@ -132,6 +134,49 @@ struct ConfigurationTests {
         let url = tempURL()
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "")
+        #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+    }
+
+    @Test("Legacy built-in User-Agent migrates to current release default")
+    func legacyDefaultUserAgentMigrates() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let legacyJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/1.0 (macOS)","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+
+        let rewrittenData = try Data(contentsOf: url)
+        let rewritten = try JSONSerialization.jsonObject(with: rewrittenData) as? [String: Any]
+        #expect(rewritten?["user_agent"] as? String == AppConfiguration.currentMacUserAgent)
+    }
+
+    @Test("Custom User-Agent is preserved")
+    func customUserAgentIsPreserved() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let customJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/Oliver-Test","selected_folder_ids":[]}
+        """
+        try customJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.userAgent == "ImageRelayClient/Oliver-Test")
     }
 
     @Test("isConfigured requires API key and root folder")

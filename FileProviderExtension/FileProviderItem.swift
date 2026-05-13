@@ -55,11 +55,11 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         if trackedItem.itemType == .folder {
             self.contentType = .folder
             self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
-                                  .allowsDeleting, .allowsAddingSubItems]
+                                  .allowsReparenting, .allowsDeleting, .allowsAddingSubItems]
             self._contentPolicy = .inherited
         } else {
             self.contentType = UTType(filenameExtension: URL(fileURLWithPath: trackedItem.name).pathExtension) ?? .data
-            self._capabilities = [.allowsReading, .allowsWriting,
+            self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
                                   .allowsReparenting, .allowsDeleting]
             self._contentPolicy = .downloadLazily
         }
@@ -86,7 +86,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         )
         self.contentModificationDate = folder.contentModifiedAt
         self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
-                              .allowsDeleting, .allowsAddingSubItems]
+                              .allowsReparenting, .allowsDeleting, .allowsAddingSubItems]
         self._contentPolicy = .inherited
         super.init()
     }
@@ -109,7 +109,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
             )
         )
         self.contentModificationDate = file.contentModifiedAt
-        self._capabilities = [.allowsReading, .allowsWriting,
+        self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
                               .allowsReparenting, .allowsDeleting]
         self._contentPolicy = .downloadLazily
         super.init()

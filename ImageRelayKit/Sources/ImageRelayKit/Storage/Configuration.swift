@@ -1,6 +1,28 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
+    public static let currentServiceUserAgent = "ImageRelayClient/1.1.0"
+    public static let currentMacUserAgent = "ImageRelayClient/1.1.0 (macOS)"
+    public static let currentIOSUserAgent = "ImageRelayClient/1.1.0 (iOS)"
+
+    private static let legacyMacUserAgents: Set<String> = [
+        "ImageRelayClient/1.0",
+        "ImageRelayClient/1.0 (macOS)",
+        "ImageRelayClient/1.1",
+        "ImageRelayClient/1.1 (macOS)"
+    ]
+
+    public static func normalizedMacUserAgent(_ userAgent: String) -> String {
+        legacyMacUserAgents.contains(userAgent) ? currentMacUserAgent : userAgent
+    }
+
+    public static func normalizedIOSUserAgent(_ userAgent: String) -> String {
+        if userAgent == "ImageRelayClient/1.1 (iOS)" {
+            return currentIOSUserAgent
+        }
+        return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
+    }
+
     // apiKey is NOT serialized to config.json — it lives in the Keychain.
     // See load(from:) for the backward-compat migration from legacy plaintext JSON.
     public var apiKey: String
@@ -53,7 +75,8 @@ public struct AppConfiguration: Codable, Sendable {
         pollIntervalSeconds = try c.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds) ?? 60
         syncUpload = try c.decodeIfPresent(Bool.self, forKey: .syncUpload) ?? true
         syncDownload = try c.decodeIfPresent(Bool.self, forKey: .syncDownload) ?? true
-        userAgent = try c.decodeIfPresent(String.self, forKey: .userAgent) ?? "ImageRelayClient/1.0 (macOS)"
+        let decodedUserAgent = try c.decodeIfPresent(String.self, forKey: .userAgent) ?? Self.currentMacUserAgent
+        userAgent = Self.normalizedMacUserAgent(decodedUserAgent)
         selectedFolderIDs = try c.decodeIfPresent([Int].self, forKey: .selectedFolderIDs) ?? []
     }
 
@@ -72,7 +95,7 @@ public struct AppConfiguration: Codable, Sendable {
         pollIntervalSeconds: 60,
         syncUpload: true,
         syncDownload: true,
-        userAgent: "ImageRelayClient/1.0 (macOS)",
+        userAgent: currentMacUserAgent,
         selectedFolderIDs: []
     )
 
@@ -118,11 +141,13 @@ public struct AppConfiguration: Codable, Sendable {
         let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         let containsLegacyAPIKey = raw?.keys.contains("api_key") ?? false
         let legacyKey = raw?["api_key"] as? String
+        let storedUserAgent = raw?["user_agent"] as? String
+        let userAgentNeedsRewrite = storedUserAgent != nil && storedUserAgent != config.userAgent
 
         // Primary path: API key already in Keychain.
         if let stored = KeychainStore.load(account: keychainAccount, accessGroup: keychainAccessGroup), !stored.isEmpty {
             config.apiKey = stored
-            if containsLegacyAPIKey {
+            if containsLegacyAPIKey || userAgentNeedsRewrite {
                 try? rewriteJSONWithoutAPIKey(config, to: url)
             }
             return config
@@ -134,7 +159,7 @@ public struct AppConfiguration: Codable, Sendable {
             KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
         }
 
-        if containsLegacyAPIKey {
+        if containsLegacyAPIKey || userAgentNeedsRewrite {
             try? rewriteJSONWithoutAPIKey(config, to: url)
         }
 

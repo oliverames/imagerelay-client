@@ -59,7 +59,7 @@ final class ConfigurationStore {
             next.remoteRootFolderID = Int(trimmedRoot)
         }
         next.syncUpload = false
-        next.userAgent = "ImageRelayClient/1.1 (iOS)"
+        next.userAgent = AppConfiguration.currentIOSUserAgent
 
         let materialChange = next.apiKey != snapshot.apiKey
             || next.remoteRootFolderID != snapshot.remoteRootFolderID
@@ -103,9 +103,7 @@ final class ConfigurationStore {
         guard let container = AppConfiguration.containerURL() else { return .default }
         var loaded = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         loaded.syncUpload = false
-        if !loaded.userAgent.contains("(iOS)") {
-            loaded.userAgent = "ImageRelayClient/1.1 (iOS)"
-        }
+        loaded.userAgent = AppConfiguration.normalizedIOSUserAgent(loaded.userAgent)
         return loaded
     }
 }

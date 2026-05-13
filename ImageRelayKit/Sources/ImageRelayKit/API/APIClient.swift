@@ -14,7 +14,7 @@ public actor APIClient {
     public init(
         baseURL: URL,
         apiKey: String,
-        userAgent: String = "ImageRelayClient/1.0",
+        userAgent: String = AppConfiguration.currentServiceUserAgent,
         sessionConfiguration: URLSessionConfiguration = .default,
         rateLimiter: RateLimiter = RateLimiter(),
         maxRetries: Int = 3,

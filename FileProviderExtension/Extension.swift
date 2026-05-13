@@ -542,7 +542,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         completionHandler: @escaping ((any Error)?) -> Void
     ) -> Progress {
         let db = self.db
-        let api = self.api
         let config = self.config
         let logger = self.logger
         let handler = UncheckedBox(value: completionHandler)
