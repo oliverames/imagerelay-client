@@ -34,7 +34,7 @@ struct GeneralSettingsView: View {
     }
 
     private var uploadNeedsDefaultFileType: Bool {
-        syncUpload && !apiKey.isEmpty && !remoteRootFolderID.isEmpty && defaultFileTypeID.isEmpty
+        syncUpload && !apiKey.isEmpty && defaultFileTypeID.isEmpty
     }
 
     var body: some View {
@@ -133,7 +133,7 @@ struct GeneralSettingsView: View {
         containerAvailable = true
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         apiKey = config.apiKey
-        remoteRootFolderID = config.remoteRootFolderID.map(String.init) ?? ""
+        remoteRootFolderID = config.remoteRootFolderID.map(String.init) ?? (config.apiKey.isEmpty ? "" : "root")
         defaultFileTypeID = config.defaultFileTypeID.map(String.init) ?? ""
         syncUpload = config.syncUpload
         launchAtLogin = SMAppService.mainApp.status == .enabled

@@ -22,6 +22,7 @@ SPARKLE_RELEASE_BASE_URL="https://github.com/$SPARKLE_RELEASE_REPOSITORY/release
 VERSION=""
 OUTPUT_DIR=""
 SMOKE_INSTALL=0
+XCODE_CLONED_SOURCE_PACKAGES_DIR="${XCODE_CLONED_SOURCE_PACKAGES_DIR:-}"
 
 usage() {
   cat <<'EOF'
@@ -290,6 +291,14 @@ echo "Generating Xcode project..."
   xcodegen generate
 )
 
+XCODE_PACKAGE_ARGS=()
+if [[ -n "$XCODE_CLONED_SOURCE_PACKAGES_DIR" ]]; then
+  XCODE_PACKAGE_ARGS=(
+    -clonedSourcePackagesDirPath "$XCODE_CLONED_SOURCE_PACKAGES_DIR"
+    -disableAutomaticPackageResolution
+  )
+fi
+
 ARCHIVE_PATH="$STAGE_DIR/ImageRelayClient.xcarchive"
 DERIVED_DATA_PATH="$STAGE_DIR/DerivedData"
 EXPORT_DIR="$STAGE_DIR/export"
@@ -334,6 +343,7 @@ xcodebuild archive \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
+  "${XCODE_PACKAGE_ARGS[@]}" \
   -archivePath "$ARCHIVE_PATH" | tee "$ARTIFACT_DIR/archive.log"
 
 echo "Exporting Developer ID app..."

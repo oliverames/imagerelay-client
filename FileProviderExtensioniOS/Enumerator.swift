@@ -45,9 +45,9 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                     return
                 }
 
-                let folderID = try Self.resolveFolderID(
+                let folderID = try await Self.resolveFolderID(
                     for: containerIdentifier,
-                    config: services.config
+                    services: services
                 )
                 let parentIdentifier = (containerIdentifier == .rootContainer || containerIdentifier == .workingSet)
                     ? NSFileProviderItemIdentifier.rootContainer
@@ -78,13 +78,14 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
     private static func resolveFolderID(
         for containerIdentifier: NSFileProviderItemIdentifier,
-        config: AppConfiguration
-    ) throws -> Int {
+        services: ExtensionServices
+    ) async throws -> Int {
         if containerIdentifier == .rootContainer || containerIdentifier == .workingSet {
-            guard let rootID = config.remoteRootFolderID else {
-                throw NSFileProviderError(.notAuthenticated)
+            if let rootID = services.config.remoteRootFolderID {
+                return rootID
             }
-            return rootID
+            let root: RemoteFolder = try await services.api.get("/folders/root.json")
+            return root.id
         }
         guard let parsed = ItemIdentifier(rawValue: containerIdentifier.rawValue),
               parsed.isFolder,

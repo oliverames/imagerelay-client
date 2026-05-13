@@ -56,11 +56,11 @@ brew install --cask image-relay
 1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
 2. Open the DMG and drag **Image Relay** to Applications
 3. Launch Image Relay — the menu bar icon appears
-4. Open Settings → General and enter your API key and root folder ID
+4. Open Settings → General and enter your API key. Leave Root Folder ID blank, use `root`, or enter a numeric folder ID.
 
 **Finding your API key**: Image Relay web app → Account Settings → API.
 
-**Finding your root folder ID**: navigate to the folder you want as your Finder root in the Image Relay web app; the numeric ID appears in the URL (`/folders/2907644`).
+**Finding a folder ID**: leave the field blank or enter `root` to mount the account root. To mount one folder instead, navigate to that folder in the Image Relay web app; the numeric ID appears in the URL (`/folders/2907644`).
 
 ## Features
 
@@ -99,7 +99,7 @@ Settings are stored as JSON in a shared App Group container, readable by both th
 | Setting | Description | Default |
 |---|---|---|
 | API Key | Image Relay API key - Account Settings > API | - |
-| Root Folder ID | Numeric ID of the folder to mount as the Finder root | - |
+| Root Folder ID | Blank/`root` mounts the account root; a numeric ID mounts one folder as Finder root | account root |
 | Default File Type ID | Metadata template applied to new uploads (optional) | none |
 | Sync Upload | Push local changes to Image Relay | on |
 | Sync Download | Pull remote changes into Finder | on |
@@ -159,8 +159,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (118 tests across 19 suites:
-# 108 ImageRelayKitTests + 10 FileProviderExtensionTests)
+# Run the unit test suite (120 tests across 19 suites:
+# 108 ImageRelayKitTests + 12 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \

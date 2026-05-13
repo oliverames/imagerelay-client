@@ -195,13 +195,13 @@ struct ConfigurationTests {
         #expect(loaded.userAgent == "ImageRelayClient/Oliver-Test")
     }
 
-    @Test("isConfigured requires API key and root folder")
+    @Test("isConfigured requires API key")
     func isConfigured() {
         var config = AppConfiguration.default
         #expect(config.isConfigured == false)
 
         config.apiKey = "key"
-        #expect(config.isConfigured == false)
+        #expect(config.isConfigured == true)
 
         config.remoteRootFolderID = 1
         #expect(config.isConfigured == true)

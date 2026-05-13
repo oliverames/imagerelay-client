@@ -56,7 +56,7 @@ struct FilesGatewayView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Not configured yet")
                         .font(.body.weight(.medium))
-                    Text("Add your API key and root folder ID in Settings to surface files in the Files app.")
+                    Text("Add your API key in Settings to surface files in the Files app.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

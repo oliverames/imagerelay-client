@@ -341,6 +341,178 @@ struct EnumeratorDataLossTests {
                 "Change enumeration should clean the tracked row after reporting the deletion")
     }
 
+    @Test("Nil root configuration resolves account root and enumerates placeholders")
+    func nilRootConfigurationResolvesAccountRoot() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let rootFolderID = 2000
+        let childFolderID = 2100
+        let childFileID = 2200
+        let config = AppConfiguration(
+            apiKey: "test-key",
+            remoteRootFolderID: nil,
+            defaultFileTypeID: 1,
+            pollIntervalSeconds: 60,
+            syncUpload: true,
+            syncDownload: true,
+            userAgent: "TestAgent/1.0"
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: sessionConfig,
+            rateLimiter: RateLimiter(maxRequests: 1000, period: 1.0),
+            maxRetries: 0,
+            maxRetryDelay: 0
+        )
+        let enumerator = Enumerator(
+            containerIdentifier: .rootContainer,
+            api: api,
+            db: db,
+            config: config
+        )
+
+        var requestedPaths: [String] = []
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            requestedPaths.append(path)
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+
+            if path.hasSuffix("/folders/root.json") {
+                return (response, Data(#"{"id": 2000, "name": "Root", "parent_id": null, "child_count": 2}"#.utf8))
+            }
+            if path.hasSuffix("/folders/\(rootFolderID)/children") {
+                let json = """
+                [{"id": \(childFolderID), "name": "Top Folder", "parent_id": \(rootFolderID), "child_count": 0}]
+                """
+                return (response, Data(json.utf8))
+            }
+            if path.hasSuffix("/folders/\(rootFolderID)/files.json") {
+                let json = """
+                [{"id": \(childFileID), "filename": "brand.jpg", "size": 1234, "folder_ids": [\(rootFolderID)], "deleted": false}]
+                """
+                return (response, Data(json.utf8))
+            }
+
+            Issue.record("Unexpected API call: \(path)")
+            return (response, Data("[]".utf8))
+        }
+
+        let observer = FakeEnumerationObserver()
+        await observer.runEnumerateItems(on: enumerator)
+
+        let itemIdentifiers = Set(observer.items.map { $0.itemIdentifier.rawValue })
+        #expect(itemIdentifiers.contains(ItemIdentifier.folder(childFolderID).rawValue))
+        #expect(itemIdentifiers.contains(ItemIdentifier.file(childFileID).rawValue))
+        #expect(requestedPaths.contains { $0.hasSuffix("/folders/root.json") })
+        #expect(try db.folders(parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue).map(\.remoteID) == [childFolderID])
+    }
+
+    @Test("Account-root working set stays shallow")
+    func accountRootWorkingSetDoesNotCrawlEntireLibrary() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let rootFolderID = 2000
+        let childFolderID = 2100
+        let rootFileID = 2200
+        let trackedDescendantFolderID = 2300
+        let trackedDescendantIdentifier = ItemIdentifier.folder(trackedDescendantFolderID).rawValue
+        let childIdentifier = ItemIdentifier.folder(childFolderID).rawValue
+
+        try db.upsertItem(TrackedItem(
+            identifier: childIdentifier,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            remoteID: childFolderID,
+            itemType: .folder,
+            name: "Top Folder",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: trackedDescendantIdentifier,
+            parentIdentifier: childIdentifier,
+            remoteID: trackedDescendantFolderID,
+            itemType: .folder,
+            name: "Previously Seen Descendant",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+
+        let config = AppConfiguration(
+            apiKey: "test-key",
+            remoteRootFolderID: nil,
+            defaultFileTypeID: 1,
+            pollIntervalSeconds: 60,
+            syncUpload: true,
+            syncDownload: true,
+            userAgent: "TestAgent/1.0"
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: sessionConfig,
+            rateLimiter: RateLimiter(maxRequests: 1000, period: 1.0),
+            maxRetries: 0,
+            maxRetryDelay: 0
+        )
+        let enumerator = Enumerator(
+            containerIdentifier: .workingSet,
+            api: api,
+            db: db,
+            config: config
+        )
+
+        var requestedPaths: [String] = []
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let path = request.url?.path ?? ""
+            requestedPaths.append(path)
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+
+            if path.hasSuffix("/folders/root.json") {
+                return (response, Data(#"{"id": 2000, "name": "Root", "parent_id": null, "child_count": 1}"#.utf8))
+            }
+            if path.hasSuffix("/folders/\(rootFolderID)/children") {
+                let json = """
+                [{"id": \(childFolderID), "name": "Top Folder", "parent_id": \(rootFolderID), "child_count": 1}]
+                """
+                return (response, Data(json.utf8))
+            }
+            if path.hasSuffix("/folders/\(rootFolderID)/files.json") {
+                let json = """
+                [{"id": \(rootFileID), "filename": "root.pdf", "size": 1234, "folder_ids": [\(rootFolderID)], "deleted": false}]
+                """
+                return (response, Data(json.utf8))
+            }
+
+            Issue.record("Unexpected recursive working-set API call: \(path)")
+            return (response, Data("[]".utf8))
+        }
+
+        let observer = FakeChangeObserver()
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        await observer.runEnumerateChanges(on: enumerator, from: initialAnchor)
+
+        let itemIdentifiers = Set(observer.updatedItems.map { $0.itemIdentifier.rawValue })
+        #expect(itemIdentifiers.contains(ItemIdentifier.folder(childFolderID).rawValue))
+        #expect(itemIdentifiers.contains(ItemIdentifier.file(rootFileID).rawValue))
+        #expect(!requestedPaths.contains { $0.hasSuffix("/folders/\(childFolderID)/children") })
+        #expect(!requestedPaths.contains { $0.hasSuffix("/folders/\(childFolderID)/files.json") })
+        #expect(try db.item(for: trackedDescendantIdentifier) != nil,
+                "Shallow account-root working set must not delete previously seen descendants")
+    }
+
     struct Fixture {
         let db: SyncDatabase
         let enumerator: Enumerator
