@@ -1,4 +1,5 @@
 @preconcurrency import FileProvider
+import Foundation
 import ImageRelayKit
 import os.log
 
@@ -35,6 +36,17 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 observer.didEnumerate(items)
                 observer.finishEnumerating(upTo: nil)
             } catch {
+                if isCacheableTransientFailure(error) {
+                    do {
+                        let cachedItems = try self.cachedItemsForCurrentContainer()
+                        self.logger.warning("Enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public); returning \(cachedItems.count, privacy: .public) cached items: \(describeError(error), privacy: .public)")
+                        observer.didEnumerate(cachedItems)
+                        observer.finishEnumerating(upTo: nil)
+                        return
+                    } catch {
+                        self.logger.error("Cached fallback failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")
+                    }
+                }
                 self.logger.error("Enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")
                 observer.finishEnumeratingWithError(error.asFileProviderError)
             }
@@ -65,6 +77,14 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
                 observer.finishEnumeratingChanges(upTo: providerAnchor, moreComing: false)
             } catch {
+                if isCacheableTransientFailure(error) {
+                    let currentAnchor = SyncAnchor(data: syncAnchor.rawValue) ?? SyncAnchor()
+                    let providerAnchor = NSFileProviderSyncAnchor(currentAnchor.data)
+                    try? self.db.setSyncAnchor(currentAnchor.data, for: self.containerIdentifier.rawValue)
+                    self.logger.warning("Change enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public); keeping cached state: \(describeError(error), privacy: .public)")
+                    observer.finishEnumeratingChanges(upTo: providerAnchor, moreComing: false)
+                    return
+                }
                 self.logger.error("Change enumeration failed for \(self.containerIdentifier.rawValue, privacy: .public): \(describeError(error), privacy: .public)")
                 observer.finishEnumeratingWithError(error.asFileProviderError)
             }
@@ -338,6 +358,20 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return identifiers
     }
 
+    private func cachedItemsForCurrentContainer() throws -> [NSFileProviderItem] {
+        if containerIdentifier == .trashContainer {
+            return []
+        }
+        if containerIdentifier == .workingSet {
+            return try db.allItems()
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                .map { FileProviderItem(trackedItem: $0) }
+        }
+        return try db.children(of: containerIdentifier.rawValue)
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map { FileProviderItem(trackedItem: $0) }
+    }
+
     private func childFolders(of folderID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {
         if containerIdentifier == .rootContainer && !config.selectedFolderIDs.isEmpty {
             return try await selectedRootFolders(parentID: folderID)
@@ -435,4 +469,31 @@ private func describeError(_ error: any Error) -> String {
     }
 
     return error.localizedDescription
+}
+
+private func isCacheableTransientFailure(_ error: any Error) -> Bool {
+    if let apiError = error as? APIError {
+        return apiError.isRetryable
+    }
+
+    let nsError = error as NSError
+    guard nsError.domain == NSURLErrorDomain else {
+        return false
+    }
+
+    let transientCodes: Set<Int> = [
+        NSURLErrorTimedOut,
+        NSURLErrorCannotFindHost,
+        NSURLErrorCannotConnectToHost,
+        NSURLErrorNetworkConnectionLost,
+        NSURLErrorDNSLookupFailed,
+        NSURLErrorNotConnectedToInternet,
+        NSURLErrorSecureConnectionFailed,
+        NSURLErrorCannotLoadFromNetwork,
+        NSURLErrorInternationalRoamingOff,
+        NSURLErrorCallIsActive,
+        NSURLErrorDataNotAllowed,
+        NSURLErrorRequestBodyStreamExhausted
+    ]
+    return transientCodes.contains(nsError.code)
 }
