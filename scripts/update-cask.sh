@@ -3,8 +3,8 @@
 # release builds and notarizes successfully.
 #
 # Usage:
-#   scripts/update-cask.sh --version 1.1.0 --dmg path/to/ImageRelayClient-1.1.0.dmg
-#   scripts/update-cask.sh --version 1.1.0 --sha-file path/to/ImageRelayClient-1.1.0.dmg.sha256
+#   scripts/update-cask.sh --version 1.1.1 --dmg path/to/ImageRelayClient-1.1.1.dmg
+#   scripts/update-cask.sh --version 1.1.1 --sha-file path/to/ImageRelayClient-1.1.1.dmg.sha256
 #
 # The script refuses to bump to a pre-release version (anything containing "-beta"
 # or "-rc") so the Cask always tracks the latest stable. Pre-releases ride the
