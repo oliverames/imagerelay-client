@@ -38,7 +38,8 @@ struct ProductsBrowserView: View {
     @ViewBuilder
     private var content: some View {
         switch state.phase {
-        case .idle, .loading where state.products.isEmpty:
+        case .idle where state.products.isEmpty,
+             .loading where state.products.isEmpty:
             VStack(spacing: 8) {
                 ProgressView()
                 Text("Loading products...")

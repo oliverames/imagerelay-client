@@ -87,7 +87,7 @@ final class CollectionsService {
         return APIClient(
             baseURL: config.baseURL,
             apiKey: config.apiKey,
-            userAgent: "ImageRelayClient/1.1"
+            userAgent: AppConfiguration.currentServiceUserAgent
         )
     }
 

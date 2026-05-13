@@ -66,7 +66,8 @@ struct WebhooksAdminView: View {
     @ViewBuilder
     private var content: some View {
         switch state.phase {
-        case .idle, .loading where state.webhooks.isEmpty:
+        case .idle where state.webhooks.isEmpty,
+             .loading where state.webhooks.isEmpty:
             VStack(spacing: 8) {
                 ProgressView()
                 Text("Loading webhooks...")

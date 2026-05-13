@@ -27,7 +27,8 @@ struct CollectionsBrowserView: View {
     @ViewBuilder
     private var sidebar: some View {
         switch state.phase {
-        case .idle, .loading where state.collections.isEmpty:
+        case .idle where state.collections.isEmpty,
+             .loading where state.collections.isEmpty:
             VStack(spacing: 8) {
                 ProgressView()
                 Text("Loading collections...")

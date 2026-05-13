@@ -228,15 +228,13 @@ struct ExtensionServices: Sendable {
         ) else {
             logger.fault("App group container unavailable — extension will refuse all requests")
             return ExtensionServices(
-                api: APIClient(baseURL: AppConfiguration.default.baseURL, apiKey: "", userAgent: "ImageRelayClient/1.1 (iOS)"),
+                api: APIClient(baseURL: AppConfiguration.default.baseURL, apiKey: "", userAgent: AppConfiguration.currentIOSUserAgent),
                 config: .default
             )
         }
 
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-        let userAgent = config.userAgent.contains("(iOS)")
-            ? config.userAgent
-            : "ImageRelayClient/1.1 (iOS)"
+        let userAgent = AppConfiguration.normalizedIOSUserAgent(config.userAgent)
         let api = APIClient(
             baseURL: config.baseURL,
             apiKey: config.apiKey,

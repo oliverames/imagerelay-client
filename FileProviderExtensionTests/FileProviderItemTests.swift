@@ -26,6 +26,27 @@ struct FileProviderItemTests {
         #expect(item.contentPolicy == .downloadLazily)
     }
 
+    @Test("File items advertise supported Finder mutations")
+    func fileItemCapabilitiesMatchMutationSupport() {
+        let file = RemoteFile(
+            id: 42,
+            name: "logo.png",
+            size: 1024,
+            updatedOn: "2026-05-12T00:00:00Z",
+            contentType: "image/png",
+            fileTypeID: 1
+        )
+        let remoteItem = FileProviderItem(file: file, parentItemIdentifier: .rootContainer)
+        #expect(remoteItem.capabilities.contains(.allowsRenaming))
+        #expect(remoteItem.capabilities.contains(.allowsReparenting))
+
+        let trackedItem = FileProviderItem(
+            trackedItem: TrackedItem.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue)
+        )
+        #expect(trackedItem.capabilities.contains(.allowsRenaming))
+        #expect(trackedItem.capabilities.contains(.allowsReparenting))
+    }
+
     @Test("Folder items inherit policy from parent")
     func folderItemInherits() {
         let folder = RemoteFolder(
@@ -37,6 +58,26 @@ struct FileProviderItemTests {
         )
         let item = FileProviderItem(folder: folder, parentItemIdentifier: .rootContainer)
         #expect(item.contentPolicy == .inherited)
+    }
+
+    @Test("Folder items advertise supported Finder mutations")
+    func folderItemCapabilitiesMatchMutationSupport() {
+        let folder = RemoteFolder(
+            id: 7,
+            name: "Brand",
+            parentID: nil,
+            path: "Brand",
+            updatedOn: nil
+        )
+        let remoteItem = FileProviderItem(folder: folder, parentItemIdentifier: .rootContainer)
+        #expect(remoteItem.capabilities.contains(.allowsRenaming))
+        #expect(remoteItem.capabilities.contains(.allowsReparenting))
+
+        let trackedItem = FileProviderItem(
+            trackedItem: TrackedItem.makeFolder(from: folder, parent: NSFileProviderItemIdentifier.rootContainer.rawValue)
+        )
+        #expect(trackedItem.capabilities.contains(.allowsRenaming))
+        #expect(trackedItem.capabilities.contains(.allowsReparenting))
     }
 
     @Test("Synthetic root container inherits policy")
