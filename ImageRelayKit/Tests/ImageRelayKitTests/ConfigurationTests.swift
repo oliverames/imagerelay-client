@@ -147,17 +147,33 @@ struct ConfigurationTests {
             cleanKeychain(account: account)
         }
 
-        let legacyJSON = """
-        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/1.0 (macOS)","selected_folder_ids":[]}
-        """
-        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+        let previousBuiltInDefaults = [
+            "ImageRelayClient/1.0 (macOS)",
+            "ImageRelayClient/1.1 (macOS)",
+            "ImageRelayClient/1.1.0",
+            "ImageRelayClient/1.1.0 (macOS)"
+        ]
 
-        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
-        #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+        for userAgent in previousBuiltInDefaults {
+            let legacyJSON = """
+            {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"\(userAgent)","selected_folder_ids":[]}
+            """
+            try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
 
-        let rewrittenData = try Data(contentsOf: url)
-        let rewritten = try JSONSerialization.jsonObject(with: rewrittenData) as? [String: Any]
-        #expect(rewritten?["user_agent"] as? String == AppConfiguration.currentMacUserAgent)
+            let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+            #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+
+            let rewrittenData = try Data(contentsOf: url)
+            let rewritten = try JSONSerialization.jsonObject(with: rewrittenData) as? [String: Any]
+            #expect(rewritten?["user_agent"] as? String == AppConfiguration.currentMacUserAgent)
+        }
+    }
+
+    @Test("Legacy iOS User-Agent migrates to current iOS default")
+    func legacyIOSDefaultUserAgentMigrates() {
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
     }
 
     @Test("Custom User-Agent is preserved")

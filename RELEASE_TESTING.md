@@ -129,8 +129,8 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Release Automation
 
-- Run `scripts/run-release-candidate-checks.sh 1.1.0` on a macOS 26 machine with Xcode 26.
-- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.1.0.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.0`.
-- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.1.0`.
+- Run `scripts/run-release-candidate-checks.sh 1.1.1` on a macOS 26 machine with Xcode 26.
+- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.1.1.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.1`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.1.1`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
