@@ -489,10 +489,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 if !itemID.isFile,
                    changedFields.contains(.filename) || changedFields.contains(.parentItemIdentifier) {
                     let oldParentID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
-                    let newParentID = changedFields.contains(.parentItemIdentifier)
+                    let newParentID: Int = changedFields.contains(.parentItemIdentifier)
                         ? try await self.resolveParentFolderID(item.parentItemIdentifier)
-                        : nil
-                    let expectedParentID = newParentID ?? oldParentID
+                        : oldParentID
+                    let expectedParentID = newParentID
                     self.updateProgress(state: .syncing, phase: "Updating folder", currentItem: tracked.name)
                     let folder: RemoteFolder = try await api.put(
                         "/folders/\(remoteID).json",
@@ -1096,9 +1096,9 @@ private struct VersionCompleteRequest: Encodable, Sendable {
 
 private struct EmptyBody: Encodable, Sendable {}
 
-private struct UpdateFolderRequest: Encodable, Sendable {
+struct UpdateFolderRequest: Encodable, Sendable {
     let name: String
-    let parent_id: Int?
+    let parent_id: Int
 }
 
 private struct MoveRequest: Encodable, Sendable {

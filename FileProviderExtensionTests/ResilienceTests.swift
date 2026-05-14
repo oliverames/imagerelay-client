@@ -44,6 +44,16 @@ struct ResilienceTests {
         #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: pauseState))
     }
 
+    @Test("Folder update request always encodes parent id")
+    func folderUpdateRequestEncodesParentID() throws {
+        let request = UpdateFolderRequest(name: "Renamed", parent_id: 2_907_644)
+        let data = try JSONEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(object["name"] as? String == "Renamed")
+        #expect(object["parent_id"] as? Int == 2_907_644)
+    }
+
     @Test("Recent 429 state delays first File Provider batch")
     func recent429DelaysFirstBatch() {
         let state = PersistedThrottleState(
