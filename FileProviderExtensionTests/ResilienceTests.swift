@@ -26,6 +26,24 @@ struct ResilienceTests {
         #expect(delay == 600)
     }
 
+    @Test("Remote poller skips when sync is disabled or paused")
+    func pollerSkipsDisabledOrPausedSync() {
+        var config = AppConfiguration.default
+        #expect(RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
+
+        config.syncUpload = false
+        #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
+
+        config.syncUpload = true
+        config.syncDownload = false
+        #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
+
+        var pauseState = SyncPauseState.default
+        pauseState.paused = true
+        config.syncDownload = true
+        #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: pauseState))
+    }
+
     @Test("Recent 429 state delays first File Provider batch")
     func recent429DelaysFirstBatch() {
         let state = PersistedThrottleState(

@@ -6,6 +6,7 @@ actor RemoteChangePoller {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Poller")
     private let domain: NSFileProviderDomain
     private let config: AppConfiguration
+    private let configURL: URL?
     private let db: SyncDatabase?
     private let throttleStateStore: ThrottleStateStore?
     private var pollingTask: Task<Void, Never>?
@@ -19,11 +20,13 @@ actor RemoteChangePoller {
     init(
         domain: NSFileProviderDomain,
         config: AppConfiguration,
+        configURL: URL? = nil,
         db: SyncDatabase? = nil,
         throttleStateStore: ThrottleStateStore? = nil
     ) {
         self.domain = domain
         self.config = config
+        self.configURL = configURL
         self.db = db
         self.throttleStateStore = throttleStateStore
     }
@@ -45,8 +48,9 @@ actor RemoteChangePoller {
 
     private func pollLoop() async {
         while !Task.isCancelled {
+            let sleepConfig = currentConfig()
             let sleepInterval = Self.pollDelay(
-                baseIntervalSeconds: config.pollIntervalSeconds,
+                baseIntervalSeconds: sleepConfig.pollIntervalSeconds,
                 consecutiveFailures: effectiveConsecutiveFailures()
             )
             do {
@@ -55,15 +59,11 @@ actor RemoteChangePoller {
                 break
             }
 
-            // Skip signaling when sync download is disabled
-            guard config.syncDownload else {
-                logger.debug("Sync download disabled; skipping remote change signal")
-                continue
-            }
+            let currentConfig = currentConfig()
+            let pauseState = (try? db?.getPauseState()) ?? .default
 
-            // Skip signaling when sync is paused
-            if let db, let pauseState = try? db.getPauseState(), pauseState.isActive {
-                logger.debug("Sync paused; skipping remote change signal")
+            guard Self.shouldSignalRemoteChanges(config: currentConfig, pauseState: pauseState) else {
+                logger.debug("Sync disabled or paused; skipping remote change signal")
                 continue
             }
 
@@ -71,7 +71,7 @@ actor RemoteChangePoller {
                 guard let manager = NSFileProviderManager(for: domain) else { continue }
                 try await manager.signalEnumerator(for: .workingSet)
                 try await manager.signalEnumerator(for: .rootContainer)
-                let folderIDs = folderIDsToSignal()
+                let folderIDs = folderIDsToSignal(config: currentConfig)
                 var folderSignalFailures = 0
                 for folderID in folderIDs {
                     do {
@@ -89,7 +89,7 @@ actor RemoteChangePoller {
 
                 if let db {
                     var progress = (try? db.getProgress()) ?? .idle
-                    progress.markRemotePollSucceeded(intervalSeconds: config.pollIntervalSeconds)
+                    progress.markRemotePollSucceeded(intervalSeconds: currentConfig.pollIntervalSeconds)
                     try? db.setProgress(progress)
                 }
             } catch {
@@ -119,11 +119,20 @@ actor RemoteChangePoller {
         return min(APIClient.jitteredDelay(cappedBackoff, multiplier: jitterMultiplier), maxBackoffInterval)
     }
 
+    static func shouldSignalRemoteChanges(config: AppConfiguration, pauseState: SyncPauseState) -> Bool {
+        config.syncUpload && config.syncDownload && !pauseState.isActive
+    }
+
+    private func currentConfig() -> AppConfiguration {
+        guard let configURL else { return config }
+        return (try? AppConfiguration.load(from: configURL)) ?? config
+    }
+
     private func effectiveConsecutiveFailures() -> Int {
         max(consecutiveFailures, throttleStateStore?.load().consecutiveFailures ?? 0)
     }
 
-    private func folderIDsToSignal() -> [Int] {
+    private func folderIDsToSignal(config: AppConfiguration) -> [Int] {
         var folderIDs = Set(config.selectedFolderIDs)
         if let db {
             folderIDs.formUnion((try? db.folders().map(\.remoteID)) ?? [])

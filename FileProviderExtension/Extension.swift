@@ -92,6 +92,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             let poller = RemoteChangePoller(
                 domain: pollerDomain,
                 config: pollerConfig,
+                configURL: configURL,
                 db: pollerDB,
                 throttleStateStore: pollerThrottleStore
             )
