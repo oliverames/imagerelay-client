@@ -32,7 +32,7 @@ final class ProductsService {
         guard config.isConfigured else { throw ServiceError.notConfigured }
         return APIClient(
             baseURL: config.baseURL,
-            apiKey: config.apiKey,
+            credential: config.credential,
             userAgent: AppConfiguration.currentServiceUserAgent,
             // #16: host-app API clients share one 1 RPS lane so the FP extension can own the other 4.
             rateLimiter: .hostAppShared,

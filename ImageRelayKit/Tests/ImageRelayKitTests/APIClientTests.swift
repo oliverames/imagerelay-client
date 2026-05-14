@@ -106,6 +106,49 @@ struct APIClientTests {
         let _: [RemoteFolder] = try await client.get("/folders.json")
     }
 
+    @Test("OAuth request uses Image Relay OAuth authorization header")
+    func oauthRequestHeader() async throws {
+        MockURLProtocol.requestHandler = { request in
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "OAuth oauth-token")
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, "[]".data(using: .utf8)!)
+        }
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let client = APIClient(
+            baseURL: baseURL,
+            credential: .oauth(OAuthTokens(accessToken: "oauth-token", tenant: "bluecrossvt")),
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: config,
+            rateLimiter: RateLimiter(maxRequests: 100, period: 1.0)
+        )
+        let _: [RemoteFolder] = try await client.get("/folders.json")
+    }
+
+    @Test("PKCE code challenge matches RFC 7636 sample")
+    func pkceCodeChallenge() {
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        #expect(OAuthFlow.codeChallenge(for: verifier) == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+    }
+
+    @Test("OAuth callback parser reads code state and error")
+    func oauthCallbackParser() throws {
+        let success = try #require(URL(string: "imagerelay-client://oauth/callback?code=abc&state=xyz"))
+        let parsed = OAuthFlow.parseCallback(success)
+        #expect(parsed.code == "abc")
+        #expect(parsed.state == "xyz")
+        #expect(parsed.error == nil)
+
+        let failure = try #require(URL(string: "imagerelay-client://oauth/callback?error=access_denied&state=xyz"))
+        let failed = OAuthFlow.parseCallback(failure)
+        #expect(failed.code == nil)
+        #expect(failed.error == "access_denied")
+    }
+
     @Test("Chunked upload sends one empty chunk for zero-byte files")
     func uploadChunkedZeroByteFile() async throws {
         var requestedPaths: [String] = []

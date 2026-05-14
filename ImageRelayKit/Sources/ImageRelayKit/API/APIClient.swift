@@ -5,11 +5,12 @@ public actor APIClient {
     static let missingRetryAfterFallbackDelay: TimeInterval = 15
 
     private let baseURL: URL
-    private let apiKey: String
+    private let credential: AuthCredential
     private let userAgent: String
     private let session: URLSession
     private let rateLimiter: RateLimiter
     private let throttleStateStore: ThrottleStateStore?
+    private let telemetry: SyncDatabase?
     private let maxRetries: Int
     private let maxRetryDelay: TimeInterval
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "APIClient")
@@ -21,11 +22,36 @@ public actor APIClient {
         sessionConfiguration: URLSessionConfiguration = .default,
         rateLimiter: RateLimiter = RateLimiter(),
         throttleStateStore: ThrottleStateStore? = nil,
+        telemetry: SyncDatabase? = nil,
+        maxRetries: Int = 3,
+        maxRetryDelay: TimeInterval = 30
+    ) {
+        self.init(
+            baseURL: baseURL,
+            credential: .apiKey(apiKey),
+            userAgent: userAgent,
+            sessionConfiguration: sessionConfiguration,
+            rateLimiter: rateLimiter,
+            throttleStateStore: throttleStateStore,
+            telemetry: telemetry,
+            maxRetries: maxRetries,
+            maxRetryDelay: maxRetryDelay
+        )
+    }
+
+    public init(
+        baseURL: URL,
+        credential: AuthCredential,
+        userAgent: String = AppConfiguration.currentServiceUserAgent,
+        sessionConfiguration: URLSessionConfiguration = .default,
+        rateLimiter: RateLimiter = RateLimiter(),
+        throttleStateStore: ThrottleStateStore? = nil,
+        telemetry: SyncDatabase? = nil,
         maxRetries: Int = 3,
         maxRetryDelay: TimeInterval = 30
     ) {
         self.baseURL = baseURL
-        self.apiKey = apiKey
+        self.credential = credential
         self.userAgent = userAgent
         // 30 s per request, 10 min total resource timeout (large uploads excluded — they
         // use URLSession.upload which has its own deadline per chunk).
@@ -36,6 +62,7 @@ public actor APIClient {
         self.session = URLSession(configuration: sessionConfiguration)
         self.rateLimiter = rateLimiter
         self.throttleStateStore = throttleStateStore
+        self.telemetry = telemetry
         self.maxRetries = maxRetries
         self.maxRetryDelay = maxRetryDelay
     }
@@ -160,6 +187,7 @@ public actor APIClient {
             let end = min(offset + chunkSize, fileData.count)
             let chunk = fileData[offset..<end]
             try await upload(data: Data(chunk), to: pathBuilder(chunkNumber))
+            try? telemetry?.recordTransferredBytes(Int64(chunk.count))
             offset = end
         }
 
@@ -190,6 +218,7 @@ public actor APIClient {
             if let response: T = try await uploadIfPresent(data: Data(chunk), to: pathBuilder(chunkNumber)) {
                 lastResponse = response
             }
+            try? telemetry?.recordTransferredBytes(Int64(chunk.count))
             offset = end
         }
 
@@ -216,7 +245,7 @@ public actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(credential.authorizationHeader, forHTTPHeaderField: "Authorization")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -256,10 +285,14 @@ public actor APIClient {
                     } else {
                         logger.debug("Rate-limited on \(method) \(path) — waiting \(delay) s (attempt \(attempt))")
                     }
+                    try? telemetry?.beginRateLimitWait(until: Date().addingTimeInterval(delay))
                 } else {
                     logger.debug("Retrying \(method) \(path) in \(delay) s (attempt \(attempt))")
                 }
                 try await Task.sleep(for: .seconds(delay))
+                if case .rateLimited = lastError as? APIError {
+                    try? telemetry?.endRateLimitWait()
+                }
             } else {
                 logger.debug("\(method) \(path)")
             }
@@ -285,6 +318,7 @@ public actor APIClient {
             do {
                 try checkStatus(httpResponse, data: data)
                 throttleStateStore?.recordSuccess()
+                try? telemetry?.recordSuccessfulAPI()
                 return (data, httpResponse)
             } catch let error as APIError where error.isRetryable && attempt < maxRetries {
                 logger.warning("\(method) \(path) retryable error: \(error.userMessage)")

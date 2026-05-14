@@ -42,6 +42,8 @@ struct ConfigurationTests {
         #expect(loaded.pollIntervalSeconds == 60)
         #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
         #expect(loaded.maxConcurrentFiles == 10)
+        #expect(loaded.showAdvancedInformation == false)
+        #expect(loaded.fileProviderDisconnected == false)
     }
 
     @Test("apiKey is absent from the saved JSON file")
@@ -60,7 +62,8 @@ struct ConfigurationTests {
 
         let raw = try String(contentsOf: url, encoding: .utf8)
         #expect(!raw.contains("secret-token"))
-        #expect(!raw.contains("api_key"))
+        let json = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
+        #expect(json?["api_key"] == nil)
     }
 
     @Test("Legacy config.json with api_key migrates to Keychain")
@@ -87,7 +90,8 @@ struct ConfigurationTests {
         // After migration, api_key must be gone from JSON on disk.
         let rewritten = try String(contentsOf: url, encoding: .utf8)
         #expect(!rewritten.contains("legacy-secret"))
-        #expect(!rewritten.contains("api_key"))
+        let json = try JSONSerialization.jsonObject(with: Data(rewritten.utf8)) as? [String: Any]
+        #expect(json?["api_key"] == nil)
     }
 
     @Test("Legacy api_key is scrubbed when Keychain already has a value")
@@ -115,7 +119,8 @@ struct ConfigurationTests {
         let rewritten = try String(contentsOf: url, encoding: .utf8)
         #expect(!rewritten.contains("stale-plaintext-secret"))
         #expect(!rewritten.contains("stored-secret"))
-        #expect(!rewritten.contains("api_key"))
+        let json = try JSONSerialization.jsonObject(with: Data(rewritten.utf8)) as? [String: Any]
+        #expect(json?["api_key"] == nil)
     }
 
     @Test("Default configuration has sensible values")
@@ -127,6 +132,8 @@ struct ConfigurationTests {
         #expect(config.syncDownload == true)
         #expect(config.userAgent == AppConfiguration.currentMacUserAgent)
         #expect(config.maxConcurrentFiles == 10)
+        #expect(config.authMethod == .apiKey)
+        #expect(config.credential == .apiKey(""))
     }
 
     @Test("Load returns default when file missing")
@@ -155,7 +162,9 @@ struct ConfigurationTests {
             "ImageRelayClient/1.1.0",
             "ImageRelayClient/1.1.0 (macOS)",
             "ImageRelayClient/1.1.1",
-            "ImageRelayClient/1.1.1 (macOS)"
+            "ImageRelayClient/1.1.1 (macOS)",
+            "ImageRelayClient/1.1.2",
+            "ImageRelayClient/1.1.2 (macOS)"
         ]
 
         for userAgent in previousBuiltInDefaults {
@@ -178,6 +187,7 @@ struct ConfigurationTests {
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
     }
 
@@ -217,6 +227,43 @@ struct ConfigurationTests {
 
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.maxConcurrentFiles == 10)
+        #expect(loaded.showAdvancedInformation == false)
+        #expect(loaded.fileProviderDisconnected == false)
+    }
+
+    @Test("OAuth tokens and client secret round trip through Keychain")
+    func oauthSecretsRoundTrip() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        KeychainStore.delete(account: AppConfiguration.oauthTokensKeychainAccount, accessGroup: nil)
+        KeychainStore.delete(account: AppConfiguration.oauthClientSecretKeychainAccount, accessGroup: nil)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+            KeychainStore.delete(account: AppConfiguration.oauthTokensKeychainAccount, accessGroup: nil)
+            KeychainStore.delete(account: AppConfiguration.oauthClientSecretKeychainAccount, accessGroup: nil)
+        }
+
+        var config = AppConfiguration.default
+        config.authMethod = .oauth
+        config.oauthTenant = "bluecrossvt.imagerelay.com"
+        config.oauthClientID = "client-id"
+        config.oauthClientSecret = "client-secret"
+        config.oauthTokens = OAuthTokens(accessToken: "access-token", refreshToken: "refresh-token", tenant: "bluecrossvt")
+
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(!raw.contains("access-token"))
+        #expect(!raw.contains("client-secret"))
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.authMethod == .oauth)
+        #expect(loaded.oauthTenant == "bluecrossvt")
+        #expect(loaded.oauthClientSecret == "client-secret")
+        #expect(loaded.oauthTokens?.accessToken == "access-token")
+        #expect(loaded.credential == .oauth(OAuthTokens(accessToken: "access-token", refreshToken: "refresh-token", tenant: "bluecrossvt")))
     }
 
     @Test("isConfigured requires API key")

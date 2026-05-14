@@ -76,6 +76,7 @@ struct ImageRelayClientApp: App {
                 .frame(width: 16, height: 16)
         }
         .menuBarExtraStyle(.menu)
+        .handlesExternalEvents(matching: ["oauth"])
 
         Settings {
             TabView {
@@ -98,6 +99,9 @@ struct ImageRelayClientApp: App {
             .frame(width: 540, height: 460)
             .environment(domainManager)
             .environment(updateController)
+            .onOpenURL { url in
+                Task { await domainManager.completeOAuthCallback(url) }
+            }
         }
 
         Window("Edit Metadata", id: "metadata-editor") {
