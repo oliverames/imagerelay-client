@@ -24,9 +24,17 @@ struct ActivitySettingsView: View {
                         VStack(alignment: .leading) {
                             Text(entry.itemName)
                                 .font(.body)
-                            Text("\(entry.action.rawValue.capitalized) \(entry.itemType.rawValue)")
+                            Text(detailLabel(for: entry))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if entry.action.isFailure,
+                               let errorMessage = entry.errorMessage,
+                               !errorMessage.isEmpty {
+                                Text(errorMessage)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                         }
                         Spacer()
                         Text(entry.timestamp, style: .relative)
@@ -69,6 +77,8 @@ struct ActivitySettingsView: View {
         case .conflicted: "exclamationmark.triangle.fill"
         case .created: "plus.circle.fill"
         case .discovered: "sparkle.magnifyingglass"
+        case .uploadFailed, .downloadFailed, .modifyFailed, .deleteFailed:
+            "exclamationmark.triangle.fill"
         }
     }
 
@@ -82,6 +92,29 @@ struct ActivitySettingsView: View {
         case .conflicted: .yellow
         case .created: .teal
         case .discovered: .indigo
+        case .uploadFailed, .downloadFailed, .modifyFailed, .deleteFailed:
+            .red
+        }
+    }
+
+    private func detailLabel(for entry: ActivityEntry) -> String {
+        "\(actionLabel(for: entry.action)) \(entry.itemType.rawValue)"
+    }
+
+    private func actionLabel(for action: SyncAction) -> String {
+        switch action {
+        case .downloaded: "Downloaded"
+        case .uploaded: "Uploaded"
+        case .deleted: "Deleted"
+        case .renamed: "Renamed"
+        case .moved: "Moved"
+        case .conflicted: "Conflict"
+        case .created: "Created"
+        case .discovered: "Discovered"
+        case .uploadFailed: "Upload Failed"
+        case .downloadFailed: "Download Failed"
+        case .modifyFailed: "Modify Failed"
+        case .deleteFailed: "Delete Failed"
         }
     }
 }

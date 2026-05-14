@@ -156,6 +156,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             await self.waitForFileOperationSlot()
             defer { self.releaseFileOperationSlot() }
 
+            var failureItemName = itemIdentifier.rawValue
             do {
                 guard let tracked = try db.item(for: itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
@@ -163,6 +164,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     handler.value(nil, nil, NSFileProviderError(.noSuchItem))
                     return
                 }
+                failureItemName = tracked.name
 
                 self.beginOperation(phase: "Downloading", currentItem: tracked.name)
                 defer { self.incrementProgress() }
@@ -191,6 +193,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 handler.value(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
+                try? db.logActivity(
+                    action: .downloadFailed,
+                    itemName: failureItemName,
+                    itemType: .file,
+                    errorMessage: error.localizedDescription
+                )
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 handler.value(nil, nil, error.asFileProviderError)
             }
@@ -339,6 +347,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
+                let failureItemType: TrackedItemType = itemTemplate.contentType == .folder ? .folder : .file
+                try? db.logActivity(
+                    action: .uploadFailed,
+                    itemName: itemTemplate.filename,
+                    itemType: failureItemType,
+                    errorMessage: error.localizedDescription
+                )
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 handler.value(nil, [], false, error.asFileProviderError)
             }
@@ -366,6 +381,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             await self.waitForFileOperationSlot()
             defer { self.releaseFileOperationSlot() }
 
+            var failureItemName = item.filename
+            var failureItemType: TrackedItemType = item.contentType == .folder ? .folder : .file
             do {
                 let mutatesRemote = changedFields.contains(.contents)
                     || changedFields.contains(.filename)
@@ -389,6 +406,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
+                failureItemName = item.filename
+                failureItemType = tracked.itemType
 
                 self.beginOperation(phase: "Modifying", currentItem: tracked.name)
                 defer { self.incrementProgress() }
@@ -557,6 +576,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
+                try? db.logActivity(
+                    action: .modifyFailed,
+                    itemName: failureItemName,
+                    itemType: failureItemType,
+                    errorMessage: error.localizedDescription
+                )
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 handler.value(nil, [], false, error.asFileProviderError)
             }
@@ -582,14 +607,21 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             await self.waitForFileOperationSlot()
             defer { self.releaseFileOperationSlot() }
 
+            var failureItemName = identifier.rawValue
+            var failureItemType: TrackedItemType = .file
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
                     handler.value(NSFileProviderError(.noSuchItem))
                     return
                 }
+                failureItemType = itemID.isFile ? .file : .folder
 
                 let tracked = try db.item(for: identifier.rawValue)
+                if let tracked {
+                    failureItemName = tracked.name
+                    failureItemType = tracked.itemType
+                }
 
                 if !config.syncUpload {
                     handler.value(fileProviderCannotSynchronize("Upload sync is disabled in Image Relay settings."))
@@ -615,6 +647,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 )
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
+                try? db.logActivity(
+                    action: .deleteFailed,
+                    itemName: failureItemName,
+                    itemType: failureItemType,
+                    errorMessage: error.localizedDescription
+                )
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 handler.value(error.asFileProviderError)
             }

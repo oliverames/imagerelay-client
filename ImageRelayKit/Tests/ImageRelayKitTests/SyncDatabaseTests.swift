@@ -226,6 +226,41 @@ struct SyncDatabaseTests {
         #expect(entries[1].itemName == "photo.jpg")
     }
 
+    @Test("Activity log stores failure error message")
+    func activityLogStoresFailureErrorMessage() throws {
+        let db = try makeDB()
+
+        try db.logActivity(
+            action: .uploadFailed,
+            itemName: "storm.raw",
+            itemType: .file,
+            errorMessage: "Too many requests"
+        )
+
+        let entries = try db.recentActivity(limit: 10)
+        #expect(entries.count == 1)
+        #expect(entries[0].action == .uploadFailed)
+        #expect(entries[0].action.isFailure)
+        #expect(entries[0].errorMessage == "Too many requests")
+    }
+
+    @Test("Activity entry decodes legacy payload without error message")
+    func activityEntryDecodesLegacyPayloadWithoutErrorMessage() throws {
+        let data = """
+        {
+          "action": "downloaded",
+          "itemName": "photo.jpg",
+          "itemType": "file",
+          "timestamp": 0
+        }
+        """.data(using: .utf8)!
+
+        let entry = try JSONDecoder().decode(ActivityEntry.self, from: data)
+
+        #expect(entry.errorMessage == nil)
+        #expect(entry.action == .downloaded)
+    }
+
     @Test("Remote poll success normalizes stale error progress")
     func remotePollSuccessNormalizesProgress() {
         let now = Date(timeIntervalSince1970: 1_777_777_000)
