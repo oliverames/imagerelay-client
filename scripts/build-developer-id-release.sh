@@ -299,6 +299,14 @@ if [[ -n "$XCODE_CLONED_SOURCE_PACKAGES_DIR" ]]; then
   )
 fi
 
+run_xcodebuild() {
+  if ((${#XCODE_PACKAGE_ARGS[@]} > 0)); then
+    xcodebuild "$@" "${XCODE_PACKAGE_ARGS[@]}"
+  else
+    xcodebuild "$@"
+  fi
+}
+
 ARCHIVE_PATH="$STAGE_DIR/ImageRelayClient.xcarchive"
 DERIVED_DATA_PATH="$STAGE_DIR/DerivedData"
 EXPORT_DIR="$STAGE_DIR/export"
@@ -337,13 +345,12 @@ cat >"$EXPORT_OPTIONS_PLIST" <<PLIST
 PLIST
 
 echo "Archiving release build..."
-xcodebuild archive \
+run_xcodebuild archive \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$DERIVED_DATA_PATH" \
-  "${XCODE_PACKAGE_ARGS[@]}" \
   -archivePath "$ARCHIVE_PATH" | tee "$ARTIFACT_DIR/archive.log"
 
 echo "Exporting Developer ID app..."

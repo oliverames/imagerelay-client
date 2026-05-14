@@ -1,9 +1,9 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    public static let currentServiceUserAgent = "ImageRelayClient/1.1.1"
-    public static let currentMacUserAgent = "ImageRelayClient/1.1.1 (macOS)"
-    public static let currentIOSUserAgent = "ImageRelayClient/1.1.1 (iOS)"
+    public static let currentServiceUserAgent = "ImageRelayClient/1.1.2"
+    public static let currentMacUserAgent = "ImageRelayClient/1.1.2 (macOS)"
+    public static let currentIOSUserAgent = "ImageRelayClient/1.1.2 (iOS)"
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -11,7 +11,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.1",
         "ImageRelayClient/1.1 (macOS)",
         "ImageRelayClient/1.1.0",
-        "ImageRelayClient/1.1.0 (macOS)"
+        "ImageRelayClient/1.1.0 (macOS)",
+        "ImageRelayClient/1.1.1",
+        "ImageRelayClient/1.1.1 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -20,7 +22,8 @@ public struct AppConfiguration: Codable, Sendable {
 
     public static func normalizedIOSUserAgent(_ userAgent: String) -> String {
         if userAgent == "ImageRelayClient/1.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.1.0 (iOS)" {
+            userAgent == "ImageRelayClient/1.1.0 (iOS)" ||
+            userAgent == "ImageRelayClient/1.1.1 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
