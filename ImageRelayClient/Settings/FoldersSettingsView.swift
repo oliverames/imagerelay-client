@@ -138,7 +138,10 @@ struct FoldersSettingsView: View {
         let api = APIClient(
             baseURL: config.baseURL,
             apiKey: config.apiKey,
-            userAgent: AppConfiguration.normalizedMacUserAgent(config.userAgent)
+            userAgent: AppConfiguration.normalizedMacUserAgent(config.userAgent),
+            // #16: host-app API clients share one 1 RPS lane so the FP extension can own the other 4.
+            rateLimiter: .hostAppShared,
+            throttleStateStore: AppConfiguration.sharedThrottleStateStore()
         )
         let rootFolderID: Int
         if let remoteRootFolderID = config.remoteRootFolderID {

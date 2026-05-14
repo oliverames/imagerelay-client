@@ -9,17 +9,20 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
     private let api: APIClient
     private let db: SyncDatabase
     private let config: AppConfiguration
+    private let startupThrottleGate: StartupThrottleGate
 
     init(
         containerIdentifier: NSFileProviderItemIdentifier,
         api: APIClient,
         db: SyncDatabase,
-        config: AppConfiguration
+        config: AppConfiguration,
+        startupThrottleGate: StartupThrottleGate = StartupThrottleGate(delay: 0)
     ) {
         self.containerIdentifier = containerIdentifier
         self.api = api
         self.db = db
         self.config = config
+        self.startupThrottleGate = startupThrottleGate
         super.init()
     }
 
@@ -113,6 +116,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             logger.info("Enumerating empty File Provider trash container")
             return ([], [])
         }
+
+        await startupThrottleGate.waitIfNeeded()
 
         if containerIdentifier == .workingSet {
             return try await fetchWorkingSetItems()

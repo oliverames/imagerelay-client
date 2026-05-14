@@ -41,6 +41,7 @@ struct ConfigurationTests {
         #expect(loaded.defaultFileTypeID == 456)
         #expect(loaded.pollIntervalSeconds == 60)
         #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+        #expect(loaded.maxConcurrentFiles == 10)
     }
 
     @Test("apiKey is absent from the saved JSON file")
@@ -125,6 +126,7 @@ struct ConfigurationTests {
         #expect(config.syncUpload == true)
         #expect(config.syncDownload == true)
         #expect(config.userAgent == AppConfiguration.currentMacUserAgent)
+        #expect(config.maxConcurrentFiles == 10)
     }
 
     @Test("Load returns default when file missing")
@@ -193,6 +195,25 @@ struct ConfigurationTests {
 
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.userAgent == "ImageRelayClient/Oliver-Test")
+    }
+
+    @Test("Legacy config without max_concurrent_files defaults to 10")
+    func legacyMaxConcurrentFilesDefaultsToTen() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let legacyJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/Oliver-Test","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.maxConcurrentFiles == 10)
     }
 
     @Test("isConfigured requires API key")

@@ -9,6 +9,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     private let api: APIClient
     private let db: SyncDatabase
     private let config: AppConfiguration
+    private let fileOperationSemaphore: AsyncSemaphore
+    private let startupThrottleGate: StartupThrottleGate
+    private let throttleStateStore: ThrottleStateStore?
     private var poller: RemoteChangePoller?
 
     required init(domain: NSFileProviderDomain) {
@@ -23,7 +26,16 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
                 .fault("App group container unavailable — check entitlements")
             self.config = .default
-            self.api = APIClient(baseURL: AppConfiguration.default.baseURL, apiKey: "", userAgent: "")
+            self.fileOperationSemaphore = AsyncSemaphore(value: AppConfiguration.default.maxConcurrentFiles)
+            self.startupThrottleGate = StartupThrottleGate(delay: 0)
+            self.throttleStateStore = nil
+            self.api = APIClient(
+                baseURL: AppConfiguration.default.baseURL,
+                apiKey: "",
+                userAgent: "",
+                // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
+                rateLimiter: .fileProviderExtensionShared
+            )
             self.db = SyncDatabase.makeInMemory()
             super.init()
             return
@@ -32,11 +44,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let configURL = AppConfiguration.fileURL(in: container)
         let loadedConfig = (try? AppConfiguration.load(from: configURL)) ?? .default
         self.config = loadedConfig
+        self.fileOperationSemaphore = AsyncSemaphore(value: loadedConfig.maxConcurrentFiles)
+
+        let throttleStore = AppConfiguration.throttleStateStore(in: container)
+        self.throttleStateStore = throttleStore
+        let startupDelay = Self.initialThrottleDelay(from: throttleStore.load(), now: Date())
+        self.startupThrottleGate = StartupThrottleGate(delay: startupDelay)
 
         self.api = APIClient(
             baseURL: loadedConfig.baseURL,
             apiKey: loadedConfig.apiKey,
-            userAgent: loadedConfig.userAgent
+            userAgent: loadedConfig.userAgent,
+            // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
+            rateLimiter: .fileProviderExtensionShared,
+            throttleStateStore: throttleStore
         )
 
         let dbURL = SyncDatabase.databaseURL(in: container)
@@ -52,6 +73,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
+        if startupDelay > 0 {
+            logger.warning("Recent 429 state found; deferring first File Provider batch by \(startupDelay, privacy: .public) seconds")
+        }
 
         // Warn if a clone-based folder move from an older beta was interrupted.
         // Current folder moves use the Image Relay folder update endpoint in place.
@@ -63,8 +87,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let pollerDomain = domain
         let pollerConfig = config
         let pollerDB = db
+        let pollerThrottleStore = throttleStateStore
         Task { [weak self] in
-            let poller = RemoteChangePoller(domain: pollerDomain, config: pollerConfig, db: pollerDB)
+            let poller = RemoteChangePoller(
+                domain: pollerDomain,
+                config: pollerConfig,
+                db: pollerDB,
+                throttleStateStore: pollerThrottleStore
+            )
             await poller.start()
             self?.poller = poller
         }
@@ -122,6 +152,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let handler = UncheckedBox(value: completionHandler)
 
         Task {
+            await self.waitForFileOperationSlot()
+            defer { self.releaseFileOperationSlot() }
+
             do {
                 guard let tracked = try db.item(for: itemIdentifier.rawValue),
                       let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
@@ -183,6 +216,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let handler = UncheckedBox(value: completionHandler)
 
         Task {
+            await self.waitForFileOperationSlot()
+            defer { self.releaseFileOperationSlot() }
+
             do {
                 // Filter out .DS_Store and temp files
                 let ignoredNames: Set<String> = [".DS_Store"]
@@ -331,6 +367,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let handler = UncheckedBox(value: completionHandler)
 
         Task {
+            await self.waitForFileOperationSlot()
+            defer { self.releaseFileOperationSlot() }
+
             do {
                 let mutatesRemote = changedFields.contains(.contents)
                     || changedFields.contains(.filename)
@@ -547,6 +586,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         let handler = UncheckedBox(value: completionHandler)
 
         Task {
+            await self.waitForFileOperationSlot()
+            defer { self.releaseFileOperationSlot() }
+
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
@@ -599,11 +641,36 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             containerIdentifier: containerItemIdentifier,
             api: api,
             db: db,
-            config: config
+            config: config,
+            startupThrottleGate: startupThrottleGate
         )
     }
 
     // MARK: - Helpers
+
+    static func initialThrottleDelay(
+        from state: PersistedThrottleState,
+        now: Date,
+        recentWindow: TimeInterval = 3 * 60 * 60
+    ) -> TimeInterval {
+        guard let lastObserved429At = state.lastObserved429At,
+              state.consecutiveFailures > 0,
+              now.timeIntervalSince(lastObserved429At) <= recentWindow else {
+            return 0
+        }
+        return min(TimeInterval(state.consecutiveFailures * 30), 300)
+    }
+
+    private func waitForFileOperationSlot() async {
+        await startupThrottleGate.waitIfNeeded()
+        await fileOperationSemaphore.wait()
+    }
+
+    private func releaseFileOperationSlot() {
+        Task {
+            await fileOperationSemaphore.signal()
+        }
+    }
 
     private func uploadNewFile(
         name: String,
