@@ -2,6 +2,8 @@ import Foundation
 import os.log
 
 public actor APIClient {
+    static let missingRetryAfterFallbackDelay: TimeInterval = 15
+
     private let baseURL: URL
     private let apiKey: String
     private let userAgent: String
@@ -244,12 +246,14 @@ public actor APIClient {
             try Task.checkCancellation()
 
             if attempt > 0 {
-                let delay: TimeInterval
-                if case .rateLimited(let retryAfter) = lastError as? APIError, let seconds = retryAfter {
-                    delay = min(seconds, maxRetryDelay)
-                    logger.debug("Rate-limited on \(method) \(path) — waiting \(delay) s (attempt \(attempt))")
+                let delay = Self.retryDelay(attempt: attempt, after: lastError, maxRetryDelay: maxRetryDelay)
+                if case .rateLimited(let retryAfter) = lastError as? APIError {
+                    if retryAfter == nil {
+                        logger.debug("Rate-limited on \(method) \(path) without Retry-After — waiting \(delay) s (attempt \(attempt))")
+                    } else {
+                        logger.debug("Rate-limited on \(method) \(path) — waiting \(delay) s (attempt \(attempt))")
+                    }
                 } else {
-                    delay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
                     logger.debug("Retrying \(method) \(path) in \(delay) s (attempt \(attempt))")
                 }
                 try await Task.sleep(for: .seconds(delay))
@@ -286,6 +290,21 @@ public actor APIClient {
         }
 
         throw lastError ?? APIError.invalidResponse
+    }
+
+    static func retryDelay(
+        attempt: Int,
+        after lastError: (any Error)?,
+        maxRetryDelay: TimeInterval
+    ) -> TimeInterval {
+        if case .rateLimited(let retryAfter) = lastError as? APIError {
+            if let seconds = retryAfter {
+                return min(seconds, maxRetryDelay)
+            }
+            return min(Self.missingRetryAfterFallbackDelay, maxRetryDelay)
+        }
+
+        return min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
     }
 
     private func decodePage<T: Decodable>(
