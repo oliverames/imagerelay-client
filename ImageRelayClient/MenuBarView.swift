@@ -10,6 +10,8 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var timer: Timer?
     @State private var metadataEditingService = MetadataEditingService()
+    @State private var showAdvancedForOpen = false
+    @State private var confirmStopSync = false
 
     var body: some View {
         Group {
@@ -28,6 +30,24 @@ struct MenuBarView: View {
                     .disabled(true)
             }
 
+            if let throughputLine {
+                Text(throughputLine)
+                    .lineLimit(1)
+                    .disabled(true)
+            }
+
+            if let rateLimitLine {
+                Text(rateLimitLine)
+                    .lineLimit(1)
+                    .disabled(true)
+            }
+
+            if let failedCountLine {
+                Text(failedCountLine)
+                    .lineLimit(1)
+                    .disabled(true)
+            }
+
             Divider()
 
             Button {
@@ -43,6 +63,15 @@ struct MenuBarView: View {
                 Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(!domainManager.isDomainActive || !domainManager.syncDownloadEnabled || domainManager.pauseState.isActive)
+
+            if domainManager.failedUploadCount > 0 {
+                Button {
+                    Task { await domainManager.retryFailedUploads() }
+                } label: {
+                    Label(retryFailedUploadsLabel, systemImage: "arrow.clockwise.circle")
+                }
+                .disabled(!domainManager.isDomainActive || domainManager.syncDisconnected)
+            }
 
             Button {
                 Task { await editMetadataForSelected() }
@@ -106,6 +135,21 @@ struct MenuBarView: View {
                 }
             }
 
+            if domainManager.syncDisconnected {
+                Button {
+                    Task { await domainManager.reconnectSync() }
+                } label: {
+                    Label("Reconnect Sync", systemImage: "play.circle")
+                }
+            } else {
+                Button(role: .destructive) {
+                    confirmStopSync = true
+                } label: {
+                    Label("Stop Sync Completely", systemImage: "stop.circle")
+                }
+                .disabled(!domainManager.isDomainActive)
+            }
+
             Menu {
                 if domainManager.recentActivity.isEmpty {
                     Text("No recent activity yet")
@@ -121,6 +165,22 @@ struct MenuBarView: View {
             }
 
             Divider()
+
+            if showAdvancedDiagnostics {
+                Menu {
+                    diagnosticsRows
+                } label: {
+                    Label("Diagnostics", systemImage: "stethoscope")
+                }
+
+                Button {
+                    copyDiagnostics()
+                } label: {
+                    Label("Copy Diagnostics", systemImage: "doc.on.clipboard")
+                }
+
+                Divider()
+            }
 
             Button {
                 openSettingsWindow()
@@ -138,6 +198,17 @@ struct MenuBarView: View {
         }
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
+        .confirmationDialog(
+            "Stop sync completely?",
+            isPresented: $confirmStopSync
+        ) {
+            Button("Stop Sync Completely", role: .destructive) {
+                Task { await domainManager.stopSyncCompletely() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This disconnects the File Provider domain so Finder stops asking Image Relay to sync. Use Reconnect Sync to resume.")
+        }
     }
 
     private var statusSummary: some View {
@@ -148,6 +219,10 @@ struct MenuBarView: View {
     private var primaryStatusLine: String {
         if !domainManager.isDomainActive {
             return "Image Relay Not Connected"
+        }
+
+        if domainManager.syncDisconnected {
+            return "Sync Stopped"
         }
 
         if domainManager.pauseState.isActive {
@@ -171,6 +246,10 @@ struct MenuBarView: View {
             return domainManager.pauseState.description
         }
 
+        if domainManager.syncDisconnected {
+            return "Reconnect to resume syncing"
+        }
+
         if !domainManager.syncDownloadEnabled {
             return "Remote downloads are disabled in Settings"
         }
@@ -183,7 +262,11 @@ struct MenuBarView: View {
 
         if domainManager.syncProgress.state == .syncing {
             if domainManager.syncProgress.totalSteps > 0 {
-                return "\(domainManager.syncProgress.phase) • \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)"
+                var line = "\(domainManager.syncProgress.phase) • \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)"
+                if let eta = domainManager.syncProgress.etaSeconds, eta > 0 {
+                    line += " • ~\(formattedDuration(eta)) remaining"
+                }
+                return line
             }
             return domainManager.syncProgress.phase
         }
@@ -207,6 +290,36 @@ struct MenuBarView: View {
         return nil
     }
 
+    private var throughputLine: String? {
+        guard domainManager.syncProgress.state == .syncing else { return nil }
+        let speed = domainManager.syncProgress.smoothedBytesPerSecond
+        guard speed > 0 else { return nil }
+        return "\(Self.byteFormatter.string(fromByteCount: speed))/s"
+    }
+
+    private var rateLimitLine: String? {
+        let progress = domainManager.syncProgress
+        guard progress.rateLimitInFlight > 0 else { return nil }
+        if let until = progress.rateLimitedUntil {
+            let remaining = max(0, Int(ceil(until.timeIntervalSince(Date()))))
+            if remaining > 0 {
+                return "Rate-limited, retrying in ~\(formattedDuration(remaining))"
+            }
+        }
+        return "Rate-limited, retrying"
+    }
+
+    private var failedCountLine: String? {
+        guard domainManager.failedUploadCount > 0 else { return nil }
+        let item = domainManager.failedUploadCount == 1 ? "item" : "items"
+        return "\(domainManager.failedUploadCount) \(item) need attention"
+    }
+
+    private var retryFailedUploadsLabel: String {
+        let item = domainManager.failedUploadCount == 1 ? "upload" : "uploads"
+        return "Retry \(domainManager.failedUploadCount) failed \(item)"
+    }
+
     private var currentItemLine: String? {
         guard domainManager.syncProgress.state == .syncing,
               let currentItem = domainManager.syncProgress.currentItem,
@@ -218,6 +331,7 @@ struct MenuBarView: View {
 
     private var statusIcon: String {
         if !domainManager.isDomainActive { return "icloud.slash.fill" }
+        if domainManager.syncDisconnected { return "stop.circle.fill" }
         if domainManager.pauseState.isActive { return "pause.circle.fill" }
         switch domainManager.syncProgress.state {
         case .syncing: return "arrow.triangle.2.circlepath.circle.fill"
@@ -225,6 +339,32 @@ struct MenuBarView: View {
         case .error: return "exclamationmark.triangle.fill"
         case .idle: return "cloud.fill"
         }
+    }
+
+    @ViewBuilder
+    private var diagnosticsRows: some View {
+        Text("Throughput: \(throughputLine ?? "Idle")").disabled(true)
+        Text("Failed items: \(domainManager.failedUploadCount)").disabled(true)
+        Text("Recent 429s: \(domainManager.syncProgress.recentRateLimitCount)").disabled(true)
+        Text("Rate-limit waits: \(domainManager.syncProgress.rateLimitInFlight)").disabled(true)
+        Text("Queue: \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)").disabled(true)
+        Text("Next poll: \(nextPollDiagnostics)").disabled(true)
+        Text("Last API: \(lastAPIDiagnostics)").disabled(true)
+        Text("FP PID: \(domainManager.syncProgress.fileProviderPID.map(String.init) ?? "Unknown")").disabled(true)
+    }
+
+    private var showAdvancedDiagnostics: Bool {
+        showAdvancedForOpen || domainManager.showAdvancedInformation
+    }
+
+    private var nextPollDiagnostics: String {
+        guard let nextPoll = domainManager.syncProgress.nextRemotePollAt else { return "Unknown" }
+        return Self.relativeFormatter.localizedString(for: nextPoll, relativeTo: Date())
+    }
+
+    private var lastAPIDiagnostics: String {
+        guard let lastAPI = domainManager.syncProgress.lastSuccessfulAPIAt else { return "Unknown" }
+        return Self.relativeFormatter.localizedString(for: lastAPI, relativeTo: Date())
     }
 
     private func pauseButton(_ title: String, choice: PauseDuration, systemImage: String) -> some View {
@@ -349,6 +489,7 @@ struct MenuBarView: View {
     }
 
     private func startPolling() {
+        showAdvancedForOpen = NSEvent.modifierFlags.contains(.option)
         domainManager.refreshStatus()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
@@ -356,6 +497,24 @@ struct MenuBarView: View {
                 domainManager.refreshStatus()
             }
         }
+    }
+
+    private func formattedDuration(_ seconds: Int) -> String {
+        if seconds < 60 {
+            let rounded = max(1, Int(round(Double(seconds) / 10.0)) * 10)
+            return "\(rounded)s"
+        }
+        let minutes = Int(ceil(Double(seconds) / 60.0))
+        if minutes < 60 {
+            return "\(minutes) min"
+        }
+        return ">1 hour"
+    }
+
+    private func copyDiagnostics() {
+        let text = domainManager.diagnosticsSnapshot()
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func stopPolling() {
@@ -369,6 +528,13 @@ struct MenuBarView: View {
         f.dateStyle = .none
         f.timeStyle = .short
         return f
+    }()
+
+    private static let byteFormatter: ByteCountFormatter = {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        return formatter
     }()
 
     private func activityLabel(for entry: ActivityEntry) -> String {

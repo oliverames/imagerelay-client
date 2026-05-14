@@ -31,7 +31,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             self.throttleStateStore = nil
             self.api = APIClient(
                 baseURL: AppConfiguration.default.baseURL,
-                apiKey: "",
+                credential: AppConfiguration.default.credential,
                 userAgent: "",
                 // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
                 rateLimiter: .fileProviderExtensionShared
@@ -46,20 +46,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         self.config = loadedConfig
         self.fileOperationSemaphore = AsyncSemaphore(value: loadedConfig.maxConcurrentFiles)
 
-        let throttleStore = AppConfiguration.throttleStateStore(in: container)
-        self.throttleStateStore = throttleStore
-        let startupDelay = Self.initialThrottleDelay(from: throttleStore.load(), now: Date())
-        self.startupThrottleGate = StartupThrottleGate(delay: startupDelay)
-
-        self.api = APIClient(
-            baseURL: loadedConfig.baseURL,
-            apiKey: loadedConfig.apiKey,
-            userAgent: loadedConfig.userAgent,
-            // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
-            rateLimiter: .fileProviderExtensionShared,
-            throttleStateStore: throttleStore
-        )
-
         let dbURL = SyncDatabase.databaseURL(in: container)
         let database: SyncDatabase
         do {
@@ -70,6 +56,21 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             database = SyncDatabase.makeInMemory()
         }
         self.db = database
+
+        let throttleStore = AppConfiguration.throttleStateStore(in: container)
+        self.throttleStateStore = throttleStore
+        let startupDelay = Self.initialThrottleDelay(from: throttleStore.load(), now: Date())
+        self.startupThrottleGate = StartupThrottleGate(delay: startupDelay)
+
+        self.api = APIClient(
+            baseURL: loadedConfig.baseURL,
+            credential: loadedConfig.credential,
+            userAgent: loadedConfig.userAgent,
+            // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
+            rateLimiter: .fileProviderExtensionShared,
+            throttleStateStore: throttleStore,
+            telemetry: database
+        )
 
         super.init()
         logger.info("File Provider extension initialized for domain: \(domain.displayName)")
@@ -251,10 +252,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let parentFolderID = try await self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
-                self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename)
-                defer { self.incrementProgress() }
-
                 if itemTemplate.contentType == .folder {
+                    self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename)
+                    defer { self.incrementProgress() }
+
                     let createRequest = CreateFolderRequest(name: itemTemplate.filename)
                     let folder: RemoteFolder = try await api.post(
                         "/folders/\(parentFolderID)/children",
@@ -298,34 +299,42 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         throw ExtensionError.missingDefaultFileTypeID
                     }
 
+                    self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename, expectedBytes: Int64(fileData.count))
+                    defer { self.incrementProgress() }
+
                     let fileID: Int
                     let contentVersion: String
+                    let finalName: String
                     if let existingRemote = try await self.remoteFile(named: itemTemplate.filename, parentFolderID: parentFolderID) {
                         // File Provider can send a second create-style request when a
                         // freshly-created file is edited before enumeration settles on
                         // the remote identifier. Treat that as a version update.
                         fileID = existingRemote.id
                         try await self.replaceFileContents(remoteID: existingRemote.id, name: itemTemplate.filename, data: fileData)
-                        try await self.waitForRemoteFileSize(
+                        let confirmed = try await self.waitForRemoteFileSize(
                             remoteID: existingRemote.id,
                             parentFolderID: parentFolderID,
-                            expectedSize: fileData.count
+                            expectedSize: fileData.count,
+                            acceptExistingAsset: true
                         )
+                        finalName = confirmed.name
                         contentVersion = UUID().uuidString
                     } else {
-                        fileID = try await self.uploadNewFile(
+                        let uploaded = try await self.uploadNewFile(
                             name: itemTemplate.filename,
                             data: fileData,
                             parentFolderID: parentFolderID,
                             fileTypeID: fileTypeID
                         )
+                        fileID = uploaded.id
+                        finalName = uploaded.name
                         contentVersion = "1"
                     }
 
                     let tracked = TrackedItem(
                         identifier: ItemIdentifier.file(fileID).rawValue,
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
-                        remoteID: fileID, itemType: .file, name: itemTemplate.filename,
+                        remoteID: fileID, itemType: .file, name: finalName,
                         size: Int64(fileData.count), contentVersion: contentVersion,
                         metadataVersion: TrackedItem.fileMetadataVersion(
                             updatedOn: contentVersion,
@@ -334,7 +343,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         contentModifiedAt: Date()
                     )
                     try db.upsertItem(tracked)
-                    try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
+                    try? db.logActivity(action: .uploaded, itemName: finalName, itemType: .file)
 
                     let item = FileProviderItem(trackedItem: tracked)
                     handler.value(item, [], false, nil)
@@ -409,7 +418,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 failureItemName = item.filename
                 failureItemType = tracked.itemType
 
-                self.beginOperation(phase: "Modifying", currentItem: tracked.name)
+                let expectedModifyBytes: Int64
+                if changedFields.contains(.contents), let newContents {
+                    let attributes = try? FileManager.default.attributesOfItem(atPath: newContents.path)
+                    expectedModifyBytes = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+                } else {
+                    expectedModifyBytes = 0
+                }
+                self.beginOperation(phase: "Modifying", currentItem: tracked.name, expectedBytes: expectedModifyBytes)
                 defer { self.incrementProgress() }
                 var updated = tracked
 
@@ -445,6 +461,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         }
                         let parentFolderID = try await self.resolveParentFolderID(item.parentItemIdentifier)
                         let fileData = try Data(contentsOf: contentURL)
+                        self.updateProgress(state: .syncing, phase: "Uploading conflict copy", currentItem: conflictName)
                         _ = try await self.uploadNewFile(
                             name: conflictName,
                             data: fileData,
@@ -463,18 +480,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
-                    self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let fileData = try Data(contentsOf: contentURL)
+                    self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
 
                     try await self.replaceFileContents(remoteID: remoteID, name: item.filename, data: fileData)
-                    try await self.waitForRemoteFileSize(
+                    let confirmed = try await self.waitForRemoteFileSize(
                         remoteID: remoteID,
                         parentFolderID: parentFolderID,
-                        expectedSize: fileData.count
+                        expectedSize: fileData.count,
+                        acceptExistingAsset: true
                     )
 
                     updated.size = Int64(fileData.count)
+                    updated.name = confirmed.name
                     updated.contentVersion = UUID().uuidString
                     updated.metadataVersion = TrackedItem.fileMetadataVersion(
                         updatedOn: updated.contentVersion,
@@ -495,9 +514,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                             parentFolderID: parentFolderID
                         )
                         updated.contentVersion = UUID().uuidString
+                        let confirmed = try await self.waitForRemoteFileName(remoteID: remoteID, parentFolderID: parentFolderID, expectedName: item.filename)
+                        updated.name = confirmed.name
+                    } else {
+                        // Content replacement already completed a direct-file confirmation.
+                        // Image Relay may canonicalize names, so don't require the folder
+                        // listing to echo the Finder spelling before accepting the upload.
+                        updated.name = updated.name.isEmpty ? item.filename : updated.name
                     }
-                    try await self.waitForRemoteFileName(remoteID: remoteID, parentFolderID: parentFolderID, expectedName: item.filename)
-                    updated.name = item.filename
                     updated.metadataVersion = TrackedItem.fileMetadataVersion(
                             updatedOn: updated.contentVersion,
                             parentIdentifier: updated.parentIdentifier
@@ -549,11 +573,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     if oldParentID != newParentID {
                         try await self.waitForRemoteFileAbsent(remoteID: remoteID, parentFolderID: oldParentID)
                     }
-                    try await self.waitForRemoteFileName(
+                    let confirmed = try await self.waitForRemoteFileName(
                         remoteID: remoteID,
                         parentFolderID: newParentID,
                         expectedName: item.filename
                     )
+                    updated.name = confirmed.name
                     updated.parentIdentifier = item.parentItemIdentifier.rawValue
                     updated.metadataVersion = TrackedItem.fileMetadataVersion(
                         updatedOn: updated.contentVersion,
@@ -706,7 +731,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         data fileData: Data,
         parentFolderID: Int,
         fileTypeID: Int
-    ) async throws -> Int {
+    ) async throws -> RemoteFile {
         let uploadData = fileData.isEmpty ? Data([0]) : fileData
         let jobRequest = UploadJobRequest(
             folder_id: parentFolderID,
@@ -736,24 +761,39 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             throw ExtensionError.uploadJobMissingAssetID
         }
 
+        let confirmed: RemoteFile
         if fileData.isEmpty {
             do {
                 try await replaceFileContents(remoteID: assetID, name: name, data: fileData)
-                try await waitForRemoteFileSize(remoteID: assetID, parentFolderID: parentFolderID, expectedSize: fileData.count)
+                confirmed = try await waitForRemoteFileSize(
+                    remoteID: assetID,
+                    parentFolderID: parentFolderID,
+                    expectedSize: fileData.count,
+                    acceptExistingAsset: true
+                )
             } catch {
                 try? await api.delete("/files/\(assetID).json")
                 throw error
             }
         } else {
             do {
-                try await waitForRemoteFileSize(remoteID: assetID, parentFolderID: parentFolderID, expectedSize: fileData.count)
+                confirmed = try await waitForRemoteFileSize(
+                    remoteID: assetID,
+                    parentFolderID: parentFolderID,
+                    expectedSize: fileData.count,
+                    acceptExistingAsset: true
+                )
             } catch {
-                try? await api.delete("/files/\(assetID).json")
+                if let direct = try? await remoteFile(remoteID: assetID),
+                   remoteFileMatches(direct, parentFolderID: parentFolderID, expectedSize: fileData.count) {
+                    logger.warning("Uploaded file \(assetID, privacy: .public) was confirmed by direct file lookup after folder-listing confirmation lagged")
+                    return remoteFile(from: direct)
+                }
                 throw error
             }
         }
 
-        return assetID
+        return confirmed
     }
 
     private func deleteTrackedItem(itemID: ItemIdentifier, remoteID: Int, tracked: TrackedItem?) async throws {
@@ -880,12 +920,24 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         throw ExtensionError.remoteFolderNotConfirmed
     }
 
-    private func waitForRemoteFileSize(remoteID: Int, parentFolderID: Int, expectedSize: Int) async throws {
+    private func waitForRemoteFileSize(
+        remoteID: Int,
+        parentFolderID: Int,
+        expectedSize: Int,
+        acceptExistingAsset: Bool = false
+    ) async throws -> RemoteFile {
         let maxAttempts = 24
         for attempt in 1...maxAttempts {
             if let file = try await remoteFile(remoteID: remoteID, parentFolderID: parentFolderID),
                file.size == expectedSize {
-                return
+                return file
+            }
+
+            if acceptExistingAsset,
+               let detail = try? await remoteFile(remoteID: remoteID),
+               remoteFileMatches(detail, parentFolderID: parentFolderID, expectedSize: expectedSize) {
+                logger.debug("Remote file \(remoteID, privacy: .public) confirmed by direct file lookup before folder listing caught up")
+                return remoteFile(from: detail)
             }
 
             guard attempt < maxAttempts else { break }
@@ -896,12 +948,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         throw ExtensionError.remoteVersionNotConfirmed
     }
 
-    private func waitForRemoteFileName(remoteID: Int, parentFolderID: Int, expectedName: String) async throws {
+    private func waitForRemoteFileName(remoteID: Int, parentFolderID: Int, expectedName: String) async throws -> RemoteFile {
         let maxAttempts = 24
         for attempt in 1...maxAttempts {
             if let file = try await remoteFile(remoteID: remoteID, parentFolderID: parentFolderID),
                file.name == expectedName {
-                return
+                return file
+            }
+
+            if let detail = try? await remoteFile(remoteID: remoteID),
+               detail.folderIDs.contains(parentFolderID),
+               filenamesMatch(detail.name, expectedName) {
+                return remoteFile(from: detail)
             }
 
             guard attempt < maxAttempts else { break }
@@ -910,6 +968,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         }
 
         throw ExtensionError.remoteVersionNotConfirmed
+    }
+
+    private func filenamesMatch(_ lhs: String, _ rhs: String) -> Bool {
+        lhs == rhs || canonicalFilename(lhs) == canonicalFilename(rhs)
+    }
+
+    private func canonicalFilename(_ value: String) -> String {
+        value.lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: "---", with: "-")
+            .replacingOccurrences(of: "--", with: "-")
     }
 
     private func remoteFile(named name: String, parentFolderID: Int) async throws -> RemoteFile? {
@@ -926,6 +996,29 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             query: ["recursive": "false"]
         )
         return files.first { $0.id == remoteID && !$0.isDeleted }
+    }
+
+    private func remoteFile(remoteID: Int) async throws -> RemoteFileDetail {
+        try await api.get("/files/\(remoteID).json")
+    }
+
+    private func remoteFileMatches(_ detail: RemoteFileDetail, parentFolderID: Int, expectedSize: Int) -> Bool {
+        detail.size == expectedSize
+            && !detail.folderIDs.isEmpty
+            && detail.folderIDs.contains(parentFolderID)
+    }
+
+    private func remoteFile(from detail: RemoteFileDetail) -> RemoteFile {
+        RemoteFile(
+            id: detail.id,
+            name: detail.name,
+            size: detail.size,
+            updatedOn: detail.updatedOn,
+            contentType: detail.contentType,
+            fileTypeID: detail.fileTypeID,
+            folderIDs: detail.folderIDs,
+            isDeleted: false
+        )
     }
 
     private func remoteFolder(remoteID: Int, parentFolderID: Int) async throws -> RemoteFolder? {
@@ -972,7 +1065,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     ) async throws {
         let data = try await downloadRemoteFileData(remoteID: remoteID, name: oldName)
         try await replaceFileContents(remoteID: remoteID, name: newName, data: data)
-        try await waitForRemoteFileSize(remoteID: remoteID, parentFolderID: parentFolderID, expectedSize: data.count)
+        _ = try await waitForRemoteFileSize(
+            remoteID: remoteID,
+            parentFolderID: parentFolderID,
+            expectedSize: data.count,
+            acceptExistingAsset: true
+        )
     }
 
     private func downloadRemoteFileData(remoteID: Int, name: String) async throws -> Data {
@@ -1095,8 +1193,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         )
     }
 
-    private func beginOperation(phase: String, currentItem: String?) {
-        try? db.beginProgressOperation(phase: phase, currentItem: currentItem)
+    private func beginOperation(phase: String, currentItem: String?, expectedBytes: Int64 = 0) {
+        try? db.beginProgressOperation(
+            phase: phase,
+            currentItem: currentItem,
+            expectedBytes: expectedBytes
+        )
     }
 
     private func incrementProgress() {

@@ -321,4 +321,78 @@ struct SyncDatabaseTests {
         #expect(progress.completedSteps == operationCount)
         #expect(progress.currentItem == nil)
     }
+
+    @Test("Progress ETA appears after three completion samples")
+    func progressETAUsesCompletionSamples() throws {
+        let db = try makeDB()
+        let start = Date(timeIntervalSince1970: 1_777_800_000)
+
+        for index in 0..<6 {
+            try db.beginProgressOperation(
+                phase: "Uploading",
+                currentItem: "item-\(index).jpg",
+                now: start
+            )
+        }
+
+        try db.completeProgressOperation(now: start.addingTimeInterval(1))
+        try db.completeProgressOperation(now: start.addingTimeInterval(2))
+        try db.completeProgressOperation(now: start.addingTimeInterval(3))
+        try db.completeProgressOperation(now: start.addingTimeInterval(4))
+
+        let progress = try db.getProgress()
+        #expect(progress.completedSteps == 4)
+        #expect(progress.totalSteps == 6)
+        #expect(progress.etaSeconds != nil)
+        #expect((progress.etaSeconds ?? 0) > 0)
+    }
+
+    @Test("Throughput records smoothed bytes per second")
+    func throughputRecordsSmoothedBytesPerSecond() throws {
+        let db = try makeDB()
+        let start = Date(timeIntervalSince1970: 1_777_800_000)
+        try db.beginProgressOperation(
+            phase: "Uploading",
+            currentItem: "large.jpg",
+            expectedBytes: 1_000,
+            now: start
+        )
+
+        try db.recordTransferredBytes(500, now: start)
+        try db.recordTransferredBytes(500, now: start.addingTimeInterval(1))
+
+        let progress = try db.getProgress()
+        #expect(progress.completedBytes == 1_000)
+        #expect(progress.totalBytes == 1_000)
+        #expect(progress.smoothedBytesPerSecond > 0)
+    }
+
+    @Test("Rate-limit telemetry begin and end preserves counter")
+    func rateLimitTelemetry() throws {
+        let db = try makeDB()
+        let now = Date(timeIntervalSince1970: 1_777_800_000)
+        try db.beginRateLimitWait(until: now.addingTimeInterval(15), now: now)
+
+        var progress = try db.getProgress()
+        #expect(progress.rateLimitInFlight == 1)
+        #expect(progress.recentRateLimitCount == 1)
+        #expect(progress.rateLimitedUntil == now.addingTimeInterval(15))
+
+        try db.endRateLimitWait(now: now.addingTimeInterval(16))
+        progress = try db.getProgress()
+        #expect(progress.rateLimitInFlight == 0)
+        #expect(progress.rateLimitedUntil == nil)
+        #expect(progress.recentRateLimitCount == 1)
+    }
+
+    @Test("Unresolved failure count ignores later success for same item")
+    func unresolvedFailureCountIgnoresResolvedItems() throws {
+        let db = try makeDB()
+        try db.logActivity(action: .uploadFailed, itemName: "stuck.docx", itemType: .file, errorMessage: "timeout")
+        try db.logActivity(action: .uploadFailed, itemName: "healed.jpg", itemType: .file, errorMessage: "timeout")
+        try db.logActivity(action: .uploaded, itemName: "healed.jpg", itemType: .file)
+
+        #expect(try db.unresolvedFailureCount() == 1)
+        #expect(try db.recentUnresolvedFailures().map(\.itemName) == ["stuck.docx"])
+    }
 }

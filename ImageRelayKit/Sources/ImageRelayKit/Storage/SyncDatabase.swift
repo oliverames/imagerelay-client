@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import GRDB
 
 public final class SyncDatabase: Sendable {
@@ -323,39 +324,180 @@ public final class SyncDatabase: Sendable {
             progress.phase = phase
             progress.currentItem = currentItem
             if let lastError { progress.lastError = lastError }
+            if state == .idle {
+                Self.resetTransientProgressFields(&progress)
+            }
             try Self.saveProgress(progress, in: db)
         }
     }
 
-    public func beginProgressOperation(phase: String, currentItem: String?) throws {
+    public func beginProgressOperation(
+        phase: String,
+        currentItem: String?,
+        expectedBytes: Int64 = 0,
+        now: Date = Date()
+    ) throws {
         try writer.write { db in
             var progress = try Self.progress(in: db)
             if progress.state != .syncing {
                 progress.completedSteps = 0
                 progress.totalSteps = 0
+                progress.completedBytes = 0
+                progress.totalBytes = 0
+                progress.instantaneousBytesPerSecond = 0
+                progress.smoothedBytesPerSecond = 0
+                progress.lastByteSampleAt = nil
+                progress.lastIncrementAt = nil
+                progress.completionSampleCount = 0
+                progress.smoothedItemsPerSecond = nil
             }
             progress.state = .syncing
             progress.phase = phase
             progress.currentItem = currentItem
             progress.totalSteps += 1
+            progress.totalBytes += max(0, expectedBytes)
+            progress.fileProviderPID = getpid()
+            progress.fileProviderStartedAt = progress.fileProviderStartedAt ?? now
             try Self.saveProgress(progress, in: db)
         }
     }
 
-    public func completeProgressOperation() throws {
+    public func completeProgressOperation(now: Date = Date()) throws {
         try writer.write { db in
             var progress = try Self.progress(in: db)
             guard progress.totalSteps > 0 else { return }
             progress.completedSteps += 1
+            Self.updateItemETA(&progress, now: now)
             if progress.state == .syncing,
                progress.completedSteps >= progress.totalSteps {
                 progress.completedSteps = progress.totalSteps
                 progress.state = .idle
                 progress.phase = "Idle"
                 progress.currentItem = nil
-                progress.etaSeconds = nil
+                Self.resetTransientProgressFields(&progress)
             }
             try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func recordTransferredBytes(_ byteCount: Int64, now: Date = Date()) throws {
+        let byteCount = max(0, byteCount)
+        guard byteCount > 0 else { return }
+
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.completedBytes += byteCount
+            progress.lastSuccessfulAPIAt = now
+
+            if let lastSampleAt = progress.lastByteSampleAt {
+                let elapsed = max(now.timeIntervalSince(lastSampleAt), 0.001)
+                let instant = Int64(Double(byteCount) / elapsed)
+                progress.instantaneousBytesPerSecond = max(0, instant)
+                if progress.smoothedBytesPerSecond > 0 {
+                    progress.smoothedBytesPerSecond = Int64(
+                        (0.7 * Double(progress.smoothedBytesPerSecond)) + (0.3 * Double(instant))
+                    )
+                } else {
+                    progress.smoothedBytesPerSecond = max(0, instant)
+                }
+            }
+            progress.lastByteSampleAt = now
+
+            if progress.smoothedBytesPerSecond > 0,
+               progress.totalBytes > progress.completedBytes {
+                progress.etaSeconds = Int(ceil(Double(progress.totalBytes - progress.completedBytes) / Double(progress.smoothedBytesPerSecond)))
+            }
+
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func recordSuccessfulAPI(now: Date = Date()) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.lastSuccessfulAPIAt = now
+            if let until = progress.rateLimitedUntil, until <= now {
+                progress.rateLimitedUntil = nil
+                progress.rateLimitInFlight = 0
+            }
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func beginRateLimitWait(until: Date, now: Date = Date()) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.rateLimitedUntil = max(progress.rateLimitedUntil ?? until, until)
+            progress.rateLimitInFlight += 1
+            progress.recentRateLimitCount += 1
+            progress.updatedAt = now
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func endRateLimitWait(now: Date = Date()) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.rateLimitInFlight = max(0, progress.rateLimitInFlight - 1)
+            if progress.rateLimitInFlight == 0,
+               let rateLimitedUntil = progress.rateLimitedUntil,
+               rateLimitedUntil <= now {
+                progress.rateLimitedUntil = nil
+            }
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func unresolvedFailureCount() throws -> Int {
+        try writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: """
+                WITH latest AS (
+                    SELECT itemName, MAX(id) AS latestID
+                    FROM activity_log
+                    GROUP BY itemName
+                )
+                SELECT COUNT(*)
+                FROM activity_log
+                JOIN latest ON latest.latestID = activity_log.id
+                WHERE action IN (?, ?, ?, ?)
+                """,
+                arguments: [
+                    SyncAction.uploadFailed.rawValue,
+                    SyncAction.downloadFailed.rawValue,
+                    SyncAction.modifyFailed.rawValue,
+                    SyncAction.deleteFailed.rawValue,
+                ]
+            ) ?? 0
+        }
+    }
+
+    public func recentUnresolvedFailures(limit: Int = 50) throws -> [ActivityEntry] {
+        try writer.read { db in
+            try ActivityEntry.fetchAll(
+                db,
+                sql: """
+                WITH latest AS (
+                    SELECT itemName, MAX(id) AS latestID
+                    FROM activity_log
+                    GROUP BY itemName
+                )
+                SELECT activity_log.*
+                FROM activity_log
+                JOIN latest ON latest.latestID = activity_log.id
+                WHERE action IN (?, ?, ?, ?)
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                arguments: [
+                    SyncAction.uploadFailed.rawValue,
+                    SyncAction.downloadFailed.rawValue,
+                    SyncAction.modifyFailed.rawValue,
+                    SyncAction.deleteFailed.rawValue,
+                    limit,
+                ]
+            )
         }
     }
 
@@ -384,6 +526,42 @@ public final class SyncDatabase: Sendable {
             """,
             arguments: ["sync_progress", json]
         )
+    }
+
+    private static func updateItemETA(_ progress: inout SyncProgressState, now: Date) {
+        if let lastIncrementAt = progress.lastIncrementAt {
+            let elapsed = max(now.timeIntervalSince(lastIncrementAt), 0.001)
+            let instantRate = 1.0 / elapsed
+            if let smoothed = progress.smoothedItemsPerSecond {
+                progress.smoothedItemsPerSecond = (0.7 * smoothed) + (0.3 * instantRate)
+            } else {
+                progress.smoothedItemsPerSecond = instantRate
+            }
+            progress.completionSampleCount += 1
+        }
+
+        progress.lastIncrementAt = now
+
+        guard progress.completionSampleCount >= 3,
+              let rate = progress.smoothedItemsPerSecond,
+              rate > 0 else { return }
+        let remaining = max(0, progress.totalSteps - progress.completedSteps)
+        progress.etaSeconds = remaining > 0 ? Int(ceil(Double(remaining) / rate)) : nil
+    }
+
+    private static func resetTransientProgressFields(_ progress: inout SyncProgressState) {
+        progress.etaSeconds = nil
+        progress.currentItem = nil
+        progress.completedBytes = 0
+        progress.totalBytes = 0
+        progress.instantaneousBytesPerSecond = 0
+        progress.smoothedBytesPerSecond = 0
+        progress.lastByteSampleAt = nil
+        progress.lastIncrementAt = nil
+        progress.completionSampleCount = 0
+        progress.smoothedItemsPerSecond = nil
+        progress.rateLimitedUntil = nil
+        progress.rateLimitInFlight = 0
     }
 
     // MARK: - Metadata Cache

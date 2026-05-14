@@ -228,7 +228,7 @@ struct ExtensionServices: Sendable {
         ) else {
             logger.fault("App group container unavailable — extension will refuse all requests")
             return ExtensionServices(
-                api: APIClient(baseURL: AppConfiguration.default.baseURL, apiKey: "", userAgent: AppConfiguration.currentIOSUserAgent),
+                api: APIClient(baseURL: AppConfiguration.default.baseURL, credential: AppConfiguration.default.credential, userAgent: AppConfiguration.currentIOSUserAgent),
                 config: .default
             )
         }
@@ -237,7 +237,7 @@ struct ExtensionServices: Sendable {
         let userAgent = AppConfiguration.normalizedIOSUserAgent(config.userAgent)
         let api = APIClient(
             baseURL: config.baseURL,
-            apiKey: config.apiKey,
+            credential: config.credential,
             userAgent: userAgent
         )
         return ExtensionServices(api: api, config: config)

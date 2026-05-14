@@ -137,7 +137,7 @@ struct FoldersSettingsView: View {
     private func refreshRootFolders(config: AppConfiguration, db: SyncDatabase) async throws -> [TrackedItem] {
         let api = APIClient(
             baseURL: config.baseURL,
-            apiKey: config.apiKey,
+            credential: config.credential,
             userAgent: AppConfiguration.normalizedMacUserAgent(config.userAgent),
             // #16: host-app API clients share one 1 RPS lane so the FP extension can own the other 4.
             rateLimiter: .hostAppShared,
