@@ -372,7 +372,13 @@ struct MenuBarView: View {
     }()
 
     private func activityLabel(for entry: ActivityEntry) -> String {
-        "\(actionLabel(for: entry.action)): \(entry.itemName) • \(Self.timeFormatter.string(from: entry.timestamp))"
+        let base = "\(actionLabel(for: entry.action)): \(entry.itemName) • \(Self.timeFormatter.string(from: entry.timestamp))"
+        guard entry.action.isFailure,
+              let errorMessage = entry.errorMessage,
+              !errorMessage.isEmpty else {
+            return base
+        }
+        return "\(base) - \(errorMessage)"
     }
 
     private func actionLabel(for action: SyncAction) -> String {
@@ -385,6 +391,10 @@ struct MenuBarView: View {
         case .conflicted: return "Conflict"
         case .created: return "Created"
         case .discovered: return "Discovered"
+        case .uploadFailed: return "Upload Failed"
+        case .downloadFailed: return "Download Failed"
+        case .modifyFailed: return "Modify Failed"
+        case .deleteFailed: return "Delete Failed"
         }
     }
 
@@ -398,6 +408,8 @@ struct MenuBarView: View {
         case .conflicted: return "exclamationmark.triangle"
         case .created: return "plus.circle"
         case .discovered: return "sparkle.magnifyingglass"
+        case .uploadFailed, .downloadFailed, .modifyFailed, .deleteFailed:
+            return "exclamationmark.triangle.fill"
         }
     }
 }
