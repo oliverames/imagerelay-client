@@ -48,6 +48,39 @@ struct APIClientTests {
         )
     }
 
+    @Test("429 without Retry-After uses defensive cooldown")
+    func missingRetryAfterUsesDefensiveCooldown() {
+        let delay = APIClient.retryDelay(
+            attempt: 1,
+            after: APIError.rateLimited(retryAfter: nil),
+            maxRetryDelay: 30
+        )
+
+        #expect(delay == 15)
+    }
+
+    @Test("Retry-After delay is capped")
+    func retryAfterDelayIsCapped() {
+        let delay = APIClient.retryDelay(
+            attempt: 1,
+            after: APIError.rateLimited(retryAfter: 45),
+            maxRetryDelay: 30
+        )
+
+        #expect(delay == 30)
+    }
+
+    @Test("Non-rate-limit retries keep exponential backoff")
+    func nonRateLimitRetriesKeepExponentialBackoff() {
+        let delay = APIClient.retryDelay(
+            attempt: 3,
+            after: APIError.serverError(statusCode: 503, message: nil),
+            maxRetryDelay: 30
+        )
+
+        #expect(delay == 4)
+    }
+
     @Test("GET request includes auth and user-agent headers")
     func requestHeaders() async throws {
         MockURLProtocol.requestHandler = { request in
