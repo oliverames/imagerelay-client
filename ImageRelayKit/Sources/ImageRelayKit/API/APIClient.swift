@@ -9,6 +9,7 @@ public actor APIClient {
     private let userAgent: String
     private let session: URLSession
     private let rateLimiter: RateLimiter
+    private let throttleStateStore: ThrottleStateStore?
     private let maxRetries: Int
     private let maxRetryDelay: TimeInterval
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "APIClient")
@@ -19,6 +20,7 @@ public actor APIClient {
         userAgent: String = AppConfiguration.currentServiceUserAgent,
         sessionConfiguration: URLSessionConfiguration = .default,
         rateLimiter: RateLimiter = RateLimiter(),
+        throttleStateStore: ThrottleStateStore? = nil,
         maxRetries: Int = 3,
         maxRetryDelay: TimeInterval = 30
     ) {
@@ -33,6 +35,7 @@ public actor APIClient {
         sessionConfiguration.urlCache = nil
         self.session = URLSession(configuration: sessionConfiguration)
         self.rateLimiter = rateLimiter
+        self.throttleStateStore = throttleStateStore
         self.maxRetries = maxRetries
         self.maxRetryDelay = maxRetryDelay
     }
@@ -281,6 +284,7 @@ public actor APIClient {
 
             do {
                 try checkStatus(httpResponse, data: data)
+                throttleStateStore?.recordSuccess()
                 return (data, httpResponse)
             } catch let error as APIError where error.isRetryable && attempt < maxRetries {
                 logger.warning("\(method) \(path) retryable error: \(error.userMessage)")
@@ -295,16 +299,26 @@ public actor APIClient {
     static func retryDelay(
         attempt: Int,
         after lastError: (any Error)?,
-        maxRetryDelay: TimeInterval
+        maxRetryDelay: TimeInterval,
+        jitterMultiplier: Double = Double.random(in: 0.5...1.5)
     ) -> TimeInterval {
+        let baseDelay: TimeInterval
         if case .rateLimited(let retryAfter) = lastError as? APIError {
             if let seconds = retryAfter {
-                return min(seconds, maxRetryDelay)
+                baseDelay = min(seconds, maxRetryDelay)
+                return jitteredDelay(baseDelay, multiplier: jitterMultiplier)
+            } else {
+                baseDelay = min(Self.missingRetryAfterFallbackDelay, maxRetryDelay)
+                return max(Self.missingRetryAfterFallbackDelay, jitteredDelay(baseDelay, multiplier: jitterMultiplier))
             }
-            return min(Self.missingRetryAfterFallbackDelay, maxRetryDelay)
         }
 
-        return min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
+        baseDelay = min(pow(2.0, Double(attempt - 1)), maxRetryDelay)
+        return jitteredDelay(baseDelay, multiplier: jitterMultiplier)
+    }
+
+    public static func jitteredDelay(_ delay: TimeInterval, multiplier: Double) -> TimeInterval {
+        delay * multiplier
     }
 
     private func decodePage<T: Decodable>(
@@ -413,6 +427,7 @@ public actor APIClient {
             throw APIError.notFound(resource: "resource")
         case 429:
             let retryAfter = Self.parseRetryAfter(response.value(forHTTPHeaderField: "Retry-After"))
+            throttleStateStore?.recordRateLimit()
             throw APIError.rateLimited(retryAfter: retryAfter)
         default:
             let message = data.flatMap { String(data: $0, encoding: .utf8) }

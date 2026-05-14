@@ -53,7 +53,8 @@ struct APIClientTests {
         let delay = APIClient.retryDelay(
             attempt: 1,
             after: APIError.rateLimited(retryAfter: nil),
-            maxRetryDelay: 30
+            maxRetryDelay: 30,
+            jitterMultiplier: 0.5
         )
 
         #expect(delay == 15)
@@ -64,7 +65,8 @@ struct APIClientTests {
         let delay = APIClient.retryDelay(
             attempt: 1,
             after: APIError.rateLimited(retryAfter: 45),
-            maxRetryDelay: 30
+            maxRetryDelay: 30,
+            jitterMultiplier: 1
         )
 
         #expect(delay == 30)
@@ -75,10 +77,17 @@ struct APIClientTests {
         let delay = APIClient.retryDelay(
             attempt: 3,
             after: APIError.serverError(statusCode: 503, message: nil),
-            maxRetryDelay: 30
+            maxRetryDelay: 30,
+            jitterMultiplier: 1
         )
 
         #expect(delay == 4)
+    }
+
+    @Test("Retry jitter multiplier range is applied directly")
+    func retryJitterMultiplierRange() {
+        #expect(APIClient.jitteredDelay(10, multiplier: 0.5) == 5)
+        #expect(APIClient.jitteredDelay(10, multiplier: 1.5) == 15)
     }
 
     @Test("GET request includes auth and user-agent headers")

@@ -35,6 +35,7 @@ public struct AppConfiguration: Codable, Sendable {
     public var syncUpload: Bool
     public var syncDownload: Bool
     public var userAgent: String
+    public var maxConcurrentFiles: Int
     /// Folder remote IDs to include in sync. Empty means all folders sync.
     public var selectedFolderIDs: [Int]
 
@@ -46,6 +47,7 @@ public struct AppConfiguration: Codable, Sendable {
         case syncUpload = "sync_upload"
         case syncDownload = "sync_download"
         case userAgent = "user_agent"
+        case maxConcurrentFiles = "max_concurrent_files"
         case selectedFolderIDs = "selected_folder_ids"
     }
 
@@ -57,6 +59,7 @@ public struct AppConfiguration: Codable, Sendable {
         syncUpload: Bool,
         syncDownload: Bool,
         userAgent: String,
+        maxConcurrentFiles: Int = 10,
         selectedFolderIDs: [Int] = []
     ) {
         self.apiKey = apiKey
@@ -66,6 +69,7 @@ public struct AppConfiguration: Codable, Sendable {
         self.syncUpload = syncUpload
         self.syncDownload = syncDownload
         self.userAgent = userAgent
+        self.maxConcurrentFiles = max(1, maxConcurrentFiles)
         self.selectedFolderIDs = selectedFolderIDs
     }
 
@@ -80,6 +84,7 @@ public struct AppConfiguration: Codable, Sendable {
         syncDownload = try c.decodeIfPresent(Bool.self, forKey: .syncDownload) ?? true
         let decodedUserAgent = try c.decodeIfPresent(String.self, forKey: .userAgent) ?? Self.currentMacUserAgent
         userAgent = Self.normalizedMacUserAgent(decodedUserAgent)
+        maxConcurrentFiles = max(1, try c.decodeIfPresent(Int.self, forKey: .maxConcurrentFiles) ?? 10)
         selectedFolderIDs = try c.decodeIfPresent([Int].self, forKey: .selectedFolderIDs) ?? []
     }
 
@@ -99,6 +104,7 @@ public struct AppConfiguration: Codable, Sendable {
         syncUpload: true,
         syncDownload: true,
         userAgent: currentMacUserAgent,
+        maxConcurrentFiles: 10,
         selectedFolderIDs: []
     )
 
@@ -176,6 +182,14 @@ public struct AppConfiguration: Codable, Sendable {
 
     public static func fileURL(in container: URL) -> URL {
         container.appendingPathComponent("config.json")
+    }
+
+    public static func throttleStateStore(in container: URL) -> ThrottleStateStore {
+        ThrottleStateStore(url: ThrottleStateStore.fileURL(in: container))
+    }
+
+    public static func sharedThrottleStateStore() -> ThrottleStateStore? {
+        containerURL().map { throttleStateStore(in: $0) }
     }
 
     // MARK: - App Group
