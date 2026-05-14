@@ -1,10 +1,17 @@
+import AppKit
 import SwiftUI
 import ServiceManagement
 import ImageRelayKit
 
 struct GeneralSettingsView: View {
     @Environment(DomainManager.self) private var domainManager
+    @State private var authMethod: AuthMethod = .apiKey
     @State private var apiKey = ""
+    @State private var oauthTenant = ""
+    @State private var oauthClientID = ""
+    @State private var oauthClientSecret = ""
+    @State private var oauthRedirectURI = "imagerelay-client://oauth/callback"
+    @State private var oauthStatus: String?
     @State private var remoteRootFolderID = ""
     @State private var defaultFileTypeID = ""
     @State private var launchAtLogin = false
@@ -34,7 +41,16 @@ struct GeneralSettingsView: View {
     }
 
     private var uploadNeedsDefaultFileType: Bool {
-        syncUpload && !apiKey.isEmpty && defaultFileTypeID.isEmpty
+        syncUpload && credentialsPresent && defaultFileTypeID.isEmpty
+    }
+
+    private var credentialsPresent: Bool {
+        switch authMethod {
+        case .apiKey:
+            return !apiKey.isEmpty
+        case .oauth:
+            return !oauthTenant.isEmpty && !oauthClientID.isEmpty
+        }
     }
 
     var body: some View {
@@ -63,8 +79,34 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                SecureField("API Key", text: $apiKey)
-                    .textContentType(.password)
+                Picker("Authorization", selection: $authMethod) {
+                    Text("API Key").tag(AuthMethod.apiKey)
+                    Text("OAuth").tag(AuthMethod.oauth)
+                }
+                .pickerStyle(.segmented)
+
+                if authMethod == .apiKey {
+                    SecureField("API Key", text: $apiKey)
+                        .textContentType(.password)
+                } else {
+                    TextField("Tenant Subdomain", text: $oauthTenant)
+                    TextField("Client ID", text: $oauthClientID)
+                    SecureField("Client Secret", text: $oauthClientSecret)
+                    TextField("Redirect URI", text: $oauthRedirectURI)
+
+                    Button {
+                        startOAuth()
+                    } label: {
+                        Label("Connect with OAuth", systemImage: "person.badge.key")
+                    }
+                    .disabled(oauthTenant.isEmpty || oauthClientID.isEmpty || oauthClientSecret.isEmpty || oauthRedirectURI.isEmpty)
+
+                    if let oauthStatus {
+                        Text(oauthStatus)
+                            .font(.caption)
+                            .foregroundStyle(oauthStatus.hasPrefix("Opened") ? Color.secondary : Color.orange)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     TextField("Root Folder ID", text: $remoteRootFolderID)
@@ -95,6 +137,7 @@ struct GeneralSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
+                    Text("OAuth support is included for beta testing with a registered Image Relay Developer app. Image Relay currently documents a client-secret token exchange, so do not ship a public client secret.")
                     Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
                     Text("Default File Type ID is required for uploading new files.")
                     if uploadNeedsDefaultFileType {
@@ -132,7 +175,12 @@ struct GeneralSettingsView: View {
         }
         containerAvailable = true
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        authMethod = config.authMethod
         apiKey = config.apiKey
+        oauthTenant = config.oauthTenant
+        oauthClientID = config.oauthClientID
+        oauthClientSecret = config.oauthClientSecret
+        oauthRedirectURI = config.oauthRedirectURI
         remoteRootFolderID = config.remoteRootFolderID.map(String.init) ?? (config.apiKey.isEmpty ? "" : "root")
         defaultFileTypeID = config.defaultFileTypeID.map(String.init) ?? ""
         syncUpload = config.syncUpload
@@ -142,7 +190,12 @@ struct GeneralSettingsView: View {
     private func saveConfig() {
         guard let container, !hasValidationError else { return }
         var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        config.authMethod = authMethod
         config.apiKey = apiKey
+        config.oauthTenant = oauthTenant
+        config.oauthClientID = oauthClientID
+        config.oauthClientSecret = oauthClientSecret
+        config.oauthRedirectURI = oauthRedirectURI
         let trimmedRoot = remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedRoot.isEmpty || trimmedRoot.caseInsensitiveCompare("root") == .orderedSame {
             config.remoteRootFolderID = nil
@@ -171,6 +224,39 @@ struct GeneralSettingsView: View {
             }
         } catch {
             saveError = error.localizedDescription
+        }
+    }
+
+    private func startOAuth() {
+        guard let container else { return }
+        var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        config.authMethod = .oauth
+        config.oauthTenant = oauthTenant
+        config.oauthClientID = oauthClientID
+        config.oauthClientSecret = oauthClientSecret
+        config.oauthRedirectURI = oauthRedirectURI
+        config.oauthCodeVerifier = OAuthFlow.makeCodeVerifier()
+        config.oauthState = UUID().uuidString
+
+        guard let verifier = config.oauthCodeVerifier,
+              let state = config.oauthState,
+              let url = OAuthFlow.authorizationURL(
+                tenant: config.oauthTenant,
+                clientID: config.oauthClientID,
+                redirectURI: config.oauthRedirectURI,
+                state: state,
+                codeChallenge: OAuthFlow.codeChallenge(for: verifier)
+              ) else {
+            oauthStatus = "Could not create the OAuth authorization URL."
+            return
+        }
+
+        do {
+            try config.save(to: AppConfiguration.fileURL(in: container))
+            oauthStatus = "Opened Image Relay authorization in your browser."
+            NSWorkspace.shared.open(url)
+        } catch {
+            oauthStatus = error.localizedDescription
         }
     }
 }

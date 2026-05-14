@@ -20,6 +20,10 @@ final class DomainManager {
     var pauseState: SyncPauseState = .default
     var syncUploadEnabled = true
     var syncDownloadEnabled = true
+    var showAdvancedInformation = false
+    var syncDisconnected = false
+    var failedUploadCount = 0
+    var lastRetryMessage: String?
     var recentActivity: [ActivityEntry] = []
     private var db: SyncDatabase?
     private var remotePollingTask: Task<Void, Never>?
@@ -79,10 +83,13 @@ final class DomainManager {
         let config = loadConfiguration()
         syncUploadEnabled = config.syncUpload
         syncDownloadEnabled = config.syncDownload
+        showAdvancedInformation = config.showAdvancedInformation
+        syncDisconnected = config.fileProviderDisconnected
 
         guard let db = ensureDatabase() else { return }
         syncProgress = (try? db.getProgress()) ?? .idle
         pauseState = (try? db.getPauseState()) ?? .default
+        failedUploadCount = (try? db.unresolvedFailureCount()) ?? 0
         recentActivity = (try? db.recentActivity(limit: 5)) ?? []
     }
 
@@ -188,6 +195,11 @@ final class DomainManager {
         let config = loadConfiguration()
         refreshStatus()
 
+        guard !config.fileProviderDisconnected else {
+            logger.info("Sync signal skipped because sync is disconnected")
+            return
+        }
+
         guard isDomainActive else {
             logger.info("Sync signal skipped because the File Provider domain is inactive")
             return
@@ -283,6 +295,7 @@ final class DomainManager {
             refreshStatus()
             let config = loadConfiguration()
             guard isDomainActive, config.syncDownload, !pauseState.isActive else { continue }
+            guard !config.fileProviderDisconnected else { continue }
 
             do {
                 try await signalEnumerators(config: config)
@@ -341,6 +354,201 @@ final class DomainManager {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             } catch {
                 logger.error("Failed to open in Finder: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func stopSyncCompletely() async {
+        guard let manager = NSFileProviderManager(for: domain) else {
+            lastError = "File Provider manager is unavailable."
+            return
+        }
+
+        do {
+            try await manager.disconnect(reason: "Stopped by user from Image Relay", options: .temporary)
+            remotePollingTask?.cancel()
+            remotePollingTask = nil
+            updateConfiguration { config in
+                config.fileProviderDisconnected = true
+            }
+            syncDisconnected = true
+            lastError = nil
+            refreshStatus()
+        } catch {
+            lastError = error.localizedDescription
+            logger.error("Failed to disconnect File Provider domain: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func reconnectSync() async {
+        guard let manager = NSFileProviderManager(for: domain) else {
+            lastError = "File Provider manager is unavailable."
+            return
+        }
+
+        do {
+            try await manager.reconnect()
+            updateConfiguration { config in
+                config.fileProviderDisconnected = false
+            }
+            syncDisconnected = false
+            lastError = nil
+            startRemotePolling()
+            await signalSync()
+            refreshStatus()
+        } catch {
+            lastError = error.localizedDescription
+            logger.error("Failed to reconnect File Provider domain: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func retryFailedUploads() async {
+        guard failedUploadCount > 0 else { return }
+        guard let manager = NSFileProviderManager(for: domain) else {
+            lastRetryMessage = "File Provider manager is unavailable."
+            return
+        }
+
+        do {
+            let retryableErrors = [
+                NSFileProviderError(.serverUnreachable) as NSError,
+                NSFileProviderError(.cannotSynchronize) as NSError
+            ]
+            for error in retryableErrors {
+                try await manager.signalErrorResolved(error)
+            }
+            try await manager.signalEnumerator(for: .workingSet)
+            try await manager.signalEnumerator(for: .rootContainer)
+            await signalSync()
+            lastRetryMessage = "Retry requested for \(failedUploadCount) failed item\(failedUploadCount == 1 ? "" : "s")."
+            refreshStatus()
+        } catch {
+            lastRetryMessage = error.localizedDescription
+            logger.error("Failed to retry failed uploads: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func diagnosticsSnapshot() -> String {
+        refreshStatus()
+        let progress = syncProgress
+        let throttleState = AppConfiguration.sharedThrottleStateStore()?.load()
+        return """
+        Image Relay Diagnostics Snapshot
+        Domain active: \(isDomainActive)
+        Sync disconnected: \(syncDisconnected)
+        Upload enabled: \(syncUploadEnabled)
+        Download enabled: \(syncDownloadEnabled)
+        Pause: \(pauseState.isActive ? pauseState.description : "not paused")
+        Progress: \(progress.phase) \(progress.completedSteps)/\(progress.totalSteps)
+        Failed items needing attention: \(failedUploadCount)
+        Throughput: \(progress.smoothedBytesPerSecond) bytes/sec
+        ETA seconds: \(progress.etaSeconds.map(String.init) ?? "unknown")
+        Rate limited until: \(progress.rateLimitedUntil?.description ?? "not rate-limited")
+        Rate-limit waits in flight: \(progress.rateLimitInFlight)
+        Recent 429 count: \(progress.recentRateLimitCount)
+        Persisted throttle failures: \(throttleState?.consecutiveFailures ?? 0)
+        Last successful API: \(progress.lastSuccessfulAPIAt?.description ?? "unknown")
+        Last remote poll: \(progress.lastRemotePollAt?.description ?? "never")
+        Next remote poll: \(progress.nextRemotePollAt?.description ?? "unknown")
+        File Provider PID: \(progress.fileProviderPID.map(String.init) ?? "unknown")
+        """
+    }
+
+    func completeOAuthCallback(_ url: URL) async {
+        let callback = OAuthFlow.parseCallback(url)
+        if let error = callback.error {
+            lastError = "OAuth failed: \(error)"
+            return
+        }
+
+        guard let code = callback.code else {
+            lastError = "OAuth callback did not include an authorization code."
+            return
+        }
+
+        guard let container = AppConfiguration.containerURL() else {
+            lastError = "App Group container is unavailable."
+            return
+        }
+
+        let configURL = AppConfiguration.fileURL(in: container)
+        var config = (try? AppConfiguration.load(from: configURL)) ?? .default
+        guard callback.state == config.oauthState else {
+            lastError = "OAuth callback state did not match the pending login."
+            return
+        }
+        guard !config.oauthTenant.isEmpty,
+              !config.oauthClientID.isEmpty,
+              !config.oauthClientSecret.isEmpty,
+              let verifier = config.oauthCodeVerifier else {
+            lastError = "OAuth settings are incomplete."
+            return
+        }
+
+        do {
+            let client = OAuthClient(tenant: config.oauthTenant)
+            let tokens = try await client.exchangeCode(
+                code: code,
+                clientID: config.oauthClientID,
+                clientSecret: config.oauthClientSecret,
+                redirectURI: config.oauthRedirectURI,
+                codeVerifier: verifier
+            )
+            config.authMethod = .oauth
+            config.oauthTokens = tokens
+            config.oauthCodeVerifier = nil
+            config.oauthState = nil
+            try config.save(to: configURL)
+            lastError = nil
+            await bootstrap()
+        } catch {
+            lastError = error.localizedDescription
+            logger.error("OAuth token exchange failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func updateConfiguration(_ mutate: (inout AppConfiguration) -> Void) {
+        guard let container = AppConfiguration.containerURL() else { return }
+        let url = AppConfiguration.fileURL(in: container)
+        var config = (try? AppConfiguration.load(from: url)) ?? .default
+        mutate(&config)
+        try? config.save(to: url)
+    }
+}
+
+extension NSFileProviderManager {
+    func disconnect(reason: String, options: NSFileProviderManager.DisconnectionOptions) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            disconnect(reason: reason, options: options) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    func reconnect() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            reconnect { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    func signalErrorResolved(_ error: NSError) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            signalErrorResolved(error) { resolvedError in
+                if let resolvedError {
+                    continuation.resume(throwing: resolvedError)
+                } else {
+                    continuation.resume()
+                }
             }
         }
     }

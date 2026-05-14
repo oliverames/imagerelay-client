@@ -7,6 +7,7 @@ struct AdvancedSettingsView: View {
     @State private var pollInterval: Double = 60
     @State private var syncUpload = true
     @State private var syncDownload = true
+    @State private var showAdvancedInformation = false
     @State private var userAgent = ""
     @State private var saveError: String?
     @State private var isResettingDomain = false
@@ -28,6 +29,7 @@ struct AdvancedSettingsView: View {
 
                 Toggle("Upload Changes", isOn: $syncUpload)
                 Toggle("Download Changes", isOn: $syncDownload)
+                Toggle("Show Advanced Information Always", isOn: $showAdvancedInformation)
             } header: {
                 Text("Sync")
             } footer: {
@@ -107,6 +109,7 @@ struct AdvancedSettingsView: View {
         pollInterval = Double(config.pollIntervalSeconds)
         syncUpload = config.syncUpload
         syncDownload = config.syncDownload
+        showAdvancedInformation = config.showAdvancedInformation
         userAgent = config.userAgent
     }
 
@@ -116,6 +119,7 @@ struct AdvancedSettingsView: View {
         config.pollIntervalSeconds = Int(pollInterval)
         config.syncUpload = syncUpload
         config.syncDownload = syncDownload
+        config.showAdvancedInformation = showAdvancedInformation
         config.userAgent = userAgent
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
