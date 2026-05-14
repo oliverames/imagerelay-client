@@ -249,4 +249,41 @@ struct SyncDatabaseTests {
         #expect(progress.lastRemotePollAt == now)
         #expect(progress.nextRemotePollAt == now.addingTimeInterval(60))
     }
+
+    @Test("Concurrent progress writes preserve all operation counters")
+    func concurrentProgressWritesPreserveCounters() async throws {
+        let db = try makeDB()
+        let operationCount = 20
+
+        await withTaskGroup(of: Void.self) { group in
+            for index in 0..<operationCount {
+                group.addTask {
+                    try? db.beginProgressOperation(
+                        phase: "Uploading",
+                        currentItem: "item-\(index).jpg"
+                    )
+                }
+            }
+        }
+
+        var progress = try db.getProgress()
+        #expect(progress.state == .syncing)
+        #expect(progress.totalSteps == operationCount)
+        #expect(progress.completedSteps == 0)
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<operationCount {
+                group.addTask {
+                    try? db.completeProgressOperation()
+                }
+            }
+        }
+
+        progress = try db.getProgress()
+        #expect(progress.state == .idle)
+        #expect(progress.phase == "Idle")
+        #expect(progress.totalSteps == operationCount)
+        #expect(progress.completedSteps == operationCount)
+        #expect(progress.currentItem == nil)
+    }
 }
