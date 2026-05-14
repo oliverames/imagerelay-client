@@ -164,9 +164,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                self.beginOperation()
+                self.beginOperation(phase: "Downloading", currentItem: tracked.name)
                 defer { self.incrementProgress() }
-                self.updateProgress(state: .syncing, phase: "Downloading", currentItem: tracked.name)
 
                 let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
                 let quickLink: QuickLink = try await api.post(
@@ -187,7 +186,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 progress.completedUnitCount = 100
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
-                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 let item = FileProviderItem(trackedItem: tracked)
                 handler.value(tempFile, item, nil)
@@ -245,9 +243,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 let parentFolderID = try await self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
-                self.beginOperation()
+                self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename)
                 defer { self.incrementProgress() }
-                self.updateProgress(state: .syncing, phase: "Uploading", currentItem: itemTemplate.filename)
 
                 if itemTemplate.contentType == .folder {
                     let createRequest = CreateFolderRequest(name: itemTemplate.filename)
@@ -280,7 +277,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
-                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
                     handler.value(item, [], false, nil)
@@ -331,7 +327,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: itemTemplate.filename, itemType: .file)
-                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                     let item = FileProviderItem(trackedItem: tracked)
                     handler.value(item, [], false, nil)
@@ -395,7 +390,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                self.beginOperation()
+                self.beginOperation(phase: "Modifying", currentItem: tracked.name)
                 defer { self.incrementProgress() }
                 var updated = tracked
 
@@ -406,7 +401,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         remoteID: remoteID,
                         tracked: tracked
                     )
-                    self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                     handler.value(nil, [], false, nil)
                     self.signalLocalMutation(
                         affectedContainerIdentifiers: [NSFileProviderItemIdentifier(tracked.parentIdentifier)],
@@ -440,7 +434,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         )
 
                         // Tell the OS to re-fetch the remote canonical version.
-                        self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                         handler.value(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
                         self.signalLocalMutation(
                             affectedContainerIdentifiers: [item.parentItemIdentifier],
@@ -551,7 +544,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 try db.upsertItem(updated)
-                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
                 let resultItem = FileProviderItem(trackedItem: updated)
                 handler.value(resultItem, [], false, nil)
                 if mutatesRemote {
@@ -609,12 +601,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     return
                 }
 
-                self.beginOperation()
+                self.beginOperation(phase: "Deleting", currentItem: tracked?.name)
                 defer { self.incrementProgress() }
-                self.updateProgress(state: .syncing, phase: "Deleting", currentItem: tracked?.name)
 
                 try await self.deleteTrackedItem(itemID: itemID, remoteID: remoteID, tracked: tracked)
-                self.updateProgress(state: .idle, phase: "Idle", currentItem: nil)
 
                 handler.value(nil)
                 self.signalLocalMutation(
@@ -1059,30 +1049,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         currentItem: String?,
         lastError: String? = nil
     ) {
-        var progress = (try? db.getProgress()) ?? .idle
-        progress.state = state
-        progress.phase = phase
-        progress.currentItem = currentItem
-        if let lastError { progress.lastError = lastError }
-        try? db.setProgress(progress)
+        try? db.updateProgress(
+            state: state,
+            phase: phase,
+            currentItem: currentItem,
+            lastError: lastError
+        )
     }
 
-    /// Marks the start of a new operation. Resets counters if transitioning from idle.
-    private func beginOperation() {
-        var progress = (try? db.getProgress()) ?? .idle
-        if progress.state != .syncing {
-            progress.completedSteps = 0
-            progress.totalSteps = 0
-        }
-        progress.state = .syncing
-        progress.totalSteps += 1
-        try? db.setProgress(progress)
+    private func beginOperation(phase: String, currentItem: String?) {
+        try? db.beginProgressOperation(phase: phase, currentItem: currentItem)
     }
 
     private func incrementProgress() {
-        var progress = (try? db.getProgress()) ?? .idle
-        progress.completedSteps += 1
-        try? db.setProgress(progress)
+        try? db.completeProgressOperation()
     }
 
 }
