@@ -60,7 +60,10 @@ final class UploadLinksService {
         return APIClient(
             baseURL: config.baseURL,
             apiKey: config.apiKey,
-            userAgent: AppConfiguration.currentServiceUserAgent
+            userAgent: AppConfiguration.currentServiceUserAgent,
+            // #16: host-app API clients share one 1 RPS lane so the FP extension can own the other 4.
+            rateLimiter: .hostAppShared,
+            throttleStateStore: AppConfiguration.sharedThrottleStateStore()
         )
     }
 

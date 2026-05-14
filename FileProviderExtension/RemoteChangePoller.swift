@@ -7,17 +7,25 @@ actor RemoteChangePoller {
     private let domain: NSFileProviderDomain
     private let config: AppConfiguration
     private let db: SyncDatabase?
+    private let throttleStateStore: ThrottleStateStore?
     private var pollingTask: Task<Void, Never>?
 
     // After this many consecutive signal failures, the error is written to SyncProgressState
     // so the menu bar UI can surface it to the user.
     private static let failureThreshold = 3
+    static let maxBackoffInterval: TimeInterval = 10 * 60
     private var consecutiveFailures = 0
 
-    init(domain: NSFileProviderDomain, config: AppConfiguration, db: SyncDatabase? = nil) {
+    init(
+        domain: NSFileProviderDomain,
+        config: AppConfiguration,
+        db: SyncDatabase? = nil,
+        throttleStateStore: ThrottleStateStore? = nil
+    ) {
         self.domain = domain
         self.config = config
         self.db = db
+        self.throttleStateStore = throttleStateStore
     }
 
     func start() {
@@ -37,8 +45,12 @@ actor RemoteChangePoller {
 
     private func pollLoop() async {
         while !Task.isCancelled {
+            let sleepInterval = Self.pollDelay(
+                baseIntervalSeconds: config.pollIntervalSeconds,
+                consecutiveFailures: effectiveConsecutiveFailures()
+            )
             do {
-                try await Task.sleep(for: .seconds(config.pollIntervalSeconds))
+                try await Task.sleep(for: .seconds(sleepInterval))
             } catch {
                 break
             }
@@ -93,6 +105,22 @@ actor RemoteChangePoller {
                 }
             }
         }
+    }
+
+    static func pollDelay(
+        baseIntervalSeconds: Int,
+        consecutiveFailures: Int,
+        jitterMultiplier: Double = Double.random(in: 0.5...1.5)
+    ) -> TimeInterval {
+        let baseInterval = TimeInterval(max(1, baseIntervalSeconds))
+        let exponent = min(max(0, consecutiveFailures), 10)
+        let rawBackoff = baseInterval * pow(2.0, Double(exponent))
+        let cappedBackoff = min(rawBackoff, maxBackoffInterval)
+        return min(APIClient.jitteredDelay(cappedBackoff, multiplier: jitterMultiplier), maxBackoffInterval)
+    }
+
+    private func effectiveConsecutiveFailures() -> Int {
+        max(consecutiveFailures, throttleStateStore?.load().consecutiveFailures ?? 0)
     }
 
     private func folderIDsToSignal() -> [Int] {
