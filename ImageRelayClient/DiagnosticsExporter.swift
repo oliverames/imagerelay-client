@@ -2,6 +2,7 @@ import AppKit
 @preconcurrency import FileProvider
 import Foundation
 import ImageRelayKit
+import OSLog
 
 enum DiagnosticsExporter {
     static func defaultCommandLineDestination() throws -> URL {
@@ -24,7 +25,7 @@ enum DiagnosticsExporter {
         try writeDatabaseState(to: exportDirectory, container: container)
         try writeDomainStatus(to: exportDirectory, domainManager: domainManager)
         try writeCrashReportSummary(to: exportDirectory)
-        try await writeRecentLogs(to: exportDirectory)
+        try writeRecentLogs(to: exportDirectory)
 
         return exportDirectory
     }
@@ -111,8 +112,8 @@ enum DiagnosticsExporter {
         try writeJSON(status, to: directory.appendingPathComponent("domain-status.json"))
     }
 
-    private static func writeRecentLogs(to directory: URL) async throws {
-        let result = await runLogShow()
+    private static func writeRecentLogs(to directory: URL) throws {
+        let result = collectRecentLogs()
         try writeText(result, to: directory.appendingPathComponent("logs.txt"))
     }
 
@@ -129,10 +130,16 @@ enum DiagnosticsExporter {
                 options: [.skipsHiddenFiles]
             )
 
+            let cutoffDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? .distantPast
             let candidates = urls
                 .filter { url in
                     let name = url.lastPathComponent
-                    return nameFragments.contains { name.localizedCaseInsensitiveContains($0) }
+                    guard nameFragments.contains(where: { name.localizedCaseInsensitiveContains($0) }) else {
+                        return false
+                    }
+                    let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                        ?? .distantPast
+                    return date >= cutoffDate
                 }
                 .sorted { lhs, rhs in
                     let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
@@ -142,7 +149,7 @@ enum DiagnosticsExporter {
                 .prefix(10)
 
             guard !candidates.isEmpty else {
-                try writeText("No Image Relay crash reports found.\n", to: outputURL)
+                try writeText("No crash reports found in the last 30 days.\n", to: outputURL)
                 return
             }
 
@@ -157,52 +164,46 @@ enum DiagnosticsExporter {
             lines.append("")
             try writeText(lines.joined(separator: "\n"), to: outputURL)
         } catch {
-            try writeText(
-                "Unable to read crash reports at \(diagnosticReportsURL.path): \(error.localizedDescription)\n",
-                to: outputURL
-            )
+            try writeText("No crash reports found in the last 30 days.\n", to: outputURL)
         }
     }
 
-    private static func runLogShow() async -> String {
-        await Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-            process.arguments = [
-                "show",
-                "--last", "1h",
-                "--style", "compact",
-                "--predicate", "subsystem BEGINSWITH \"com.oliverames.imagerelay-client\""
-            ]
+    private static func collectRecentLogs() -> String {
+        let sections = [
+            collectRecentLogs(scope: .currentProcessIdentifier, title: "Current process logs"),
+            collectRecentLogs(scope: .system, title: "System Image Relay logs")
+        ]
+        return sections.joined(separator: "\n\n")
+    }
 
-            let output = Pipe()
-            let error = Pipe()
-            process.standardOutput = output
-            process.standardError = error
+    private static func collectRecentLogs(scope: OSLogStore.Scope, title: String) -> String {
+        do {
+            let store = try OSLogStore(scope: scope)
+            let start = store.position(date: Date().addingTimeInterval(-3600))
+            let predicate = NSPredicate(
+                format: "subsystem BEGINSWITH %@",
+                "com.oliverames.imagerelay-client"
+            )
+            let entries = try store.getEntries(at: start, matching: predicate)
+            let formatter = ISO8601DateFormatter()
+            var lines = ["\(title):"]
 
-            do {
-                try process.run()
-                process.waitUntilExit()
-            } catch {
-                return "Unable to collect unified logs: \(error.localizedDescription)\n"
+            for entry in entries {
+                guard let log = entry as? OSLogEntryLog else { continue }
+                let timestamp = formatter.string(from: log.date)
+                let category = log.category.isEmpty ? "-" : log.category
+                lines.append(
+                    "\(timestamp) \(String(describing: log.level)) \(log.subsystem)/\(category): \(log.composedMessage)"
+                )
             }
 
-            let outputData = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = error.fileHandleForReading.readDataToEndOfFile()
-            let outputText = String(data: outputData, encoding: .utf8) ?? ""
-            let errorText = String(data: errorData, encoding: .utf8) ?? ""
-
-            if process.terminationStatus == 0 {
-                return outputText.isEmpty ? "No Image Relay logs found in the last hour.\n" : outputText
+            if lines.count == 1 {
+                lines.append("No Image Relay logs found in the last hour.")
             }
-
-            return """
-            log show exited with status \(process.terminationStatus).
-
-            \(errorText)
-            \(outputText)
-            """
-        }.value
+            return lines.joined(separator: "\n")
+        } catch {
+            return "\(title):\nUnable to collect unified logs: \(error.localizedDescription)"
+        }
     }
 
     private static func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {
