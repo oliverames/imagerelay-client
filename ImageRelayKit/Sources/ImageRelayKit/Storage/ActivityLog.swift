@@ -3,6 +3,16 @@ import GRDB
 
 public enum SyncAction: String, Codable, Sendable, DatabaseValueConvertible {
     case downloaded, uploaded, deleted, renamed, moved, conflicted, created, discovered
+    case uploadFailed, downloadFailed, modifyFailed, deleteFailed
+
+    public var isFailure: Bool {
+        switch self {
+        case .uploadFailed, .downloadFailed, .modifyFailed, .deleteFailed:
+            true
+        case .downloaded, .uploaded, .deleted, .renamed, .moved, .conflicted, .created, .discovered:
+            false
+        }
+    }
 }
 
 public enum TrackedItemType: String, Codable, Sendable, DatabaseValueConvertible {
@@ -97,11 +107,43 @@ public struct ActivityEntry: Codable, Sendable, FetchableRecord, PersistableReco
     public var itemName: String
     public var itemType: TrackedItemType
     public var timestamp: Date
+    public var errorMessage: String?
 
-    public init(action: SyncAction, itemName: String, itemType: TrackedItemType, timestamp: Date = Date()) {
+    public init(
+        action: SyncAction,
+        itemName: String,
+        itemType: TrackedItemType,
+        timestamp: Date = Date(),
+        errorMessage: String? = nil
+    ) {
         self.action = action
         self.itemName = itemName
         self.itemType = itemType
         self.timestamp = timestamp
+        self.errorMessage = errorMessage
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, action, itemName, itemType, timestamp, errorMessage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(Int64.self, forKey: .id)
+        action = try container.decode(SyncAction.self, forKey: .action)
+        itemName = try container.decode(String.self, forKey: .itemName)
+        itemType = try container.decode(TrackedItemType.self, forKey: .itemType)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(id, forKey: .id)
+        try container.encode(action, forKey: .action)
+        try container.encode(itemName, forKey: .itemName)
+        try container.encode(itemType, forKey: .itemType)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(errorMessage, forKey: .errorMessage)
     }
 }

@@ -97,6 +97,12 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v6") { db in
+            try db.alter(table: "activity_log") { t in
+                t.add(column: "errorMessage", .text)
+            }
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -225,9 +231,19 @@ public final class SyncDatabase: Sendable {
 
     // MARK: - Activity Log
 
-    public func logActivity(action: SyncAction, itemName: String, itemType: TrackedItemType) throws {
+    public func logActivity(
+        action: SyncAction,
+        itemName: String,
+        itemType: TrackedItemType,
+        errorMessage: String? = nil
+    ) throws {
         try writer.write { db in
-            let entry = ActivityEntry(action: action, itemName: itemName, itemType: itemType)
+            let entry = ActivityEntry(
+                action: action,
+                itemName: itemName,
+                itemType: itemType,
+                errorMessage: errorMessage
+            )
             try entry.insert(db)
             // Prune after insert so the table never grows beyond the retention window.
             try db.execute(sql: """
