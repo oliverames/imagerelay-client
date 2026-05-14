@@ -1,5 +1,44 @@
 # Worklog
 
+## 2026-05-13 - 429 storm incident, multi-stage autonomous recovery, 21 resilience issues filed
+
+**What happened**: During a Finder-drop of ~107 RAW photos (1.47 GB) into the live Image Relay mount, the macOS File Provider extension hit Image Relay's per-IP rate limit and triggered a sustained account-level 429 penalty that persisted for ~3 hours of cumulative true silence. The dump itself completed 107 uploads cleanly at ~5.6 MB/sec across 4:14-4:16 PM ET; bursts of ~290 RPS combined across the host app + FP extension exceeded the documented 5 RPS limit by 2-3×, triggering not just per-second throttling but an extended cooldown that no amount of "Pause Sync" or process kills could short-circuit. The Pause Sync menu item only stopped uploads — the `RemoteChangePoller` kept firing every 60 seconds, generating fresh 429s that likely kept the abuse timer warm. `killall FileProviderExtension` was respawned by `fileproviderd` within seconds. True silence required `pluginkit -e ignore -i com.oliverames.imagerelay-client.fileprovider`.
+
+**Recovery**: Multi-stage autonomous recovery script chained four progressive-silence probes:
+
+| Stage | Time | Cumulative silence | Result |
+|---|---|---|---|
+| 1 | 17:28:30 | 30 min | STILL_THROTTLED (19 × 429) |
+| 2 | 18:30:00 | 90 min | STILL_THROTTLED (4 × 429) |
+| **3** | **20:00:00** | **~3 hours** | **RECOVERED (398 × 2xx, 22 creates)** |
+| 4 | 22:30:00 | — | SKIPPED (stage 3 succeeded) |
+
+Between stages, the script auto-disabled the plugin via `pluginkit -e ignore` and killed processes to preserve true silence. Stage 4 auto-skipped when stage 3 wrote RECOVERED. Overnight drainage proceeded at ~1.3 files/min (vs. original 24 files/min burst rate); 498 files cleared by 02:08, queue at zero this morning, all cloud-warning badges resolved.
+
+**Issues filed**: 21 GitHub issues capturing every gap the incident exposed. Five form the resilience cluster that would prevent recurrence: [#6](https://github.com/oliverames/imagerelay-client/issues/6) adaptive concurrency throttle (target ~10 concurrent files = ~5 RPS, mirroring Image Relay's own web uploader), [#9](https://github.com/oliverames/imagerelay-client/issues/9) retry jitter to break thundering-herd, [#10](https://github.com/oliverames/imagerelay-client/issues/10) `Retry-After` parsing investigation (header appears missing or unparsed; client falls through to too-short exponential 1s/2s/4s), [#16](https://github.com/oliverames/imagerelay-client/issues/16) cross-process rate limiter coordination (host + FP extension each had their own 5 RPS limiter, summing to 10), [#17](https://github.com/oliverames/imagerelay-client/issues/17) `RemoteChangePoller` exponential backoff on sustained failures.
+
+Three more from the UX layer: [#3](https://github.com/oliverames/imagerelay-client/issues/3) MenuBar batch-progress (TOCTOU + per-item idle reset), [#4](https://github.com/oliverames/imagerelay-client/issues/4) time-remaining estimator, [#7](https://github.com/oliverames/imagerelay-client/issues/7) surface rate-limit state in MenuBar.
+
+Three for visibility / diagnostics: [#11](https://github.com/oliverames/imagerelay-client/issues/11) diagnostics bundle `logs.txt` empty due to `log show` sandbox refusal (switch to `OSLogStore`), [#12](https://github.com/oliverames/imagerelay-client/issues/12) activity log captures failures, [#18](https://github.com/oliverames/imagerelay-client/issues/18) throughput metric + option-click advanced mode.
+
+Three for operational control: [#13](https://github.com/oliverames/imagerelay-client/issues/13) failed-uploads count in MenuBar dropdown (not icon badge, per user UX refinement), [#14](https://github.com/oliverames/imagerelay-client/issues/14) bulk-retry affordance, [#21](https://github.com/oliverames/imagerelay-client/issues/21) FP extension respawn should persist throttle state.
+
+Two from this incident specifically: [#19](https://github.com/oliverames/imagerelay-client/issues/19) Pause Sync should also pause the `RemoteChangePoller`, [#20](https://github.com/oliverames/imagerelay-client/issues/20) in-app "Stop Sync Completely" command via `NSFileProviderManager.disconnect` (Terminal shouldn't be required).
+
+Adjacent: [#5](https://github.com/oliverames/imagerelay-client/issues/5) `parent_id: null` ambiguity on folder rename (spotted while reading the folder-move code path), [#8](https://github.com/oliverames/imagerelay-client/issues/8) `signalLocalMutation` fan-out investigation, [#15](https://github.com/oliverames/imagerelay-client/issues/15) OAuth2 support (distribution-readiness for shipping beyond personal use).
+
+**Decisions made**: File every finding as a discrete GitHub issue as it surfaced rather than batching — easier for another agent to pick up; the cross-references between issues form a useful dependency graph. Target ~10 concurrent files (per user calibration against Image Relay's own web uploader) rather than my earlier guess of 4-6 — calibrating against the actual server's tolerance is a stronger anchor than a speculative number. Use a dropdown-only failure count (not menu bar icon badge) per UX preference for quiet-by-default affordances. Pre-draft the support email rather than auto-sending — drafting is reversible, sending isn't. Adopt `pluginkit -e ignore` rather than `NSFileProviderManager.disconnect` for this incident's recovery because we couldn't change app code in flight, but file [#20](https://github.com/oliverames/imagerelay-client/issues/20) so future incidents have an in-app affordance.
+
+**Empirical findings preserved**: Image Relay's documented 5 RPS limit is real but loose — bursts of 10+ RPS trigger an extended account-level penalty, not just per-second 429s. The penalty's duration empirically clears at ~3 hours of cumulative true silence; less than 2 hours is insufficient. Updates to [reference_v2_api_quirks memory](.claude/projects/-Users-oliverames-Library-Mobile-Documents-com-apple-CloudDocs-Developer-Projects-imagerelay-client/memory/reference_v2_api_quirks.md) capture this for future sessions.
+
+**Left off at**: v1.1.1 is still the released version, no code changes from today's incident. The 21 issues form the post-1.1.1 work queue. The local environment is fully recovered: plugin re-enabled, queue drained, FP extension in normal idle-cycle pattern. Pre-drafted support email at `~/Desktop/imagerelay-support-email-draft.md` is now stale (recovery succeeded without it) but kept as a template for future support threads.
+
+**Open questions**: Priority ordering of the 21 issues for 1.2. The resilience cluster ([#6](https://github.com/oliverames/imagerelay-client/issues/6) → [#9](https://github.com/oliverames/imagerelay-client/issues/9) → [#10](https://github.com/oliverames/imagerelay-client/issues/10) → [#16](https://github.com/oliverames/imagerelay-client/issues/16) → [#17](https://github.com/oliverames/imagerelay-client/issues/17)) is the highest-value bundle — shipping all five would have prevented today's outage. UX cluster (#3 → #4 → #7 → #18) is parallel. [#20](https://github.com/oliverames/imagerelay-client/issues/20) (in-app disconnect) is also high-value as the escape hatch when resilience fails. [#15](https://github.com/oliverames/imagerelay-client/issues/15) (OAuth) is a separate distribution-readiness arc.
+
+Open against Image Relay (not us): does the v2 API actually send a `Retry-After` header on 429 responses? Live probe captured during recovery testing would resolve [#10](https://github.com/oliverames/imagerelay-client/issues/10) one way or the other. If they don't send it, that's a request to file with their team — desktop clients can't realistically handle 429 with only a 7-second client-side exponential backoff.
+
+---
+
 ## 2026-05-13 - 1.1.0 stable release shipped
 
 **What changed**: Completed the official 1.1.0 release closeout from the stable release candidate. Fixed Finder-advertised File Provider capabilities so files expose rename support and folders expose rename/reparent support in line with the implemented `modifyItem` behavior. Centralized current User-Agent defaults at `ImageRelayClient/1.1.0`, migrated legacy built-in defaults to `ImageRelayClient/1.1.0 (macOS)` while preserving custom values, and updated macOS, iOS, and shared service call sites. Cleaned up release-build warnings, refreshed release-testing docs, updated the stable cask to the final DMG SHA, published the GitHub release, and synced `oliverames/homebrew-tap`.
