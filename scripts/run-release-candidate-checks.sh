@@ -29,6 +29,14 @@ if [[ -n "$XCODE_CLONED_SOURCE_PACKAGES_DIR" ]]; then
   )
 fi
 
+run_xcodebuild() {
+  if ((${#XCODE_PACKAGE_ARGS[@]} > 0)); then
+    xcodebuild "$@" "${XCODE_PACKAGE_ARGS[@]}"
+  else
+    xcodebuild "$@"
+  fi
+}
+
 echo "Checking patch whitespace..."
 git diff --check
 
@@ -39,26 +47,23 @@ echo "Regenerating Xcode project..."
 xcodegen generate
 
 echo "Running Xcode scheme tests..."
-xcodebuild test \
+run_xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
-  -destination 'platform=macOS' \
-  "${XCODE_PACKAGE_ARGS[@]}"
+  -destination 'platform=macOS'
 
 echo "Running unsigned app build..."
-xcodebuild build \
+run_xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
   -destination 'platform=macOS' \
-  "${XCODE_PACKAGE_ARGS[@]}" \
   CODE_SIGNING_ALLOWED=NO
 
 echo "Running unsigned iOS simulator build..."
-xcodebuild build \
+run_xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClientiOS \
   -destination 'platform=iOS Simulator,name=iPhone 17e' \
-  "${XCODE_PACKAGE_ARGS[@]}" \
   CODE_SIGNING_ALLOWED=NO
 
 if [[ "$RUN_LIVE_SYNC" == "1" ]]; then
