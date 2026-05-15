@@ -75,6 +75,7 @@ brew install --cask image-relay
 - **Diagnostics export** - export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
 - **Domain reset** - Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
 - **Metadata editing** - edit descriptions, keywords, and custom text fields for the selected Finder item without opening the web app
+- **Copy Public Link** - right-click a tracked file in Finder and choose Copy Public Link to mint an Image Relay quick link with inline disposition and paste-ready URL on the clipboard
 - **Upload links** - create, inspect, copy, and revoke Image Relay upload links from Settings
 - **Library tools** - browse Collections, Products, Webhooks, file types, keywords, users, folder links, quick links, permission groups, and invited users from native windows
 
