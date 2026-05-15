@@ -20,9 +20,9 @@ struct AdvancedSettingsView: View {
         Form {
             Section {
                 VStack(alignment: .leading) {
-                    Text("Poll Interval: \(Int(pollInterval))s")
+                    Text("Background Refresh: \(Int(pollInterval))s")
                     Slider(value: $pollInterval, in: 15...300, step: 5) {
-                        Text("Poll Interval")
+                        Text("Background Refresh")
                     }
                     .labelsHidden()
                 }
@@ -34,7 +34,7 @@ struct AdvancedSettingsView: View {
                 Text("Sync")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Poll interval controls how often the app checks Image Relay for remote changes. Shorter intervals mean faster syncing but more API requests.")
+                    Text("Background refresh controls the safety-net check for remote Image Relay changes. Local Finder changes still sync immediately.")
                     Text("Disable Upload to make this a read-only sync. Disable Download to push local changes without pulling remote ones.")
                 }
                 .font(.caption)

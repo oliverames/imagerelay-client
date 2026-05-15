@@ -26,21 +26,25 @@ struct ResilienceTests {
         #expect(delay == 600)
     }
 
-    @Test("Remote poller skips when sync is disabled or paused")
+    @Test("Remote poller skips when download sync is disabled or paused")
     func pollerSkipsDisabledOrPausedSync() {
         var config = AppConfiguration.default
         #expect(RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
 
         config.syncUpload = false
-        #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
+        #expect(RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
 
         config.syncUpload = true
         config.syncDownload = false
         #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
 
+        config.syncDownload = true
+        config.fileProviderDisconnected = true
+        #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: .default))
+
         var pauseState = SyncPauseState.default
         pauseState.paused = true
-        config.syncDownload = true
+        config.fileProviderDisconnected = false
         #expect(!RemoteChangePoller.shouldSignalRemoteChanges(config: config, pauseState: pauseState))
     }
 
