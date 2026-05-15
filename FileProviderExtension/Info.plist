@@ -38,6 +38,14 @@
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Refresh from Image Relay</string>
 			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-public-link</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Public Link</string>
+			</dict>
 		</array>
 		<key>NSExtensionFileProviderAllowsUserControlledEviction</key>
 		<true/>

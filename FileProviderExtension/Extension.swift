@@ -1,4 +1,5 @@
 @preconcurrency import FileProvider
+import AppKit
 import ImageRelayKit
 import os.log
 
@@ -710,40 +711,119 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         completionHandler: @escaping ((any Error)?) -> Void
     ) -> Progress {
         let handler = UncheckedBox(value: completionHandler)
-        let logger = self.logger
-        let domain = self.domain
-        let targets = localMutationSignalTargets(itemIdentifiers)
 
         Task {
-            guard actionIdentifier.rawValue == FileProviderAction.refreshFromImageRelay.rawValue else {
+            switch actionIdentifier.rawValue {
+            case FileProviderAction.refreshFromImageRelay.rawValue:
+                await self.runRefreshAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.copyPublicLink.rawValue:
+                await self.runCopyPublicLinkAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            default:
                 handler.value(NSFileProviderError(.cannotSynchronize))
-                return
-            }
-
-            guard let manager = NSFileProviderManager(for: domain) else {
-                handler.value(fileProviderCannotSynchronize("Image Relay could not reach the File Provider manager."))
-                return
-            }
-
-            var failures = 0
-            for target in targets {
-                do {
-                    try await manager.signalEnumerator(for: target)
-                } catch {
-                    failures += 1
-                    logger.debug("Finder refresh action signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                }
-            }
-
-            if failures == targets.count {
-                handler.value(fileProviderCannotSynchronize("Image Relay could not refresh this item in Finder."))
-            } else {
-                logger.info("Finder refresh action signaled \(targets.count, privacy: .public) targets with \(failures, privacy: .public) failures")
-                handler.value(nil)
             }
         }
 
         return Progress(totalUnitCount: 1)
+    }
+
+    private func runRefreshAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        let targets = localMutationSignalTargets(itemIdentifiers)
+
+        guard let manager = NSFileProviderManager(for: domain) else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not reach the File Provider manager."))
+            return
+        }
+
+        var failures = 0
+        for target in targets {
+            do {
+                try await manager.signalEnumerator(for: target)
+            } catch {
+                failures += 1
+                logger.debug("Finder refresh action signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        if failures == targets.count {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not refresh this item in Finder."))
+        } else {
+            logger.info("Finder refresh action signaled \(targets.count, privacy: .public) targets with \(failures, privacy: .public) failures")
+            handler.value(nil)
+        }
+    }
+
+    /// Resolve each selected file to an Image Relay quick link with inline disposition
+    /// and a year-out expiration, then write the URL(s) to the general pasteboard.
+    /// Folders and unknown items are rejected — Image Relay's quick-link primitive
+    /// is asset-scoped.
+    private func runCopyPublicLinkAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolvedAssetIDs: [(name: String, id: Int)] = []
+
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFile,
+                  let assetID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("Public links are only available for files."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolvedAssetIDs.append((tracked?.name ?? "\(assetID)", assetID))
+        }
+
+        guard !resolvedAssetIDs.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        // Image Relay's API doc describes `expires` as a date (not datetime); send
+        // a calendar-date string so the parameter parses on the server side.
+        let expiresFormatter = DateFormatter()
+        expiresFormatter.calendar = Calendar(identifier: .gregorian)
+        expiresFormatter.locale = Locale(identifier: "en_US_POSIX")
+        expiresFormatter.timeZone = TimeZone(identifier: "UTC")
+        expiresFormatter.dateFormat = "yyyy-MM-dd"
+        let expiresAt = expiresFormatter.string(
+            from: Date().addingTimeInterval(60 * 60 * 24 * 365)
+        )
+
+        var urls: [URL] = []
+        for resolved in resolvedAssetIDs {
+            do {
+                let request = QuickLinkRequest(
+                    asset_id: resolved.id,
+                    purpose: "download",
+                    disposition: "inline",
+                    expires: expiresAt
+                )
+                let quickLink: QuickLink = try await api.post("/quick_links.json", body: request)
+                urls.append(quickLink.url)
+            } catch {
+                logger.error("Copy public link failed for \(resolved.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(fileProviderCannotSynchronize("Image Relay could not create a public link for \(resolved.name)."))
+                return
+            }
+        }
+
+        let joined = urls.map(\.absoluteString).joined(separator: "\n")
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(joined, forType: .string)
+            if urls.count == 1, let first = urls.first {
+                pasteboard.setString(first.absoluteString, forType: .URL)
+            }
+        }
+
+        logger.info("Copied \(urls.count, privacy: .public) public link(s) to pasteboard")
+        handler.value(nil)
     }
 
     // MARK: - Helpers
@@ -1282,6 +1362,14 @@ private struct QuickLinkRequest: Encodable, Sendable {
     let asset_id: Int
     let purpose: String
     let disposition: String
+    let expires: String?
+
+    init(asset_id: Int, purpose: String, disposition: String, expires: String? = nil) {
+        self.asset_id = asset_id
+        self.purpose = purpose
+        self.disposition = disposition
+        self.expires = expires
+    }
 }
 
 private struct CreateFolderRequest: Encodable, Sendable {

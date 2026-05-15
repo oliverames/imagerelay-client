@@ -27,6 +27,9 @@ enum FileProviderAction {
     static let refreshFromImageRelay = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.refresh"
     )
+    static let copyPublicLink = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-public-link"
+    )
 }
 
 final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDecorating {

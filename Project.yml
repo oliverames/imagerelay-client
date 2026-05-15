@@ -121,6 +121,9 @@ targets:
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.refresh
               NSExtensionFileProviderActionName: Refresh from Image Relay
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-public-link
+              NSExtensionFileProviderActionName: Copy Public Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
           NSFileProviderDecorations:
             - Identifier: com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention
               Label: Needs attention
