@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-05-15 - 1.2.0-beta.4 Copy Public Link beta
+
+**What changed**: Prepared v1.2.0-beta.4 as a small follow-up beta on top of beta.3's Finder-native File Provider work. The File Provider extension's `performAction` now dispatches on the action identifier rather than guarding a single one, and a new `Copy Public Link` Finder context-menu action mints an Image Relay quick link with `disposition: "inline"` and a year-out `expires` date, then writes the resulting URL to the general pasteboard. Multi-selection joins URLs by newline; folder or unknown items are rejected with a clear error. The release train advanced to `1.2.0-beta.4` build `33`.
+
+**Decisions made**: Used Image Relay's existing quick-link primitive rather than a dedicated public-link write API, since the v2 surface does not currently expose a separate persistent share-link primitive — see `API_COMPATIBILITY.md`. Sent the `expires` field as `yyyy-MM-dd` (UTC, POSIX locale) to match the API doc's "date" wording, accepting the risk of a one-off format fix if the live API rejects it. Kept the activation rule as `TRUEPREDICATE` and rejected folders at runtime, matching the existing `refresh` action pattern rather than introducing a separate item-content-type predicate. Skipped the smoke-install flag for this beta to shorten the release loop; the action behavior is verifiable through the right-click → ⌘V smoke check after install.
+
+**Left off at**: TBD — release pipeline still running.
+
+**Open questions**: Whether `NSPasteboard.general` write from the sandboxed File Provider extension XPC service works end-to-end on macOS 26, and whether Image Relay accepts `yyyy-MM-dd` for the quick-link `expires` field versus a full ISO 8601 timestamp. Both are first-click discoverable.
+
+---
+
 ## 2026-05-15 - 1.2.0-beta.3 Finder-native File Provider beta
 
 **What changed**: Prepared v1.2.0-beta.3 as the Finder integration beta. The File Provider extension now advertises upload/download/metadata pipeline depths, user-controlled eviction, a Finder "Refresh from Image Relay" action, a needs-attention decoration, Finder-native upload/uploaded/error state, child counts, file-system flags, item userInfo, trash support, and cached Finder search over tracked Image Relay items.
