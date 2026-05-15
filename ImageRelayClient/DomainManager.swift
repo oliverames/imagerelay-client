@@ -36,7 +36,12 @@ final class DomainManager {
     }
 
     private var domain: NSFileProviderDomain {
-        NSFileProviderDomain(identifier: Self.domainIdentifier, displayName: Self.domainDisplayName)
+        let domain = NSFileProviderDomain(identifier: Self.domainIdentifier, displayName: Self.domainDisplayName)
+        domain.supportsSyncingTrash = true
+        #if compiler(>=6.2)
+        domain.supportsStringSearchRequest = true
+        #endif
+        return domain
     }
 
     /// Returns the cached `SyncDatabase`, opening it on first use. The connection
@@ -110,13 +115,9 @@ final class DomainManager {
     @discardableResult
     func setupDomain() async -> Bool {
         do {
-            if try await isDomainRegistered() {
-                isDomainActive = true
-                lastError = nil
-                logger.info("File Provider domain already registered")
-                return true
-            }
-
+            let wasRegistered = try await isDomainRegistered()
+            // Re-adding an existing replicated domain updates File Provider domain
+            // properties such as string-search support without forcing a reset.
             try await NSFileProviderManager.add(domain)
             guard await waitForDomainRegistration(expected: true) else {
                 isDomainActive = false
@@ -126,7 +127,11 @@ final class DomainManager {
             }
             isDomainActive = true
             lastError = nil
-            logger.info("File Provider domain added successfully")
+            if wasRegistered {
+                logger.info("File Provider domain updated successfully")
+            } else {
+                logger.info("File Provider domain added successfully")
+            }
             return true
         } catch let error as NSError where error.code == NSFileWriteFileExistsError {
             let ready = await waitForDomainRegistration(expected: true)

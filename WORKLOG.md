@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-05-15 - 1.2.0-beta.3 Finder-native File Provider beta
+
+**What changed**: Prepared v1.2.0-beta.3 as the Finder integration beta. The File Provider extension now advertises upload/download/metadata pipeline depths, user-controlled eviction, a Finder "Refresh from Image Relay" action, a needs-attention decoration, Finder-native upload/uploaded/error state, child counts, file-system flags, item userInfo, trash support, and cached Finder search over tracked Image Relay items.
+
+Added cached filename search to `SyncDatabase` and wired the macOS domain to advertise string search support. Existing domains are re-added during setup so installed beta users pick up updated File Provider domain properties without a manual reset. The release train advanced to `1.2.0-beta.3` build `32`, and beta 2 user agents now normalize forward.
+
+**Decisions made**: Implemented File Provider controls that can be backed by real local or Image Relay state. Did not fake downloaded/downloading state because the replicated extension already tells macOS about materialized content through `fetchContents`. Did not add thumbnails or partial-content fetching yet because current Image Relay API evidence does not give us a safe thumbnail or range-download contract, and downloading full RAW originals just to render Finder thumbnails would make the sync engine more brittle.
+
+Left system download/delete menu behavior with macOS defaults. Image Relay already handles deletes through the replicated trash/delete path, and the system's download affordance remains the right native control for on-demand materialization.
+
+**Left off at**: Release candidate checks pass for `1.2.0-beta.3`: package tests, Xcode project regeneration, macOS scheme tests, unsigned macOS app build, and unsigned iOS simulator build. Signed packaging, GitHub publishing, public download verification, and the final SHA are next in the release lane.
+
+**Open questions**: Whether Image Relay exposes a documented thumbnail or ranged-download endpoint that can safely power `NSFileProviderThumbnailing` or `NSFileProviderPartialContentFetching` without materializing huge originals.
+
+---
+
 ## 2026-05-14 - 1.2.0-beta.2 sync confidence beta shipped
 
 **What changed**: Shipped v1.2.0-beta.2 as the follow-up beta for the screenshots and diagnostics from beta 1. The MenuBar no longer exposes polling mechanics in the primary status line: "next check overdue" is gone from normal UX, the idle state reads as last synced, and remote polling detail lives in Diagnostics where it belongs. Diagnostics and Copy Diagnostics are always visible instead of being gated behind option-click, which fixes the "option click does not show advanced diagnostics" report directly.

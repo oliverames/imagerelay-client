@@ -194,6 +194,29 @@ public final class SyncDatabase: Sendable {
         }
     }
 
+    public func searchItems(matching query: String, limit: Int) throws -> [TrackedItem] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty, limit > 0 else { return [] }
+
+        let pattern = "%\(Self.escapedLikePattern(for: trimmedQuery))%"
+        return try writer.read { db in
+            try TrackedItem.fetchAll(
+                db,
+                sql: """
+                SELECT *
+                FROM tracked_items
+                WHERE name LIKE ? ESCAPE '\\'
+                ORDER BY
+                    CASE itemType WHEN 'folder' THEN 0 ELSE 1 END,
+                    lower(name),
+                    name
+                LIMIT ?
+                """,
+                arguments: [pattern, limit]
+            )
+        }
+    }
+
     public func folders(parentIdentifier: String? = nil) throws -> [TrackedItem] {
         try writer.read { db in
             var request = TrackedItem
@@ -203,6 +226,17 @@ public final class SyncDatabase: Sendable {
             }
             return try request.fetchAll(db)
         }
+    }
+
+    private static func escapedLikePattern(for value: String) -> String {
+        var escaped = ""
+        for character in value {
+            if character == "\\" || character == "%" || character == "_" {
+                escaped.append("\\")
+            }
+            escaped.append(character)
+        }
+        return escaped
     }
 
     // MARK: - Sync Anchors
@@ -456,21 +490,26 @@ public final class SyncDatabase: Sendable {
         try Array(unresolvedFailures().prefix(limit))
     }
 
+    public func unresolvedFailure(itemName: String, itemType: TrackedItemType) throws -> ActivityEntry? {
+        let key = Self.activityResolutionKey(itemName: itemName, itemType: itemType)
+        return try unresolvedFailureLookup()[key]
+    }
+
+    public func unresolvedFailureLookup() throws -> [String: ActivityEntry] {
+        try writer.read { db in
+            let entries = try ActivityEntry
+                .order(Column("id").asc)
+                .fetchAll(db)
+            return Self.unresolvedFailureLookup(from: entries)
+        }
+    }
+
     private func unresolvedFailures() throws -> [ActivityEntry] {
         try writer.read { db in
             let entries = try ActivityEntry
                 .order(Column("id").asc)
                 .fetchAll(db)
-            var unresolved: [String: ActivityEntry] = [:]
-
-            for entry in entries {
-                let key = Self.activityResolutionKey(for: entry)
-                if entry.action.isFailure {
-                    unresolved[key] = entry
-                } else if entry.action.resolvesFailures {
-                    unresolved.removeValue(forKey: key)
-                }
-            }
+            let unresolved = Self.unresolvedFailureLookup(from: entries)
 
             return unresolved.values.sorted { lhs, rhs in
                 if lhs.timestamp == rhs.timestamp {
@@ -482,7 +521,26 @@ public final class SyncDatabase: Sendable {
     }
 
     private static func activityResolutionKey(for entry: ActivityEntry) -> String {
-        "\(entry.itemType.rawValue):\(canonicalActivityName(entry.itemName))"
+        activityResolutionKey(itemName: entry.itemName, itemType: entry.itemType)
+    }
+
+    public static func activityResolutionKey(itemName: String, itemType: TrackedItemType) -> String {
+        "\(itemType.rawValue):\(canonicalActivityName(itemName))"
+    }
+
+    private static func unresolvedFailureLookup(from entries: [ActivityEntry]) -> [String: ActivityEntry] {
+        var unresolved: [String: ActivityEntry] = [:]
+
+        for entry in entries {
+            let key = Self.activityResolutionKey(for: entry)
+            if entry.action.isFailure {
+                unresolved[key] = entry
+            } else if entry.action.resolvesFailures {
+                unresolved.removeValue(forKey: key)
+            }
+        }
+
+        return unresolved
     }
 
     private static func canonicalActivityName(_ value: String) -> String {

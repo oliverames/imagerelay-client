@@ -82,6 +82,51 @@ struct SyncDatabaseTests {
         #expect(Set(allFolders.map(\.remoteID)) == [10, 11])
     }
 
+    @Test("Search items matches cached names with bounded results")
+    func searchItemsMatchesCachedNamesWithBoundedResults() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "file-1", parentIdentifier: "root",
+            remoteID: 1, itemType: .file, name: "Mountain Photo.jpg",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "folder-2", parentIdentifier: "root",
+            remoteID: 2, itemType: .folder, name: "Mountain Days",
+            size: 0, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-3", parentIdentifier: "root",
+            remoteID: 3, itemType: .file, name: "Release Form.docx",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        let results = try db.searchItems(matching: "mountain", limit: 10)
+
+        #expect(results.map(\.identifier) == ["folder-2", "file-1"])
+    }
+
+    @Test("Search items treats wildcard characters literally")
+    func searchItemsEscapesLikeWildcards() throws {
+        let db = try makeDB()
+
+        try db.upsertItem(TrackedItem(
+            identifier: "file-1", parentIdentifier: "root",
+            remoteID: 1, itemType: .file, name: "100_percent.jpg",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+        try db.upsertItem(TrackedItem(
+            identifier: "file-2", parentIdentifier: "root",
+            remoteID: 2, itemType: .file, name: "100xpercent.jpg",
+            size: 10, contentVersion: "v1", metadataVersion: "m1"
+        ))
+
+        let results = try db.searchItems(matching: "100_", limit: 10)
+
+        #expect(results.map(\.identifier) == ["file-1"])
+    }
+
     @Test("Delete item by identifier")
     func deleteItem() throws {
         let db = try makeDB()
@@ -443,6 +488,18 @@ struct SyncDatabaseTests {
 
         #expect(try db.unresolvedFailureCount() == 0)
         #expect(try db.recentUnresolvedFailures().isEmpty)
+    }
+
+    @Test("Unresolved failure lookup returns canonicalized item failure")
+    func unresolvedFailureLookupReturnsCanonicalizedItemFailure() throws {
+        let db = try makeDB()
+        try db.logActivity(action: .uploadFailed, itemName: "Photo Release Form.docx", itemType: .file, errorMessage: "timeout")
+
+        let failure = try db.unresolvedFailure(itemName: "Photo-Release-Form.docx", itemType: .file)
+        #expect(failure?.errorMessage == "timeout")
+
+        let key = SyncDatabase.activityResolutionKey(itemName: "Photo_Release_Form.docx", itemType: .file)
+        #expect(try db.unresolvedFailureLookup()[key]?.itemName == "Photo Release Form.docx")
     }
 
     @Test("Root folders cache round trips through settings")
