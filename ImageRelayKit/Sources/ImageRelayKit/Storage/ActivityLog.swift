@@ -13,6 +13,15 @@ public enum SyncAction: String, Codable, Sendable, DatabaseValueConvertible {
             false
         }
     }
+
+    public var resolvesFailures: Bool {
+        switch self {
+        case .downloaded, .uploaded, .deleted, .renamed, .moved, .created, .discovered:
+            true
+        case .conflicted, .uploadFailed, .downloadFailed, .modifyFailed, .deleteFailed:
+            false
+        }
+    }
 }
 
 public enum TrackedItemType: String, Codable, Sendable, DatabaseValueConvertible {

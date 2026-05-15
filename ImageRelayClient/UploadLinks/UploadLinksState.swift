@@ -21,6 +21,9 @@ final class UploadLinksState {
 
     var phase: LoadPhase = .idle
     var links: [UploadLink] = []
+    var cachedAt: Date?
+    var isRefreshing: Bool = false
+    var refreshWarning: String?
 
     // Create form drafts
     var draftName: String = ""
@@ -38,13 +41,26 @@ final class UploadLinksState {
     }
 
     func load() async {
-        phase = .loading
+        loadCachedLinks()
+        if links.isEmpty {
+            phase = .loading
+        }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         do {
             links = try await service.list()
+            cachedAt = Date()
+            refreshWarning = nil
             phase = .loaded
         } catch {
             logger.warning("Upload links list failed: \(error.localizedDescription)")
-            phase = .failed(error.localizedDescription)
+            if links.isEmpty {
+                phase = .failed(error.localizedDescription)
+            } else {
+                refreshWarning = "Could not refresh upload links: \(error.localizedDescription)"
+                phase = .loaded
+            }
         }
     }
 
@@ -65,6 +81,9 @@ final class UploadLinksState {
         do {
             let created = try await service.create(payload)
             links.insert(created, at: 0)
+            try? service.storeCachedLinks(links)
+            cachedAt = Date()
+            refreshWarning = nil
             // Reset the form
             draftName = ""
             draftFolderID = ""
@@ -83,10 +102,27 @@ final class UploadLinksState {
         do {
             try await service.delete(id: link.id)
             links.removeAll { $0.id == link.id }
+            try? service.storeCachedLinks(links)
+            cachedAt = Date()
+            refreshWarning = nil
         } catch {
             logger.warning("Upload link delete failed: \(error.localizedDescription)")
-            phase = .failed(error.localizedDescription)
+            if links.isEmpty {
+                phase = .failed(error.localizedDescription)
+            } else {
+                refreshWarning = "Could not revoke upload link: \(error.localizedDescription)"
+                phase = .loaded
+            }
         }
+    }
+
+    private func loadCachedLinks() {
+        guard links.isEmpty,
+              let snapshot = try? service.cachedLinks(),
+              !snapshot.links.isEmpty else { return }
+        links = snapshot.links
+        cachedAt = snapshot.fetchedAt
+        phase = .loaded
     }
 
     private static let expiresOnFormatter: DateFormatter = {

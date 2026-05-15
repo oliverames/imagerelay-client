@@ -449,56 +449,52 @@ public final class SyncDatabase: Sendable {
     }
 
     public func unresolvedFailureCount() throws -> Int {
-        try writer.read { db in
-            try Int.fetchOne(
-                db,
-                sql: """
-                WITH latest AS (
-                    SELECT itemName, MAX(id) AS latestID
-                    FROM activity_log
-                    GROUP BY itemName
-                )
-                SELECT COUNT(*)
-                FROM activity_log
-                JOIN latest ON latest.latestID = activity_log.id
-                WHERE action IN (?, ?, ?, ?)
-                """,
-                arguments: [
-                    SyncAction.uploadFailed.rawValue,
-                    SyncAction.downloadFailed.rawValue,
-                    SyncAction.modifyFailed.rawValue,
-                    SyncAction.deleteFailed.rawValue,
-                ]
-            ) ?? 0
-        }
+        try unresolvedFailures().count
     }
 
     public func recentUnresolvedFailures(limit: Int = 50) throws -> [ActivityEntry] {
+        try Array(unresolvedFailures().prefix(limit))
+    }
+
+    private func unresolvedFailures() throws -> [ActivityEntry] {
         try writer.read { db in
-            try ActivityEntry.fetchAll(
-                db,
-                sql: """
-                WITH latest AS (
-                    SELECT itemName, MAX(id) AS latestID
-                    FROM activity_log
-                    GROUP BY itemName
-                )
-                SELECT activity_log.*
-                FROM activity_log
-                JOIN latest ON latest.latestID = activity_log.id
-                WHERE action IN (?, ?, ?, ?)
-                ORDER BY timestamp DESC, id DESC
-                LIMIT ?
-                """,
-                arguments: [
-                    SyncAction.uploadFailed.rawValue,
-                    SyncAction.downloadFailed.rawValue,
-                    SyncAction.modifyFailed.rawValue,
-                    SyncAction.deleteFailed.rawValue,
-                    limit,
-                ]
-            )
+            let entries = try ActivityEntry
+                .order(Column("id").asc)
+                .fetchAll(db)
+            var unresolved: [String: ActivityEntry] = [:]
+
+            for entry in entries {
+                let key = Self.activityResolutionKey(for: entry)
+                if entry.action.isFailure {
+                    unresolved[key] = entry
+                } else if entry.action.resolvesFailures {
+                    unresolved.removeValue(forKey: key)
+                }
+            }
+
+            return unresolved.values.sorted { lhs, rhs in
+                if lhs.timestamp == rhs.timestamp {
+                    return (lhs.id ?? 0) > (rhs.id ?? 0)
+                }
+                return lhs.timestamp > rhs.timestamp
+            }
         }
+    }
+
+    private static func activityResolutionKey(for entry: ActivityEntry) -> String {
+        "\(entry.itemType.rawValue):\(canonicalActivityName(entry.itemName))"
+    }
+
+    private static func canonicalActivityName(_ value: String) -> String {
+        var canonical = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+        while canonical.contains("--") {
+            canonical = canonical.replacingOccurrences(of: "--", with: "-")
+        }
+        return canonical
     }
 
     private static func progress(in db: Database) throws -> SyncProgressState {
@@ -527,6 +523,54 @@ public final class SyncDatabase: Sendable {
             arguments: ["sync_progress", json]
         )
     }
+
+    // MARK: - Settings UI Cache
+
+    public func cachedRootFolders() throws -> CachedRootFoldersSnapshot? {
+        try readSettingsCache(CachedRootFoldersSnapshot.self, key: Self.rootFoldersCacheKey)
+    }
+
+    public func storeRootFoldersCache(_ snapshot: CachedRootFoldersSnapshot) throws {
+        try writeSettingsCache(snapshot, key: Self.rootFoldersCacheKey)
+    }
+
+    public func cachedUploadLinks() throws -> CachedUploadLinksSnapshot? {
+        try readSettingsCache(CachedUploadLinksSnapshot.self, key: Self.uploadLinksCacheKey)
+    }
+
+    public func storeUploadLinksCache(_ snapshot: CachedUploadLinksSnapshot) throws {
+        try writeSettingsCache(snapshot, key: Self.uploadLinksCacheKey)
+    }
+
+    private func readSettingsCache<T: Decodable>(_ type: T.Type, key: String) throws -> T? {
+        let json: String? = try writer.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT value FROM settings WHERE key = ?",
+                arguments: [key]
+            )?["value"]
+        }
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder.imageRelay.decode(T.self, from: data)
+    }
+
+    private func writeSettingsCache<T: Encodable>(_ value: T, key: String) throws {
+        let data = try JSONEncoder.imageRelay.encode(value)
+        let json = String(decoding: data, as: UTF8.self)
+        try writer.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO settings (key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                arguments: [key, json]
+            )
+        }
+    }
+
+    private static let rootFoldersCacheKey = "settings_root_folders_cache"
+    private static let uploadLinksCacheKey = "settings_upload_links_cache"
 
     private static func updateItemETA(_ progress: inout SyncProgressState, now: Date) {
         if let lastIncrementAt = progress.lastIncrementAt {

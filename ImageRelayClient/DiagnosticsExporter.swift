@@ -84,6 +84,9 @@ enum DiagnosticsExporter {
         guard let container else {
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("activity.json"))
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("sync-progress.json"))
+            try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("unresolved-failures.json"))
+            try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("root-folders-cache.json"))
+            try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("upload-links-cache.json"))
             return
         }
 
@@ -91,11 +94,17 @@ enum DiagnosticsExporter {
         guard let db = try? SyncDatabase(url: dbURL) else {
             try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("activity.json"))
             try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("sync-progress.json"))
+            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("unresolved-failures.json"))
+            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("root-folders-cache.json"))
+            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("upload-links-cache.json"))
             return
         }
 
         try writeJSON(try db.recentActivity(limit: 100), to: directory.appendingPathComponent("activity.json"))
         try writeJSON(try db.getProgress(), to: directory.appendingPathComponent("sync-progress.json"))
+        try writeJSON(try db.recentUnresolvedFailures(limit: 100), to: directory.appendingPathComponent("unresolved-failures.json"))
+        try writeJSON(try db.cachedRootFolders(), to: directory.appendingPathComponent("root-folders-cache.json"))
+        try writeJSON(try db.cachedUploadLinks(), to: directory.appendingPathComponent("upload-links-cache.json"))
     }
 
     @MainActor
