@@ -28,14 +28,44 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionFileProviderActions</key>
+		<array>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.refresh</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Refresh from Image Relay</string>
+			</dict>
+		</array>
+		<key>NSExtensionFileProviderAllowsUserControlledEviction</key>
+		<true/>
 		<key>NSExtensionFileProviderDocumentGroup</key>
 		<string>$(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client</string>
+		<key>NSExtensionFileProviderDownloadPipelineDepth</key>
+		<integer>4</integer>
+		<key>NSExtensionFileProviderMetadataOnlyUploadPipelineDepth</key>
+		<integer>4</integer>
 		<key>NSExtensionFileProviderSupportsEnumeration</key>
 		<true/>
+		<key>NSExtensionFileProviderUploadPipelineDepth</key>
+		<integer>4</integer>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.fileprovider-nonui</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).Extension</string>
+		<key>NSFileProviderDecorations</key>
+		<array>
+			<dict>
+				<key>Category</key>
+				<string>Sharing</string>
+				<key>Identifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention</string>
+				<key>Label</key>
+				<string>Needs attention</string>
+			</dict>
+		</array>
 	</dict>
 </dict>
 </plist>

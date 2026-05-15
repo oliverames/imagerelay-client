@@ -140,6 +140,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         var items: [NSFileProviderItem] = []
         var remoteIdentifiers = Set<String>()
         var visibleIdentifiers = Set<String>()
+        let syncSnapshot = try itemSyncSnapshot()
 
         for folder in folders {
             let identifier = ItemIdentifier.folder(folder.id).rawValue
@@ -148,7 +149,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
             if visibleFolderIDs?.contains(folder.id) ?? true {
                 visibleIdentifiers.insert(identifier)
-                let item = FileProviderItem(folder: folder, parentItemIdentifier: containerIdentifier)
+                let item = FileProviderItem(
+                    folder: folder,
+                    parentItemIdentifier: containerIdentifier,
+                    syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+                )
                 items.append(item)
             }
 
@@ -164,7 +169,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             let existingItem = try db.item(for: identifier)
             visibleIdentifiers.insert(identifier)
 
-            let item = FileProviderItem(file: file, parentItemIdentifier: containerIdentifier)
+            let item = FileProviderItem(
+                file: file,
+                parentItemIdentifier: containerIdentifier,
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+            )
             items.append(item)
 
             try db.upsertItem(.makeFile(from: file, parent: containerIdentifier.rawValue))
@@ -219,13 +228,15 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
         var items: [NSFileProviderItem] = []
         var visibleIdentifiers = Set<String>()
+        let syncSnapshot = try itemSyncSnapshot()
 
         for folder in rootFolders {
             try await appendFolderTree(
                 folder,
                 parentIdentifier: .rootContainer,
                 items: &items,
-                visibleIdentifiers: &visibleIdentifiers
+                visibleIdentifiers: &visibleIdentifiers,
+                syncSnapshot: syncSnapshot
             )
         }
 
@@ -268,11 +279,16 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         let files = try await filesTask
 
         var items: [NSFileProviderItem] = []
+        let syncSnapshot = try itemSyncSnapshot()
 
         for folder in folders {
             let identifier = ItemIdentifier.folder(folder.id).rawValue
             let existingItem = try db.item(for: identifier)
-            items.append(FileProviderItem(folder: folder, parentItemIdentifier: .rootContainer))
+            items.append(FileProviderItem(
+                folder: folder,
+                parentItemIdentifier: .rootContainer,
+                syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+            ))
 
             try db.upsertItem(.makeFolder(from: folder, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
             if existingItem == nil {
@@ -283,7 +299,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         for file in files where !file.isDeleted {
             let identifier = ItemIdentifier.file(file.id).rawValue
             let existingItem = try db.item(for: identifier)
-            items.append(FileProviderItem(file: file, parentItemIdentifier: .rootContainer))
+            items.append(FileProviderItem(
+                file: file,
+                parentItemIdentifier: .rootContainer,
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+            ))
 
             try db.upsertItem(.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
             if existingItem == nil {
@@ -313,12 +333,17 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         _ folder: RemoteFolder,
         parentIdentifier: NSFileProviderItemIdentifier,
         items: inout [NSFileProviderItem],
-        visibleIdentifiers: inout Set<String>
+        visibleIdentifiers: inout Set<String>,
+        syncSnapshot: ItemSyncSnapshot
     ) async throws {
         let identifier = ItemIdentifier.folder(folder.id).rawValue
         let existingItem = try db.item(for: identifier)
         visibleIdentifiers.insert(identifier)
-        items.append(FileProviderItem(folder: folder, parentItemIdentifier: parentIdentifier))
+        items.append(FileProviderItem(
+            folder: folder,
+            parentItemIdentifier: parentIdentifier,
+            syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+        ))
 
         try db.upsertItem(.makeFolder(from: folder, parent: parentIdentifier.rawValue))
         if existingItem == nil {
@@ -337,7 +362,11 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             let fileIdentifier = ItemIdentifier.file(file.id).rawValue
             let existingFile = try db.item(for: fileIdentifier)
             visibleIdentifiers.insert(fileIdentifier)
-            items.append(FileProviderItem(file: file, parentItemIdentifier: NSFileProviderItemIdentifier(identifier)))
+            items.append(FileProviderItem(
+                file: file,
+                parentItemIdentifier: NSFileProviderItemIdentifier(identifier),
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+            ))
 
             try db.upsertItem(.makeFile(from: file, parent: identifier))
             if existingFile == nil {
@@ -350,7 +379,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 childFolder,
                 parentIdentifier: NSFileProviderItemIdentifier(identifier),
                 items: &items,
-                visibleIdentifiers: &visibleIdentifiers
+                visibleIdentifiers: &visibleIdentifiers,
+                syncSnapshot: syncSnapshot
             )
         }
     }
@@ -368,13 +398,15 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             return []
         }
         if containerIdentifier == .workingSet {
+            let syncSnapshot = try itemSyncSnapshot()
             return try db.allItems()
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-                .map { FileProviderItem(trackedItem: $0) }
+                .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot)) }
         }
+        let syncSnapshot = try itemSyncSnapshot()
         return try db.children(of: containerIdentifier.rawValue)
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            .map { FileProviderItem(trackedItem: $0) }
+            .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot)) }
     }
 
     private func childFolders(of folderID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {
@@ -450,6 +482,68 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         return root.id
     }
 
+    private func itemSyncSnapshot() throws -> ItemSyncSnapshot {
+        ItemSyncSnapshot(
+            failures: try db.unresolvedFailureLookup(),
+            progress: try db.getProgress()
+        )
+    }
+
+    private func syncState(for trackedItem: TrackedItem, snapshot: ItemSyncSnapshot) -> FileProviderItemSyncState {
+        syncState(for: trackedItem.name, itemType: trackedItem.itemType, snapshot: snapshot)
+    }
+
+    private func syncState(
+        for itemName: String,
+        itemType: TrackedItemType,
+        snapshot: ItemSyncSnapshot
+    ) -> FileProviderItemSyncState {
+        let key = SyncDatabase.activityResolutionKey(itemName: itemName, itemType: itemType)
+        let failure = snapshot.failures[key]
+        let isUploading = snapshot.progress.isActiveUpload(forItemNamed: itemName)
+
+        return FileProviderItemSyncState(
+            isUploading: isUploading,
+            uploadingErrorMessage: failure?.errorMessage ?? (failure == nil ? nil : "Previous sync failed.")
+        )
+    }
+
+}
+
+private struct ItemSyncSnapshot {
+    let failures: [String: ActivityEntry]
+    let progress: SyncProgressState
+}
+
+private extension SyncProgressState {
+    func isActiveUpload(forItemNamed itemName: String) -> Bool {
+        guard state == .syncing,
+              let currentItem,
+              canonicalProgressName(currentItem) == canonicalProgressName(itemName) else {
+            return false
+        }
+
+        let lowercasedPhase = phase.lowercased()
+        return lowercasedPhase.contains("upload")
+            || lowercasedPhase.contains("finalizing")
+            || lowercasedPhase.contains("confirming")
+            || lowercasedPhase.contains("modifying")
+            || lowercasedPhase.contains("renaming")
+            || lowercasedPhase.contains("updating")
+            || lowercasedPhase.contains("deleting")
+    }
+}
+
+private func canonicalProgressName(_ value: String) -> String {
+    var canonical = value
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+        .replacingOccurrences(of: "_", with: "-")
+        .replacingOccurrences(of: " ", with: "-")
+    while canonical.contains("--") {
+        canonical = canonical.replacingOccurrences(of: "--", with: "-")
+    }
+    return canonical
 }
 
 private func describeError(_ error: any Error) -> String {

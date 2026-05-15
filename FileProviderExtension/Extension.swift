@@ -2,7 +2,7 @@
 import ImageRelayKit
 import os.log
 
-final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked Sendable {
+final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProviderCustomAction, @unchecked Sendable {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
     let domain: NSFileProviderDomain
 
@@ -128,7 +128,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 } else if identifier == .trashContainer {
                     handler.value(FileProviderItem(containerIdentifier: .trashContainer, filename: "Trash"), nil)
                 } else if let tracked = try db.item(for: identifier.rawValue) {
-                    handler.value(FileProviderItem(trackedItem: tracked), nil)
+                    handler.value(FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked)), nil)
                 } else {
                     handler.value(nil, NSFileProviderError(.noSuchItem))
                 }
@@ -190,7 +190,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
 
-                let item = FileProviderItem(trackedItem: tracked)
+                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
                 handler.value(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
@@ -471,7 +471,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         )
 
                         // Tell the OS to re-fetch the remote canonical version.
-                        handler.value(FileProviderItem(trackedItem: tracked), [.contents], false, nil)
+                        handler.value(FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked)), [.contents], false, nil)
                         self.signalLocalMutation(
                             affectedContainerIdentifiers: [item.parentItemIdentifier],
                             reason: "uploaded conflict copy"
@@ -590,7 +590,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                 }
 
                 try db.upsertItem(updated)
-                let resultItem = FileProviderItem(trackedItem: updated)
+                let resultItem = FileProviderItem(trackedItem: updated, syncState: self.syncState(for: updated))
                 handler.value(resultItem, [], false, nil)
                 if mutatesRemote {
                     self.signalLocalMutation(
@@ -700,6 +700,50 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             config: config,
             startupThrottleGate: startupThrottleGate
         )
+    }
+
+    // MARK: - Finder Context Actions
+
+    func performAction(
+        identifier actionIdentifier: NSFileProviderExtensionActionIdentifier,
+        onItemsWithIdentifiers itemIdentifiers: [NSFileProviderItemIdentifier],
+        completionHandler: @escaping ((any Error)?) -> Void
+    ) -> Progress {
+        let handler = UncheckedBox(value: completionHandler)
+        let logger = self.logger
+        let domain = self.domain
+        let targets = localMutationSignalTargets(itemIdentifiers)
+
+        Task {
+            guard actionIdentifier.rawValue == FileProviderAction.refreshFromImageRelay.rawValue else {
+                handler.value(NSFileProviderError(.cannotSynchronize))
+                return
+            }
+
+            guard let manager = NSFileProviderManager(for: domain) else {
+                handler.value(fileProviderCannotSynchronize("Image Relay could not reach the File Provider manager."))
+                return
+            }
+
+            var failures = 0
+            for target in targets {
+                do {
+                    try await manager.signalEnumerator(for: target)
+                } catch {
+                    failures += 1
+                    logger.debug("Finder refresh action signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+
+            if failures == targets.count {
+                handler.value(fileProviderCannotSynchronize("Image Relay could not refresh this item in Finder."))
+            } else {
+                logger.info("Finder refresh action signaled \(targets.count, privacy: .public) targets with \(failures, privacy: .public) failures")
+                handler.value(nil)
+            }
+        }
+
+        return Progress(totalUnitCount: 1)
     }
 
     // MARK: - Helpers
@@ -1187,6 +1231,15 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         }
     }
 
+    private func syncState(for trackedItem: TrackedItem) -> FileProviderItemSyncState {
+        let failure = (try? db.unresolvedFailure(itemName: trackedItem.name, itemType: trackedItem.itemType)) ?? nil
+        let progress = try? db.getProgress()
+        return FileProviderItemSyncState(
+            isUploading: progress?.isActiveFileProviderMutation(forItemNamed: trackedItem.name) ?? false,
+            uploadingErrorMessage: failure?.errorMessage ?? (failure == nil ? nil : "Previous sync failed.")
+        )
+    }
+
     private func updateProgress(
         state: SyncProgressState.SyncState,
         phase: String,
@@ -1214,6 +1267,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
     }
 
 }
+
+#if compiler(>=6.2)
+extension Extension: NSFileProviderSearching {
+    func searchEnumerator(for request: NSFileProviderStringSearchRequest) -> NSFileProviderSearchEnumerator {
+        SearchEnumerator(request: request, db: db)
+    }
+}
+#endif
 
 // MARK: - Request Body Types
 
