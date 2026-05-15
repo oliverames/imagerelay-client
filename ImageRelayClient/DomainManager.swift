@@ -299,6 +299,7 @@ final class DomainManager {
 
             do {
                 try await signalEnumerators(config: config)
+                markRemotePollSucceeded(intervalSeconds: Self.hostWatchdogIntervalSeconds)
             } catch {
                 logger.debug("Remote watchdog signal failed: \(error.localizedDescription, privacy: .public)")
             }
@@ -306,9 +307,13 @@ final class DomainManager {
     }
 
     private func markRemotePollSucceeded(config: AppConfiguration) {
+        markRemotePollSucceeded(intervalSeconds: config.pollIntervalSeconds)
+    }
+
+    private func markRemotePollSucceeded(intervalSeconds: Int) {
         guard let db = ensureDatabase() else { return }
         var progress = (try? db.getProgress()) ?? .idle
-        progress.markRemotePollSucceeded(intervalSeconds: config.pollIntervalSeconds)
+        progress.markRemotePollSucceeded(intervalSeconds: intervalSeconds)
         try? db.setProgress(progress)
         refreshStatus()
     }
@@ -445,7 +450,7 @@ final class DomainManager {
         ETA seconds: \(progress.etaSeconds.map(String.init) ?? "unknown")
         Rate limited until: \(progress.rateLimitedUntil?.description ?? "not rate-limited")
         Rate-limit waits in flight: \(progress.rateLimitInFlight)
-        Recent 429 count: \(progress.recentRateLimitCount)
+        429s recorded: \(progress.recentRateLimitCount)
         Persisted throttle failures: \(throttleState?.consecutiveFailures ?? 0)
         Last successful API: \(progress.lastSuccessfulAPIAt?.description ?? "unknown")
         Last remote poll: \(progress.lastRemotePollAt?.description ?? "never")

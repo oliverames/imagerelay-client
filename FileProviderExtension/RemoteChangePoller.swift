@@ -53,6 +53,7 @@ actor RemoteChangePoller {
                 baseIntervalSeconds: sleepConfig.pollIntervalSeconds,
                 consecutiveFailures: effectiveConsecutiveFailures()
             )
+            markNextPollScheduled(after: sleepInterval)
             do {
                 try await Task.sleep(for: .seconds(sleepInterval))
             } catch {
@@ -86,6 +87,7 @@ actor RemoteChangePoller {
                 logger.info("Remote poll signaled enumerators (folders: \(folderIDs.count, privacy: .public), folder failures: \(folderSignalFailures, privacy: .public))")
 
                 consecutiveFailures = 0
+                throttleStateStore?.recordSuccess()
 
                 if let db {
                     var progress = (try? db.getProgress()) ?? .idle
@@ -120,7 +122,7 @@ actor RemoteChangePoller {
     }
 
     static func shouldSignalRemoteChanges(config: AppConfiguration, pauseState: SyncPauseState) -> Bool {
-        config.syncUpload && config.syncDownload && !pauseState.isActive
+        config.syncDownload && !config.fileProviderDisconnected && !pauseState.isActive
     }
 
     private func currentConfig() -> AppConfiguration {
@@ -130,6 +132,13 @@ actor RemoteChangePoller {
 
     private func effectiveConsecutiveFailures() -> Int {
         max(consecutiveFailures, throttleStateStore?.load().consecutiveFailures ?? 0)
+    }
+
+    private func markNextPollScheduled(after interval: TimeInterval) {
+        guard let db else { return }
+        var progress = (try? db.getProgress()) ?? .idle
+        progress.markRemotePollScheduled(after: interval)
+        try? db.setProgress(progress)
     }
 
     private func folderIDsToSignal(config: AppConfiguration) -> [Int] {

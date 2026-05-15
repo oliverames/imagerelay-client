@@ -10,7 +10,6 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var timer: Timer?
     @State private var metadataEditingService = MetadataEditingService()
-    @State private var showAdvancedForOpen = false
     @State private var confirmStopSync = false
 
     var body: some View {
@@ -68,7 +67,7 @@ struct MenuBarView: View {
                 Button {
                     Task { await domainManager.retryFailedUploads() }
                 } label: {
-                    Label(retryFailedUploadsLabel, systemImage: "arrow.clockwise.circle")
+                    Label(retryFailedItemsLabel, systemImage: "arrow.clockwise.circle")
                 }
                 .disabled(!domainManager.isDomainActive || domainManager.syncDisconnected)
             }
@@ -166,21 +165,19 @@ struct MenuBarView: View {
 
             Divider()
 
-            if showAdvancedDiagnostics {
-                Menu {
-                    diagnosticsRows
-                } label: {
-                    Label("Diagnostics", systemImage: "stethoscope")
-                }
-
-                Button {
-                    copyDiagnostics()
-                } label: {
-                    Label("Copy Diagnostics", systemImage: "doc.on.clipboard")
-                }
-
-                Divider()
+            Menu {
+                diagnosticsRows
+            } label: {
+                Label("Diagnostics", systemImage: "stethoscope")
             }
+
+            Button {
+                copyDiagnostics()
+            } label: {
+                Label("Copy Diagnostics", systemImage: "doc.on.clipboard")
+            }
+
+            Divider()
 
             Button {
                 openSettingsWindow()
@@ -271,20 +268,8 @@ struct MenuBarView: View {
             return domainManager.syncProgress.phase
         }
 
-        let now = Date()
-        if let nextPoll = domainManager.syncProgress.nextRemotePollAt, nextPoll > now {
-            return "Next check \(Self.relativeFormatter.localizedString(for: nextPoll, relativeTo: now))"
-        }
-
-        if let nextPoll = domainManager.syncProgress.nextRemotePollAt, nextPoll <= now {
-            if let lastPoll = domainManager.syncProgress.lastRemotePollAt {
-                return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: now)); next check overdue"
-            }
-            return "Next check overdue"
-        }
-
         if let lastPoll = domainManager.syncProgress.lastRemotePollAt {
-            return "Last checked \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: now))"
+            return "Synced \(Self.relativeFormatter.localizedString(for: lastPoll, relativeTo: Date()))"
         }
 
         return nil
@@ -292,6 +277,11 @@ struct MenuBarView: View {
 
     private var throughputLine: String? {
         guard domainManager.syncProgress.state == .syncing else { return nil }
+        if domainManager.syncProgress.totalBytes > 0,
+           domainManager.syncProgress.completedBytes >= domainManager.syncProgress.totalBytes,
+           domainManager.syncProgress.phase.localizedCaseInsensitiveContains("confirming") {
+            return "Upload transferred; confirming with Image Relay"
+        }
         let speed = domainManager.syncProgress.smoothedBytesPerSecond
         guard speed > 0 else { return nil }
         return "\(Self.byteFormatter.string(fromByteCount: speed))/s"
@@ -315,8 +305,8 @@ struct MenuBarView: View {
         return "\(domainManager.failedUploadCount) \(item) need attention"
     }
 
-    private var retryFailedUploadsLabel: String {
-        let item = domainManager.failedUploadCount == 1 ? "upload" : "uploads"
+    private var retryFailedItemsLabel: String {
+        let item = domainManager.failedUploadCount == 1 ? "item" : "items"
         return "Retry \(domainManager.failedUploadCount) failed \(item)"
     }
 
@@ -345,16 +335,12 @@ struct MenuBarView: View {
     private var diagnosticsRows: some View {
         Text("Throughput: \(throughputLine ?? "Idle")").disabled(true)
         Text("Failed items: \(domainManager.failedUploadCount)").disabled(true)
-        Text("Recent 429s: \(domainManager.syncProgress.recentRateLimitCount)").disabled(true)
+        Text("429s recorded: \(domainManager.syncProgress.recentRateLimitCount)").disabled(true)
         Text("Rate-limit waits: \(domainManager.syncProgress.rateLimitInFlight)").disabled(true)
         Text("Queue: \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)").disabled(true)
         Text("Next poll: \(nextPollDiagnostics)").disabled(true)
         Text("Last API: \(lastAPIDiagnostics)").disabled(true)
         Text("FP PID: \(domainManager.syncProgress.fileProviderPID.map(String.init) ?? "Unknown")").disabled(true)
-    }
-
-    private var showAdvancedDiagnostics: Bool {
-        showAdvancedForOpen || domainManager.showAdvancedInformation
     }
 
     private var nextPollDiagnostics: String {
@@ -489,7 +475,6 @@ struct MenuBarView: View {
     }
 
     private func startPolling() {
-        showAdvancedForOpen = NSEvent.modifierFlags.contains(.option)
         domainManager.refreshStatus()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in

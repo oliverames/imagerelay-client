@@ -285,6 +285,45 @@ struct SyncDatabaseTests {
         #expect(progress.nextRemotePollAt == now.addingTimeInterval(60))
     }
 
+    @Test("Remote poll scheduled records actual delay")
+    func remotePollScheduledRecordsActualDelay() {
+        let now = Date(timeIntervalSince1970: 1_777_777_100)
+        var progress = SyncProgressState(lastRemotePollAt: now.addingTimeInterval(-60))
+
+        progress.markRemotePollScheduled(after: 240, now: now)
+
+        #expect(progress.nextRemotePollAt == now.addingTimeInterval(240))
+        #expect(progress.lastRemotePollAt == now.addingTimeInterval(-60))
+    }
+
+    @Test("Remote poll success preserves active operation progress")
+    func remotePollSuccessPreservesActiveOperationProgress() {
+        let now = Date(timeIntervalSince1970: 1_777_777_200)
+        var progress = SyncProgressState(
+            state: .syncing,
+            phase: "Confirming upload",
+            completedSteps: 4,
+            totalSteps: 8,
+            etaSeconds: 10,
+            currentItem: "photo.jpg",
+            completedBytes: 100,
+            totalBytes: 100,
+            smoothedBytesPerSecond: 50
+        )
+
+        progress.markRemotePollSucceeded(intervalSeconds: 60, now: now)
+
+        #expect(progress.state == .syncing)
+        #expect(progress.phase == "Confirming upload")
+        #expect(progress.completedSteps == 4)
+        #expect(progress.totalSteps == 8)
+        #expect(progress.currentItem == "photo.jpg")
+        #expect(progress.completedBytes == 100)
+        #expect(progress.totalBytes == 100)
+        #expect(progress.lastRemotePollAt == now)
+        #expect(progress.nextRemotePollAt == now.addingTimeInterval(60))
+    }
+
     @Test("Concurrent progress writes preserve all operation counters")
     func concurrentProgressWritesPreserveCounters() async throws {
         let db = try makeDB()
@@ -394,5 +433,73 @@ struct SyncDatabaseTests {
 
         #expect(try db.unresolvedFailureCount() == 1)
         #expect(try db.recentUnresolvedFailures().map(\.itemName) == ["stuck.docx"])
+    }
+
+    @Test("Unresolved failures are resolved by canonicalized later success")
+    func unresolvedFailuresResolveCanonicalizedNames() throws {
+        let db = try makeDB()
+        try db.logActivity(action: .uploadFailed, itemName: "Photo Release Form.docx", itemType: .file, errorMessage: "timeout")
+        try db.logActivity(action: .uploaded, itemName: "Photo-Release-Form.docx", itemType: .file)
+
+        #expect(try db.unresolvedFailureCount() == 0)
+        #expect(try db.recentUnresolvedFailures().isEmpty)
+    }
+
+    @Test("Root folders cache round trips through settings")
+    func rootFoldersCacheRoundTrip() throws {
+        let db = try makeDB()
+        let fetchedAt = Date(timeIntervalSince1970: 1_777_900_000)
+        let snapshot = CachedRootFoldersSnapshot(
+            folders: [
+                CachedFolder(id: 10, name: "Photography", parentID: 1, path: "Root/Photography", updatedOn: "2026-05-14", childCount: 3)
+            ],
+            fetchedAt: fetchedAt,
+            rootFolderID: 1
+        )
+
+        try db.storeRootFoldersCache(snapshot)
+        let loaded = try #require(try db.cachedRootFolders())
+
+        #expect(loaded == snapshot)
+        #expect(loaded.folders.first?.trackedItem(parentIdentifier: "root").remoteID == 10)
+    }
+
+    @Test("Missing settings caches return nil")
+    func missingSettingsCachesReturnNil() throws {
+        let db = try makeDB()
+
+        #expect(try db.cachedRootFolders() == nil)
+        #expect(try db.cachedUploadLinks() == nil)
+    }
+
+    @Test("Upload links cache round trips through settings")
+    func uploadLinksCacheRoundTrip() throws {
+        let db = try makeDB()
+        let fetchedAt = Date(timeIntervalSince1970: 1_777_900_001)
+        let snapshot = CachedUploadLinksSnapshot(
+            links: [
+                UploadLink(id: 20, url: "https://example.test/upload", name: "Drop", folderID: 10, folderName: "Photography")
+            ],
+            fetchedAt: fetchedAt
+        )
+
+        try db.storeUploadLinksCache(snapshot)
+        let loaded = try #require(try db.cachedUploadLinks())
+
+        #expect(loaded == snapshot)
+    }
+
+    @Test("Cache snapshots decode legacy payloads with defaults")
+    func cacheSnapshotsDecodeLegacyPayloadsWithDefaults() throws {
+        let rootData = Data(#"{"folders":[{"id":12,"name":"Root"}]}"#.utf8)
+        let linksData = Data(#"{"links":[{"id":22,"purpose":"Contributor Drop"}]}"#.utf8)
+
+        let root = try JSONDecoder.imageRelay.decode(CachedRootFoldersSnapshot.self, from: rootData)
+        let links = try JSONDecoder.imageRelay.decode(CachedUploadLinksSnapshot.self, from: linksData)
+
+        #expect(root.folders.first?.name == "Root")
+        #expect(root.fetchedAt == .distantPast)
+        #expect(links.links.first?.name == "Contributor Drop")
+        #expect(links.fetchedAt == .distantPast)
     }
 }

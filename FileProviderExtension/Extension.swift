@@ -311,6 +311,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                         // the remote identifier. Treat that as a version update.
                         fileID = existingRemote.id
                         try await self.replaceFileContents(remoteID: existingRemote.id, name: itemTemplate.filename, data: fileData)
+                        self.updateProgress(state: .syncing, phase: "Confirming upload", currentItem: itemTemplate.filename)
                         let confirmed = try await self.waitForRemoteFileSize(
                             remoteID: existingRemote.id,
                             parentFolderID: parentFolderID,
@@ -485,6 +486,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
                     let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
 
                     try await self.replaceFileContents(remoteID: remoteID, name: item.filename, data: fileData)
+                    self.updateProgress(state: .syncing, phase: "Confirming upload", currentItem: tracked.name)
                     let confirmed = try await self.waitForRemoteFileSize(
                         remoteID: remoteID,
                         parentFolderID: parentFolderID,
@@ -750,6 +752,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             chunkSize: 5 * 1024 * 1024,
             responseType: UploadJob.self
         )
+        updateProgress(state: .syncing, phase: "Finalizing upload", currentItem: name)
 
         var completedJob = uploadResult.lastResponse ?? job
         if completedJob.finished != true || completedJob.assetID == nil {
@@ -761,10 +764,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             throw ExtensionError.uploadJobMissingAssetID
         }
 
+        updateProgress(state: .syncing, phase: "Confirming upload", currentItem: name)
+
         let confirmed: RemoteFile
         if fileData.isEmpty {
             do {
                 try await replaceFileContents(remoteID: assetID, name: name, data: fileData)
+                updateProgress(state: .syncing, phase: "Confirming upload", currentItem: name)
                 confirmed = try await waitForRemoteFileSize(
                     remoteID: assetID,
                     parentFolderID: parentFolderID,
@@ -1051,10 +1057,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
             pathBuilder: { n in "/files/\(remoteID)/versions/\(uuid)/chunk/\(n)" },
             chunkSize: 5 * 1024 * 1024
         )
+        updateProgress(state: .syncing, phase: "Finalizing version", currentItem: name)
         try await api.post(
             "/files/\(remoteID)/versions/\(uuid)/complete.json",
             body: VersionCompleteRequest(file_name: name, chunk_count: chunkCount)
         )
+        updateProgress(state: .syncing, phase: "Confirming upload", currentItem: name)
     }
 
     private func renameFileByVersion(

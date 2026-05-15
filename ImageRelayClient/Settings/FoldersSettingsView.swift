@@ -8,6 +8,7 @@ struct FoldersSettingsView: View {
     @State private var selectedFolderIDs: Set<Int> = []
     @State private var isLoading = false
     @State private var loadError: String?
+    @State private var cachedAt: Date?
 
     private var container: URL? { AppConfiguration.containerURL() }
 
@@ -18,7 +19,7 @@ struct FoldersSettingsView: View {
                     ContentUnavailableView(
                         "No Folders Synced Yet",
                         systemImage: "folder",
-                        description: Text("Folders will appear here once Image Relay connects and enumerates your library.")
+                        description: Text("Folders will appear here after the first library refresh.")
                     )
 
                     if isLoading {
@@ -36,6 +37,10 @@ struct FoldersSettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Spacer()
+                        if isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
                         Button {
                             Task { await load(refreshRemote: true) }
                         } label: {
@@ -58,6 +63,14 @@ struct FoldersSettingsView: View {
                                 .labelsHidden()
                         }
                     }
+                }
+
+                if let cachedAt {
+                    Text("Last refreshed \(cachedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                        .padding(.bottom, selectedFolderIDs.isEmpty ? 0 : 4)
                 }
 
                 if !selectedFolderIDs.isEmpty {
@@ -98,6 +111,9 @@ struct FoldersSettingsView: View {
 
             var rootFolders = try cachedRootFolders(from: db)
             var refreshError: (any Error)?
+            if !rootFolders.isEmpty {
+                folders = rootFolders
+            }
             if config.isConfigured {
                 do {
                     rootFolders = try await refreshRootFolders(config: config, db: db)
@@ -130,8 +146,19 @@ struct FoldersSettingsView: View {
     }
 
     private func cachedRootFolders(from db: SyncDatabase) throws -> [TrackedItem] {
-        try db.folders(parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue)
+        if let snapshot = try db.cachedRootFolders(), !snapshot.folders.isEmpty {
+            cachedAt = snapshot.fetchedAt
+            return snapshot.folders
+                .map { $0.trackedItem(parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue) }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+
+        let tracked = try db.folders(parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue)
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        if !tracked.isEmpty {
+            cachedAt = nil
+        }
+        return tracked
     }
 
     private func refreshRootFolders(config: AppConfiguration, db: SyncDatabase) async throws -> [TrackedItem] {
@@ -162,6 +189,14 @@ struct FoldersSettingsView: View {
         for folder in trackedFolders {
             try db.upsertItem(folder)
         }
+        try db.storeRootFoldersCache(
+            CachedRootFoldersSnapshot(
+                folders: topLevelFolders.map(CachedFolder.init(remoteFolder:)),
+                fetchedAt: Date(),
+                rootFolderID: rootFolderID
+            )
+        )
+        cachedAt = Date()
         return trackedFolders
     }
 

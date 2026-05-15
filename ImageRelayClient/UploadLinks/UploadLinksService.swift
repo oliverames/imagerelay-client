@@ -34,7 +34,19 @@ final class UploadLinksService {
         let api = try makeClient()
         // Paginate so accounts with many upload links see every entry — the
         // API caps a single page at ~100.
-        return try await api.getAllPages("/upload_links.json")
+        let links: [UploadLink] = try await api.getAllPages("/upload_links.json")
+        try? storeCachedLinks(links)
+        return links
+    }
+
+    func cachedLinks() throws -> CachedUploadLinksSnapshot? {
+        try makeDatabase()?.cachedUploadLinks()
+    }
+
+    func storeCachedLinks(_ links: [UploadLink]) throws {
+        try makeDatabase()?.storeUploadLinksCache(
+            CachedUploadLinksSnapshot(links: links, fetchedAt: Date())
+        )
     }
 
     func create(_ payload: UploadLinkCreate) async throws -> UploadLink {
@@ -72,6 +84,13 @@ final class UploadLinksService {
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else { return .default }
         return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+    }
+
+    private func makeDatabase() throws -> SyncDatabase? {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+        ) else { return nil }
+        return try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
     }
 
     private struct CreateResponse: Decodable, Sendable {

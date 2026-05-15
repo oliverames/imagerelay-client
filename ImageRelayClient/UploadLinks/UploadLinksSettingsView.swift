@@ -13,6 +13,15 @@ struct UploadLinksSettingsView: View {
 
             Divider()
 
+            if let warning = state.refreshWarning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                Divider()
+            }
+
             content
 
             Divider()
@@ -141,10 +150,14 @@ struct UploadLinksSettingsView: View {
 
     private var footer: some View {
         HStack {
-            Text("\(state.links.count) link\(state.links.count == 1 ? "" : "s")")
+            Text(footerStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
+            if state.isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+            }
             Button {
                 Task { await state.load() }
             } label: {
@@ -152,9 +165,18 @@ struct UploadLinksSettingsView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh")
+            .disabled(state.isRefreshing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    private var footerStatus: String {
+        var text = "\(state.links.count) link\(state.links.count == 1 ? "" : "s")"
+        if let cachedAt = state.cachedAt {
+            text += " • refreshed \(cachedAt.formatted(date: .abbreviated, time: .shortened))"
+        }
+        return text
     }
 
     private func copyURL(_ link: UploadLink) {
