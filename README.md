@@ -19,7 +19,7 @@
   <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
     <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
-  <img src="https://img.shields.io/badge/status-1.1-f5a542?style=flat-square" alt="1.1">
+  <img src="https://img.shields.io/badge/status-1.2-f5a542?style=flat-square" alt="1.2">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
     <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
@@ -30,7 +30,7 @@
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.1 release**: Image Relay Client is ready for day-to-day Finder sync on macOS 26 (Tahoe), with Finder-aware metadata editing, upload-link management, Collections, Products, Webhooks, and Library Admin tools added on top of the 1.0 sync foundation.
+> **1.2 release**: Image Relay Client deepens the Finder integration on macOS 26 (Tahoe). Finder shows native upload/download state, child counts, and needs-attention decorations; right-click adds Refresh from Image Relay and Copy Public Link. The menu bar surfaces ETA, throughput, rate-limit state, and failed-upload counts; you can retry failed uploads, OAuth-authenticate developer apps, or Stop Sync Completely without a Terminal. All 1.1 capabilities (metadata editing, upload links, Collections, Products, Webhooks, Library Admin) carry forward unchanged.
 
 ## Why This Exists
 
@@ -69,8 +69,11 @@ brew install --cask image-relay
 - **Upload on save** — drop a file into the Finder location and it uploads automatically in 5 MB chunks
 - **Selective sync** — choose which top-level folders appear in Finder; unselected folders stay invisible
 - **Conflict preservation** — if a file changes remotely while you're editing locally, your version is uploaded as a conflict copy and the remote version takes the canonical slot; nothing is silently discarded
-- **Pause controls** — pause sync for 30 minutes, 1 hour, until tomorrow, or indefinitely from the menu bar
-- **Live status** — menu bar shows sync state, recent activity, and the next scheduled remote check
+- **Pause controls** — pause sync for 30 minutes, 1 hour, until tomorrow, or indefinitely from the menu bar; pause also stops the remote poller
+- **Stop / reconnect** — Stop Sync Completely disconnects the File Provider domain from the menu bar; Reconnect Sync brings it back
+- **Live status with ETA** — menu bar shows sync state, batch progress, time remaining, throughput, recent activity, and rate-limit waits
+- **Bulk retry** — Retry N Failed Uploads in the menu bar re-queues every failed item in one click
+- **OAuth or API key** — connect via classic API key or an Image Relay Developer-app OAuth flow
 - **Update checks** — Sparkle-backed Check for Updates action from the menu bar
 - **Diagnostics export** - export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
 - **Domain reset** - Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
@@ -160,8 +163,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (122 tests across 19 suites:
-# 108 ImageRelayKitTests + 14 FileProviderExtensionTests)
+# Run the unit test suite (163 tests across 22 suites:
+# 139 ImageRelayKitTests + 24 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -171,13 +174,13 @@ xcodebuild test \
 swift test --package-path ImageRelayKit
 
 # Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.1.1
+scripts/run-release-candidate-checks.sh 1.2.0
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.1.1
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.0
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.1.1 --smoke-install
+scripts/build-developer-id-release.sh --version 1.2.0 --smoke-install
 ```
 
 ## Known Limitations

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.1.1}"
+VERSION="${1:-1.2.0}"
 RUN_LIVE_SYNC="${RUN_LIVE_SYNC:-0}"
 RUN_PACKAGE="${RUN_PACKAGE:-0}"
 XCODE_CLONED_SOURCE_PACKAGES_DIR="${XCODE_CLONED_SOURCE_PACKAGES_DIR:-}"
