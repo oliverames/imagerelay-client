@@ -127,10 +127,20 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Create a folder link on a known-safe folder, copy the URL, delete the folder link. Confirm the URL stops working after the delete propagates.
 - Skip Invited User Create and User Permission-Group Update during smoke tests — both produce side effects (real invitation emails, real permission changes) on real users.
 
+## Finder Context Actions (1.2)
+
+- Right-click a tracked folder in Finder. Confirm the Quick Actions submenu lists Refresh from Image Relay, Copy Public Link, and Open Folder in Image Relay Web.
+- Choose Refresh from Image Relay on a folder and confirm Finder re-enumerates.
+- Choose Copy Public Link on a single file and confirm the pasteboard holds a `https://links.imagerelay.com/cdn/...` URL that downloads inline in the browser.
+- Choose Open Folder in Image Relay Web on a folder and confirm the default browser opens to your account's `https://<subdomain>.imagerelay.com/folders/<id>` page.
+- Choose Open Folder in Image Relay Web on a file selection and confirm the browser opens to the file's containing folder.
+- Quit the app, relaunch, choose Open Folder in Image Relay Web again, and confirm the action skips the `/users/me.json` round-trip (the web base URL is cached in `config.json` after the first invocation).
+- If the action falls back to copying the URL instead of opening the browser, confirm the pasteboard holds the folder URL and the menu bar's activity log notes the fallback.
+
 ## Release Automation
 
-- Run `scripts/run-release-candidate-checks.sh 1.2.0` on a macOS 26 machine with Xcode 26.
-- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.2.0.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.0`.
-- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.2.0`.
+- Run `scripts/run-release-candidate-checks.sh 1.2.1` on a macOS 26 machine with Xcode 26.
+- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.2.1.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.1`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.2.1`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

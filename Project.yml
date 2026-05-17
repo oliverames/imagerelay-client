@@ -18,8 +18,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: PV3W52NDZ3
-    MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "34"
+    MARKETING_VERSION: "1.2.1"
+    CURRENT_PROJECT_VERSION: "35"
     ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
@@ -123,6 +123,9 @@ targets:
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-public-link
               NSExtensionFileProviderActionName: Copy Public Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web
+              NSExtensionFileProviderActionName: Open Folder in Image Relay Web
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
           NSFileProviderDecorations:
             - Identifier: com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention

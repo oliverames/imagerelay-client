@@ -1,9 +1,9 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    public static let currentServiceUserAgent = "ImageRelayClient/1.2.0"
-    public static let currentMacUserAgent = "ImageRelayClient/1.2.0 (macOS)"
-    public static let currentIOSUserAgent = "ImageRelayClient/1.2.0 (iOS)"
+    public static let currentServiceUserAgent = "ImageRelayClient/1.2.1"
+    public static let currentMacUserAgent = "ImageRelayClient/1.2.1 (macOS)"
+    public static let currentIOSUserAgent = "ImageRelayClient/1.2.1 (iOS)"
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -23,7 +23,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.2.0-beta.3",
         "ImageRelayClient/1.2.0-beta.3 (macOS)",
         "ImageRelayClient/1.2.0-beta.4",
-        "ImageRelayClient/1.2.0-beta.4 (macOS)"
+        "ImageRelayClient/1.2.0-beta.4 (macOS)",
+        "ImageRelayClient/1.2.0",
+        "ImageRelayClient/1.2.0 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -38,7 +40,8 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.2.0-beta.1 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0-beta.2 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0-beta.3 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" {
+            userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" ||
+            userAgent == "ImageRelayClient/1.2.0 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
@@ -66,6 +69,11 @@ public struct AppConfiguration: Codable, Sendable {
     public var fileProviderDisconnected: Bool
     /// Folder remote IDs to include in sync. Empty means all folders sync.
     public var selectedFolderIDs: [Int]
+    /// Image Relay account's web base URL (e.g., `https://bluecrossvt.imagerelay.com`).
+    /// Populated lazily by Finder right-click actions that need it (e.g., "Open Folder
+    /// in Image Relay Web") by probing `GET /users/me.json` once and persisting the
+    /// `subdomain.http_base` value here. Nil until first action invocation.
+    public var webBaseURL: URL?
 
     // Sensitive auth fields intentionally absent — they are never written to JSON.
     enum CodingKeys: String, CodingKey {
@@ -85,6 +93,7 @@ public struct AppConfiguration: Codable, Sendable {
         case showAdvancedInformation = "show_advanced_information"
         case fileProviderDisconnected = "file_provider_disconnected"
         case selectedFolderIDs = "selected_folder_ids"
+        case webBaseURL = "web_base_url"
     }
 
     public init(
@@ -106,7 +115,8 @@ public struct AppConfiguration: Codable, Sendable {
         maxConcurrentFiles: Int = 10,
         showAdvancedInformation: Bool = false,
         fileProviderDisconnected: Bool = false,
-        selectedFolderIDs: [Int] = []
+        selectedFolderIDs: [Int] = [],
+        webBaseURL: URL? = nil
     ) {
         self.apiKey = apiKey
         self.authMethod = authMethod
@@ -127,6 +137,7 @@ public struct AppConfiguration: Codable, Sendable {
         self.showAdvancedInformation = showAdvancedInformation
         self.fileProviderDisconnected = fileProviderDisconnected
         self.selectedFolderIDs = selectedFolderIDs
+        self.webBaseURL = webBaseURL
     }
 
     public init(from decoder: Decoder) throws {
@@ -152,6 +163,12 @@ public struct AppConfiguration: Codable, Sendable {
         showAdvancedInformation = try c.decodeIfPresent(Bool.self, forKey: .showAdvancedInformation) ?? false
         fileProviderDisconnected = try c.decodeIfPresent(Bool.self, forKey: .fileProviderDisconnected) ?? false
         selectedFolderIDs = try c.decodeIfPresent([Int].self, forKey: .selectedFolderIDs) ?? []
+        if let raw = try c.decodeIfPresent(String.self, forKey: .webBaseURL),
+           let url = URL(string: raw) {
+            webBaseURL = url
+        } else {
+            webBaseURL = nil
+        }
     }
 
     public var isConfigured: Bool {

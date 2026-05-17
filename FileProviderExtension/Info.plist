@@ -46,6 +46,14 @@
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Public Link</string>
 			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Open Folder in Image Relay Web</string>
+			</dict>
 		</array>
 		<key>NSExtensionFileProviderAllowsUserControlledEviction</key>
 		<true/>

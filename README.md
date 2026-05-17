@@ -30,7 +30,7 @@
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.2 release**: Image Relay Client deepens the Finder integration on macOS 26 (Tahoe). Finder shows native upload/download state, child counts, and needs-attention decorations; right-click adds Refresh from Image Relay and Copy Public Link. The menu bar surfaces ETA, throughput, rate-limit state, and failed-upload counts; you can retry failed uploads, OAuth-authenticate developer apps, or Stop Sync Completely without a Terminal. All 1.1 capabilities (metadata editing, upload links, Collections, Products, Webhooks, Library Admin) carry forward unchanged.
+> **1.2 release**: Image Relay Client deepens the Finder integration on macOS 26 (Tahoe). Finder shows native upload/download state, child counts, and needs-attention decorations; right-click adds Refresh from Image Relay, Copy Public Link, and Open Folder in Image Relay Web. The menu bar surfaces ETA, throughput, rate-limit state, and failed-upload counts; you can retry failed uploads, OAuth-authenticate developer apps, or Stop Sync Completely without a Terminal. All 1.1 capabilities (metadata editing, upload links, Collections, Products, Webhooks, Library Admin) carry forward unchanged.
 
 ## Why This Exists
 
@@ -79,6 +79,7 @@ brew install --cask image-relay
 - **Domain reset** - Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
 - **Metadata editing** - edit descriptions, keywords, and custom text fields for the selected Finder item without opening the web app
 - **Copy Public Link** - right-click a tracked file in Finder and choose Copy Public Link to mint an Image Relay quick link with inline disposition and paste-ready URL on the clipboard
+- **Open Folder in Image Relay Web** - right-click any tracked item and jump straight to the folder's page in your Image Relay web app; works on folders directly and on files by revealing the containing folder
 - **Upload links** - create, inspect, copy, and revoke Image Relay upload links from Settings
 - **Library tools** - browse Collections, Products, Webhooks, file types, keywords, users, folder links, quick links, permission groups, and invited users from native windows
 
@@ -163,8 +164,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (163 tests across 22 suites:
-# 139 ImageRelayKitTests + 24 FileProviderExtensionTests)
+# Run the unit test suite (168 tests across 23 suites:
+# 144 ImageRelayKitTests + 24 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -174,13 +175,13 @@ xcodebuild test \
 swift test --package-path ImageRelayKit
 
 # Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.2.0
+scripts/run-release-candidate-checks.sh 1.2.1
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.0
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.1
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.2.0 --smoke-install
+scripts/build-developer-id-release.sh --version 1.2.1 --smoke-install
 ```
 
 ## Known Limitations

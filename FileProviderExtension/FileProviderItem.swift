@@ -30,6 +30,9 @@ enum FileProviderAction {
     static let copyPublicLink = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.copy-public-link"
     )
+    static let openFolderInWeb = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web"
+    )
 }
 
 final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDecorating {

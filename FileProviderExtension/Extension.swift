@@ -718,6 +718,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 await self.runRefreshAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.copyPublicLink.rawValue:
                 await self.runCopyPublicLinkAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.openFolderInWeb.rawValue:
+                await self.runOpenFolderInWebAction(itemIdentifiers: itemIdentifiers, handler: handler)
             default:
                 handler.value(NSFileProviderError(.cannotSynchronize))
             }
@@ -824,6 +826,123 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
         logger.info("Copied \(urls.count, privacy: .public) public link(s) to pasteboard")
         handler.value(nil)
+    }
+
+    /// Open the selected folder (or, for a file selection, its containing folder)
+    /// in the user's Image Relay web app. The web base URL is discovered from
+    /// `GET /users/me.json` on first invocation and cached in `config.json` so
+    /// later invocations skip the round trip.
+    private func runOpenFolderInWebAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+
+        guard let target = itemIdentifiers.first else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        let folderID: Int
+        do {
+            folderID = try await resolveWebOpenFolderID(target)
+        } catch {
+            logger.error("Open in web could not resolve a folder for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            handler.value(fileProviderCannotSynchronize("Image Relay could not determine which folder to open."))
+            return
+        }
+
+        let webBaseURL: URL
+        do {
+            webBaseURL = try await resolvedWebBaseURL()
+        } catch {
+            logger.error("Open in web could not resolve web base URL: \(error.localizedDescription, privacy: .public)")
+            handler.value(fileProviderCannotSynchronize("Image Relay could not look up your web URL. Check your API key in Settings."))
+            return
+        }
+
+        let folderURL = webBaseURL
+            .appendingPathComponent("folders")
+            .appendingPathComponent(String(folderID))
+
+        let opened = await MainActor.run {
+            NSWorkspace.shared.open(folderURL)
+        }
+
+        if opened {
+            logger.info("Opened folder \(folderID, privacy: .public) in Image Relay web")
+            handler.value(nil)
+            return
+        }
+
+        // NSWorkspace declined — fall back to writing the URL to the pasteboard
+        // so the user still gets something useful from the action.
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(folderURL.absoluteString, forType: .string)
+            pasteboard.setString(folderURL.absoluteString, forType: .URL)
+        }
+        logger.warning("NSWorkspace declined to open \(folderURL.absoluteString, privacy: .public); URL copied to pasteboard instead")
+        handler.value(nil)
+    }
+
+    /// Resolve a selected item to the folder ID that should open in the web app.
+    /// Folder selections resolve to the folder itself; file selections resolve to
+    /// the file's containing folder.
+    private func resolveWebOpenFolderID(_ identifier: NSFileProviderItemIdentifier) async throws -> Int {
+        guard let itemID = ItemIdentifier(rawValue: identifier.rawValue) else {
+            // Root container or working set — fall back to the configured root.
+            return try await resolveRootFolderID()
+        }
+        if itemID.isFolder, let folderID = itemID.numericID {
+            return folderID
+        }
+        guard itemID.isFile,
+              let tracked = try? db.item(for: identifier.rawValue) else {
+            throw ExtensionError.invalidParentIdentifier(identifier.rawValue)
+        }
+        return try await resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
+    }
+
+    /// Return the cached web base URL or, if absent, probe `/users/me.json` once
+    /// and persist the result to `config.json` for future invocations.
+    private func resolvedWebBaseURL() async throws -> URL {
+        if let cached = currentDiskConfig()?.webBaseURL {
+            return cached
+        }
+        let info: UserInfo = try await api.get("/users/me.json")
+        guard let url = info.subdomain.httpBase else {
+            throw ExtensionError.remoteFolderNotConfirmed
+        }
+        persistWebBaseURL(url)
+        return url
+    }
+
+    private func currentDiskConfig() -> AppConfiguration? {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier
+        ) else { return nil }
+        return try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))
+    }
+
+    private func persistWebBaseURL(_ url: URL) {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier
+        ) else { return }
+        let configURL = AppConfiguration.fileURL(in: container)
+        guard var disk = try? AppConfiguration.load(from: configURL) else { return }
+        if disk.webBaseURL == url { return }
+        disk.webBaseURL = url
+        // JSON-only write: avoid the full `save(to:)` path because that re-stamps
+        // the Keychain entries for the API key and OAuth tokens and would race
+        // with the host app's OAuth-token refresh if the two collided.
+        do {
+            let data = try JSONEncoder.imageRelay.encode(disk)
+            try data.write(to: configURL, options: .atomic)
+        } catch {
+            logger.warning("Could not persist cached web base URL: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Helpers

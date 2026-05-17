@@ -172,7 +172,9 @@ struct ConfigurationTests {
             "ImageRelayClient/1.2.0-beta.3",
             "ImageRelayClient/1.2.0-beta.3 (macOS)",
             "ImageRelayClient/1.2.0-beta.4",
-            "ImageRelayClient/1.2.0-beta.4 (macOS)"
+            "ImageRelayClient/1.2.0-beta.4 (macOS)",
+            "ImageRelayClient/1.2.0",
+            "ImageRelayClient/1.2.0 (macOS)"
         ]
 
         for userAgent in previousBuiltInDefaults {
@@ -200,6 +202,7 @@ struct ConfigurationTests {
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.2.0-beta.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.2.0-beta.3 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.2.0-beta.4 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.2.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
     }
 
@@ -288,5 +291,45 @@ struct ConfigurationTests {
 
         config.remoteRootFolderID = 1
         #expect(config.isConfigured == true)
+    }
+
+    @Test("webBaseURL defaults to nil and round-trips through save/load")
+    func webBaseURLRoundTrips() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        var config = AppConfiguration.default
+        config.apiKey = "k"
+        #expect(config.webBaseURL == nil)
+
+        config.webBaseURL = URL(string: "https://bluecrossvt.imagerelay.com")
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.webBaseURL?.absoluteString == "https://bluecrossvt.imagerelay.com")
+    }
+
+    @Test("Legacy config.json without web_base_url decodes cleanly")
+    func legacyConfigWithoutWebBaseURL() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let legacyJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/1.2.0 (macOS)","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.webBaseURL == nil)
+        #expect(loaded.remoteRootFolderID == 99)
     }
 }
