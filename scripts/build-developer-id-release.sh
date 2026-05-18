@@ -67,6 +67,17 @@ if [[ -z "$VERSION" ]]; then
   exit 64
 fi
 
+PROJECT_MARKETING_VERSION="$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' "$ROOT_DIR/Project.yml")"
+PROJECT_BUILD_VERSION="$(awk -F'"' '/CURRENT_PROJECT_VERSION:/ {print $2; exit}' "$ROOT_DIR/Project.yml")"
+if [[ "$PROJECT_MARKETING_VERSION" != "$VERSION" ]]; then
+  echo "Project.yml MARKETING_VERSION ($PROJECT_MARKETING_VERSION) does not match --version ($VERSION)." >&2
+  exit 65
+fi
+if [[ -z "$PROJECT_BUILD_VERSION" ]]; then
+  echo "Project.yml CURRENT_PROJECT_VERSION could not be read." >&2
+  exit 65
+fi
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Required command not found: $1" >&2
@@ -80,6 +91,10 @@ done
 
 sanitize_name() {
   printf '%s' "$1" | tr -c '[:alnum:]._-/' '_'
+}
+
+is_prerelease_version() {
+  [[ "$1" == *-beta* || "$1" == *-rc* || "$1" == *-alpha* ]]
 }
 
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -553,11 +568,13 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   fi
 fi
 
-# Update Casks/image-relay.rb for stable releases. The updater short-circuits
-# pre-release versions (-beta, -rc, -alpha) so beta builds don't bump the
-# stable cask. Failures here are warnings; the release artifacts are still valid.
+# Update Casks/image-relay.rb for stable releases. Pre-releases ride the
+# Sparkle appcast instead of the public Homebrew cask.
 CASK_UPDATED=0
-if [[ -x "$ROOT_DIR/scripts/update-cask.sh" ]]; then
+if is_prerelease_version "$VERSION"; then
+  echo "Skipping Cask update for pre-release version: $VERSION"
+  echo "(Pre-releases are distributed via Sparkle appcast, not Homebrew.)"
+elif [[ -x "$ROOT_DIR/scripts/update-cask.sh" ]]; then
   if "$ROOT_DIR/scripts/update-cask.sh" --version "$VERSION" --dmg "$DMG_PATH"; then
     CASK_UPDATED=1
   else

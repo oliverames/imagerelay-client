@@ -1,9 +1,27 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    public static let currentServiceUserAgent = "ImageRelayClient/1.3.0-beta.2"
-    public static let currentMacUserAgent = "ImageRelayClient/1.3.0-beta.2 (macOS)"
-    public static let currentIOSUserAgent = "ImageRelayClient/1.3.0-beta.2 (iOS)"
+    private static let fallbackAppVersion = "1.3.0-beta.3"
+    private static let versionedBundleIdentifiers: Set<String> = [
+        "com.oliverames.imagerelay-client",
+        "com.oliverames.imagerelay-client.fileprovider",
+        "com.oliverames.imagerelay-client.ios",
+        "com.oliverames.imagerelay-client.ios.fileprovider"
+    ]
+
+    private static var currentAppVersion: String {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier,
+              versionedBundleIdentifiers.contains(bundleIdentifier),
+              let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !version.isEmpty else {
+            return fallbackAppVersion
+        }
+        return version
+    }
+
+    public static var currentServiceUserAgent: String { "ImageRelayClient/\(currentAppVersion)" }
+    public static var currentMacUserAgent: String { "\(currentServiceUserAgent) (macOS)" }
+    public static var currentIOSUserAgent: String { "\(currentServiceUserAgent) (iOS)" }
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -29,7 +47,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.2.1",
         "ImageRelayClient/1.2.1 (macOS)",
         "ImageRelayClient/1.3.0-beta.1",
-        "ImageRelayClient/1.3.0-beta.1 (macOS)"
+        "ImageRelayClient/1.3.0-beta.1 (macOS)",
+        "ImageRelayClient/1.3.0-beta.2",
+        "ImageRelayClient/1.3.0-beta.2 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -47,7 +67,8 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0-beta.1 (iOS)" {
+            userAgent == "ImageRelayClient/1.3.0-beta.1 (iOS)" ||
+            userAgent == "ImageRelayClient/1.3.0-beta.2 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
