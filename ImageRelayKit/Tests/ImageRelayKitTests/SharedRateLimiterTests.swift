@@ -57,7 +57,7 @@ struct SharedRateLimiterTests {
         let limiter = SharedRateLimiter(url: url, recoveryHysteresis: 3)
 
         // Seed state at phase 2.
-        var seed = SharedRateLimiterState(rampPhase: 2)
+        let seed = SharedRateLimiterState(rampPhase: 2)
         await limiter.writeState(seed)
 
         await limiter.recordSuccess()

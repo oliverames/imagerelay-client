@@ -55,6 +55,7 @@
 		905391112B24E21A2D3B994B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
 		9368AE6588A3944E95C34CB6 /* Thumbnailing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395C5774C2A7EB2F00839EFA /* Thumbnailing.swift */; };
 		9370F6959D4C6228C61F6A4C /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
+		9484F494156F37AB4073EBA1 /* ActionFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70839E86A67E6491DD18FAAB /* ActionFormatting.swift */; };
 		960B40F8B168A16893E05254 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
 		99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354821ECFF0127BC8CC280A1 /* Extension.swift */; };
 		9AA24C58E66241965C7637BF /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
@@ -685,6 +686,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9484F494156F37AB4073EBA1 /* ActionFormatting.swift in Sources */,
 				CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */,
 				D39BABEE6FA73544F07647C6 /* AdvancedSettingsView.swift in Sources */,
 				DE4D78A483B3275786907ADA /* App.swift in Sources */,

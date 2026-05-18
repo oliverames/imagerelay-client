@@ -1256,8 +1256,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         if let downloadsURL {
             for (name, url) in generated {
                 let baseName = (name as NSString).deletingPathExtension
-                let safeBase = baseName.isEmpty ? "image-relay-link" : baseName
-                let target = downloadsURL.appendingPathComponent("\(safeBase).qr.png")
+                let target = ActionFormatting.uniqueFileURL(
+                    in: downloadsURL,
+                    baseName: baseName,
+                    extension: "qr.png"
+                )
                 if let png = ActionFormatting.generateQRPNG(from: url) {
                     do {
                         try png.write(to: target, options: .atomic)

@@ -150,6 +150,35 @@ enum ActionFormatting {
         return png
     }
 
+    /// Returns a non-existing URL in `directory`, preserving the first choice
+    /// when possible and appending " 2", " 3", ... before the extension when
+    /// needed. Used by export actions so they never overwrite user files.
+    static func uniqueFileURL(
+        in directory: URL,
+        baseName: String,
+        extension fileExtension: String,
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL {
+        let fallbackName = "image-relay-link"
+        let trimmedBaseName = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeBaseName = trimmedBaseName.isEmpty ? fallbackName : trimmedBaseName
+
+        var candidate = directory.appendingPathComponent(safeBaseName)
+            .appendingPathExtension(fileExtension)
+        guard fileExists(candidate) else { return candidate }
+
+        for suffix in 2...10_000 {
+            candidate = directory.appendingPathComponent("\(safeBaseName) \(suffix)")
+                .appendingPathExtension(fileExtension)
+            if !fileExists(candidate) {
+                return candidate
+            }
+        }
+
+        return directory.appendingPathComponent("\(safeBaseName) \(UUID().uuidString)")
+            .appendingPathExtension(fileExtension)
+    }
+
     /// Build a `mailto:` URL for one or more public-link results. Subject is
     /// "Image Relay: <first filename>" (or "Image Relay assets" for multi);
     /// body lists each filename followed by its link, separated by blank lines.
@@ -173,10 +202,10 @@ enum ActionFormatting {
         return components.url
     }
 
-    /// Build a URL the host app understands: `imagerelay-client://<action>?file_ids=…&names=…`.
-    /// `file_ids` is a comma-separated decimal list; `names` is a percent-encoded
-    /// pipe-separated list (pipe doesn't appear in any Image Relay-canonical
-    /// filename, so it's safer than comma which can appear in custom uploads).
+    /// Build a URL the host app understands:
+    /// `imagerelay-client://<action>?file_id=…&name=…&file_id=…&name=…`.
+    /// Repeated query items avoid inventing a filename separator, so uploaded
+    /// names containing punctuation still round-trip exactly.
     ///
     /// `action` becomes the URL host so SwiftUI's `handlesExternalEvents(matching:)`
     /// can route distinct actions to distinct Windows.
@@ -189,10 +218,12 @@ enum ActionFormatting {
         components.scheme = "imagerelay-client"
         components.host = host
         components.path = ""
-        components.queryItems = [
-            URLQueryItem(name: "file_ids", value: files.map { String($0.id) }.joined(separator: ",")),
-            URLQueryItem(name: "names", value: files.map(\.name).joined(separator: "|"))
-        ]
+        components.queryItems = files.flatMap { file in
+            [
+                URLQueryItem(name: "file_id", value: String(file.id)),
+                URLQueryItem(name: "name", value: file.name)
+            ]
+        }
         return components.url
     }
 
@@ -210,11 +241,22 @@ enum ActionFormatting {
         }
 
         let items = components.queryItems ?? []
-        let idsString = items.first(where: { $0.name == "file_ids" })?.value ?? ""
-        let namesString = items.first(where: { $0.name == "names" })?.value ?? ""
-
-        let ids = idsString.split(separator: ",").compactMap { Int($0) }
-        let names = namesString.split(separator: "|").map(String.init)
+        let repeatedIDs = items.filter { $0.name == "file_id" }.compactMap { item in
+            item.value.flatMap(Int.init)
+        }
+        let repeatedNames = items.filter { $0.name == "name" }.map { $0.value ?? "" }
+        let ids: [Int]
+        let names: [String]
+        if !repeatedIDs.isEmpty {
+            ids = repeatedIDs
+            names = repeatedNames
+        } else {
+            // Backward-compatible parser for the beta-2 preflight URL shape.
+            let idsString = items.first(where: { $0.name == "file_ids" })?.value ?? ""
+            let namesString = items.first(where: { $0.name == "names" })?.value ?? ""
+            ids = idsString.split(separator: ",").compactMap { Int($0) }
+            names = namesString.split(separator: "|").map(String.init)
+        }
         guard !ids.isEmpty else { return nil }
 
         var files: [(name: String, id: Int)] = []

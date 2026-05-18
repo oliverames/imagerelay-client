@@ -52,6 +52,7 @@ targets:
     platform: macOS
     sources:
       - path: ImageRelayClient
+      - path: FileProviderExtension/ActionFormatting.swift
     dependencies:
       - package: ImageRelayKit
       - package: Sparkle

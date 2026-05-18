@@ -195,9 +195,29 @@ struct ActionFormattingTests {
         #expect(parsed.files[1].id == 7)
     }
 
+    @Test("hostAppActionURL preserves separator-like filename punctuation")
+    func hostAppURLPreservesPunctuation() throws {
+        let files = [(name: "logo|hero,final.pdf", id: 12345)]
+        let url = try #require(ActionFormatting.hostAppActionURL(host: "edit-metadata", files: files))
+        let parsed = try #require(ActionFormatting.parseHostAppActionURL(url))
+        #expect(parsed.files.count == 1)
+        #expect(parsed.files[0].name == "logo|hero,final.pdf")
+        #expect(parsed.files[0].id == 12345)
+    }
+
+    @Test("parseHostAppActionURL still reads legacy comma and pipe payloads")
+    func parseHostAppURLLegacyPayload() throws {
+        let url = try #require(URL(string: "imagerelay-client://edit-metadata?file_ids=1,2&names=foo%7Cbar"))
+        let parsed = try #require(ActionFormatting.parseHostAppActionURL(url))
+        #expect(parsed.files[0].name == "foo")
+        #expect(parsed.files[0].id == 1)
+        #expect(parsed.files[1].name == "bar")
+        #expect(parsed.files[1].id == 2)
+    }
+
     @Test("parseHostAppActionURL pads missing names with placeholders")
     func parseHostAppURLPadding() throws {
-        let url = try #require(URL(string: "imagerelay-client://add-to-collection?file_ids=1,2,3&names=foo"))
+        let url = try #require(URL(string: "imagerelay-client://add-to-collection?file_id=1&name=foo&file_id=2&file_id=3"))
         let parsed = try #require(ActionFormatting.parseHostAppActionURL(url))
         #expect(parsed.files.count == 3)
         #expect(parsed.files[0].name == "foo")
@@ -230,5 +250,36 @@ struct ActionFormattingTests {
         let magic = png.prefix(8)
         #expect(magic.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
         #expect(png.count > 100)  // sanity: nontrivial size
+    }
+
+    @Test("uniqueFileURL avoids existing files")
+    func uniqueFileURLAvoidsExistingFiles() {
+        let directory = URL(fileURLWithPath: "/tmp", isDirectory: true)
+        let existing: Set<String> = [
+            "/tmp/annual report.qr.png",
+            "/tmp/annual report 2.qr.png"
+        ]
+
+        let url = ActionFormatting.uniqueFileURL(
+            in: directory,
+            baseName: "annual report",
+            extension: "qr.png",
+            fileExists: { existing.contains($0.path) }
+        )
+
+        #expect(url.path == "/tmp/annual report 3.qr.png")
+    }
+
+    @Test("uniqueFileURL uses fallback for blank base name")
+    func uniqueFileURLBlankBaseName() {
+        let directory = URL(fileURLWithPath: "/tmp", isDirectory: true)
+        let url = ActionFormatting.uniqueFileURL(
+            in: directory,
+            baseName: " ",
+            extension: "qr.png",
+            fileExists: { _ in false }
+        )
+
+        #expect(url.path == "/tmp/image-relay-link.qr.png")
     }
 }
