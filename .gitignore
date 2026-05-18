@@ -7,5 +7,6 @@ build/
 __pycache__/
 *.pyc
 ImageRelayClient.xcodeproj/xcuserdata/
+ImageRelayClient [0-9]*.xcodeproj/
 *.xcuserstate
 DerivedData/
