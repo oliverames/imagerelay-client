@@ -5,11 +5,17 @@ struct CollectionsBrowserView: View {
     @Bindable var state: CollectionsState
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-                .frame(minWidth: 220)
-        } detail: {
-            detail
+        VStack(spacing: 0) {
+            if !state.pendingAddFileIDs.isEmpty {
+                pendingAddBanner
+                Divider()
+            }
+            NavigationSplitView {
+                sidebar
+                    .frame(minWidth: 220)
+            } detail: {
+                detail
+            }
         }
         .task { await state.load() }
         .toolbar {
@@ -22,6 +28,46 @@ struct CollectionsBrowserView: View {
                 .help("Refresh")
             }
         }
+    }
+
+    @ViewBuilder
+    private var pendingAddBanner: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "plus.rectangle.on.rectangle")
+                .font(.title2)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Add \(state.pendingAddFileIDs.count) file\(state.pendingAddFileIDs.count == 1 ? "" : "s") to a collection")
+                    .font(.headline)
+                if !state.pendingAddFileNames.isEmpty {
+                    Text(state.pendingAddFileNames.prefix(3).joined(separator: ", ")
+                         + (state.pendingAddFileNames.count > 3 ? "…" : ""))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if let selected = state.selectedCollection {
+                Button {
+                    Task { await state.submitPendingAdd(to: selected) }
+                } label: {
+                    Label("Add to \(selected.name)", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                Text("Pick a collection on the left")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Cancel") {
+                state.clearPendingAdd()
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.accentColor.opacity(0.08))
     }
 
     @ViewBuilder

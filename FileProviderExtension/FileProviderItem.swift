@@ -30,6 +30,39 @@ enum FileProviderAction {
     static let copyPublicLink = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.copy-public-link"
     )
+    static let copyDownloadLink = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-download-link"
+    )
+    static let copyImageRelayID = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-id"
+    )
+    static let copyFolderShareLink = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link"
+    )
+    static let copyMetadata = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-metadata"
+    )
+    static let copyDiagnostics = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics"
+    )
+    static let copyLongLivedLink = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link"
+    )
+    static let exportPublicLinkAsQR = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.export-qr"
+    )
+    static let newMailWithPublicLink = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.new-mail-link"
+    )
+    static let forceReDownload = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.force-redownload"
+    )
+    static let editMetadata = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.edit-metadata"
+    )
+    static let addToCollection = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.add-to-collection"
+    )
     static let openFolderInWeb = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web"
     )
@@ -101,12 +134,16 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
     }
 
     /// Create from a tracked database item
-    init(trackedItem: TrackedItem, syncState: FileProviderItemSyncState = .synced) {
+    init(
+        trackedItem: TrackedItem,
+        syncState: FileProviderItemSyncState = .synced,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         self.itemIdentifier = NSFileProviderItemIdentifier(trackedItem.identifier)
         self.parentItemIdentifier = trackedItem.parentIdentifier == "root"
             ? .rootContainer
             : NSFileProviderItemIdentifier(trackedItem.parentIdentifier)
-        self.filename = trackedItem.name
+        self.filename = FilenamePresentation.display(trackedItem.name, style: filenameStyle)
         self.documentSize = NSNumber(value: trackedItem.size)
         self.childItemCount = nil
         self.itemVersion = NSFileProviderItemVersion(
@@ -147,11 +184,16 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
     }
 
     /// Create from an API RemoteFolder
-    init(folder: RemoteFolder, parentItemIdentifier: NSFileProviderItemIdentifier, syncState: FileProviderItemSyncState = .synced) {
+    init(
+        folder: RemoteFolder,
+        parentItemIdentifier: NSFileProviderItemIdentifier,
+        syncState: FileProviderItemSyncState = .synced,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         let id = ItemIdentifier.folder(folder.id)
         self.itemIdentifier = NSFileProviderItemIdentifier(id.rawValue)
         self.parentItemIdentifier = parentItemIdentifier
-        self.filename = folder.name
+        self.filename = FilenamePresentation.display(folder.name, style: filenameStyle)
         self.contentType = .folder
         self.documentSize = nil
         self.childItemCount = NSNumber(value: folder.childCount)
@@ -186,11 +228,16 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
     }
 
     /// Create from an API RemoteFile
-    init(file: RemoteFile, parentItemIdentifier: NSFileProviderItemIdentifier, syncState: FileProviderItemSyncState = .synced) {
+    init(
+        file: RemoteFile,
+        parentItemIdentifier: NSFileProviderItemIdentifier,
+        syncState: FileProviderItemSyncState = .synced,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         let id = ItemIdentifier.file(file.id)
         self.itemIdentifier = NSFileProviderItemIdentifier(id.rawValue)
         self.parentItemIdentifier = parentItemIdentifier
-        self.filename = file.name
+        self.filename = FilenamePresentation.display(file.name, style: filenameStyle)
         self.contentType = UTType(filenameExtension: URL(fileURLWithPath: file.name).pathExtension) ?? .data
         self.documentSize = NSNumber(value: file.size)
         self.childItemCount = nil

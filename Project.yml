@@ -18,8 +18,8 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: PV3W52NDZ3
-    MARKETING_VERSION: "1.3.0-beta.1"
-    CURRENT_PROJECT_VERSION: "36"
+    MARKETING_VERSION: "1.3.0-beta.2"
+    CURRENT_PROJECT_VERSION: "37"
     ENABLE_HARDENED_RUNTIME: YES
 
 schemes:
@@ -123,6 +123,39 @@ targets:
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-public-link
               NSExtensionFileProviderActionName: Copy Public Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-download-link
+              NSExtensionFileProviderActionName: Copy Download Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-id
+              NSExtensionFileProviderActionName: Copy Image Relay ID
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link
+              NSExtensionFileProviderActionName: Copy Folder Share Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-metadata
+              NSExtensionFileProviderActionName: Copy Metadata
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics
+              NSExtensionFileProviderActionName: Copy Diagnostic Info
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link
+              NSExtensionFileProviderActionName: Copy Long-Lived Public Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.export-qr
+              NSExtensionFileProviderActionName: Export Public Link as QR Code
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.new-mail-link
+              NSExtensionFileProviderActionName: New Mail with Public Link
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.force-redownload
+              NSExtensionFileProviderActionName: Force Re-download
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.edit-metadata
+              NSExtensionFileProviderActionName: Edit Metadata in Image Relay…
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.add-to-collection
+              NSExtensionFileProviderActionName: Add to Collection…
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web
               NSExtensionFileProviderActionName: Open Folder in Image Relay Web

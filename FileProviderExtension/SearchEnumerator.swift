@@ -8,12 +8,18 @@ final class SearchEnumerator: NSObject, NSFileProviderSearchEnumerator, @uncheck
     private let query: String
     private let desiredNumberOfResults: Int
     private let db: SyncDatabase
+    private let filenameStyle: FilenamePresentationStyle
     private var invalidated = false
 
-    init(request: NSFileProviderStringSearchRequest, db: SyncDatabase) {
+    init(
+        request: NSFileProviderStringSearchRequest,
+        db: SyncDatabase,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         self.query = request.query
         self.desiredNumberOfResults = request.desiredNumberOfResults
         self.db = db
+        self.filenameStyle = filenameStyle
         super.init()
     }
 
@@ -35,8 +41,9 @@ final class SearchEnumerator: NSObject, NSFileProviderSearchEnumerator, @uncheck
         let limit = min(observerLimit, requestedLimit)
 
         do {
+            let style = filenameStyle
             let results = try db.searchItems(matching: query, limit: limit)
-                .map { FileProviderItem(trackedItem: $0) }
+                .map { FileProviderItem(trackedItem: $0, filenameStyle: style) }
             logger.info("Enumerated \(results.count, privacy: .public) cached search results for query length \(self.query.count, privacy: .public)")
             observer.didEnumerate(results)
             observer.finishEnumerating(upTo: nil)

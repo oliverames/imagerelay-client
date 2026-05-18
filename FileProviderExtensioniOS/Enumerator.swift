@@ -113,11 +113,12 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
         var items: [NSFileProviderItem] = []
         items.reserveCapacity(folders.count + files.count)
+        let style = services.config.filenamePresentationStyle
         for folder in folders where folder.parentID == folderID && !folder.name.isEmpty {
-            items.append(FileProviderItem(folder: folder, parentItemIdentifier: parentItemIdentifier))
+            items.append(FileProviderItem(folder: folder, parentItemIdentifier: parentItemIdentifier, filenameStyle: style))
         }
         for file in files where !file.isDeleted {
-            items.append(FileProviderItem(file: file, parentItemIdentifier: parentItemIdentifier))
+            items.append(FileProviderItem(file: file, parentItemIdentifier: parentItemIdentifier, filenameStyle: style))
         }
         return items
     }

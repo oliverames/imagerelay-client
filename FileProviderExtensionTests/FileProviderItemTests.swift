@@ -156,4 +156,60 @@ struct FileProviderItemTests {
 
         #expect(progress.isActiveFileProviderMutation(forItemNamed: "Photo-Release-Form.docx"))
     }
+
+    @Test("File items default to serverCanonical filename")
+    func fileItemDefaultFilename() {
+        let file = RemoteFile(
+            id: 1, name: "annual-report.pdf", size: 100,
+            updatedOn: "2026-05-12T00:00:00Z",
+            contentType: "application/pdf", fileTypeID: 1
+        )
+        let item = FileProviderItem(file: file, parentItemIdentifier: .rootContainer)
+        #expect(item.filename == "annual-report.pdf")
+    }
+
+    @Test("File items beautify when filenameStyle is humanReadable")
+    func fileItemHumanReadableFilename() {
+        let file = RemoteFile(
+            id: 1, name: "annual-report.pdf", size: 100,
+            updatedOn: "2026-05-12T00:00:00Z",
+            contentType: "application/pdf", fileTypeID: 1
+        )
+        let item = FileProviderItem(
+            file: file,
+            parentItemIdentifier: .rootContainer,
+            filenameStyle: .humanReadable
+        )
+        #expect(item.filename == "Annual Report.pdf")
+    }
+
+    @Test("Folder items beautify when filenameStyle is humanReadable")
+    func folderItemHumanReadableFilename() {
+        let folder = RemoteFolder(
+            id: 42, name: "marketing-assets", parentID: nil,
+            path: "/marketing-assets",
+            updatedOn: "2026-05-12T00:00:00Z", childCount: 3
+        )
+        let item = FileProviderItem(
+            folder: folder,
+            parentItemIdentifier: .rootContainer,
+            filenameStyle: .humanReadable
+        )
+        #expect(item.filename == "Marketing Assets")
+    }
+
+    @Test("ContentType still derives from canonical extension after beautification")
+    func contentTypeDerivesFromCanonical() {
+        let file = RemoteFile(
+            id: 1, name: "annual-report.pdf", size: 100,
+            updatedOn: "2026-05-12T00:00:00Z",
+            contentType: "application/pdf", fileTypeID: 1
+        )
+        let item = FileProviderItem(
+            file: file,
+            parentItemIdentifier: .rootContainer,
+            filenameStyle: .humanReadable
+        )
+        #expect(item.contentType.preferredFilenameExtension == "pdf")
+    }
 }

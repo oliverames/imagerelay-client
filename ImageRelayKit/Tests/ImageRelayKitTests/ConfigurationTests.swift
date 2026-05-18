@@ -335,4 +335,43 @@ struct ConfigurationTests {
         #expect(loaded.webBaseURL == nil)
         #expect(loaded.remoteRootFolderID == 99)
     }
+
+    @Test("filenamePresentationStyle defaults to serverCanonical and round-trips")
+    func filenamePresentationStyleRoundTrips() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        var config = AppConfiguration.default
+        config.apiKey = "k"
+        #expect(config.filenamePresentationStyle == .serverCanonical)
+
+        config.filenamePresentationStyle = .humanReadable
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.filenamePresentationStyle == .humanReadable)
+    }
+
+    @Test("Legacy config.json without filename_presentation_style decodes to serverCanonical")
+    func legacyConfigWithoutFilenameStyle() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let legacyJSON = """
+        {"remote_root_folder_id":7,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/1.2.0 (macOS)","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.filenamePresentationStyle == .serverCanonical)
+    }
 }

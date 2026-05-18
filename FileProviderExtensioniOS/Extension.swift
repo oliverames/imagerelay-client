@@ -86,14 +86,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     let parent: NSFileProviderItemIdentifier = folder.parentID
                         .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
                         ?? .rootContainer
-                    completionHandler(FileProviderItem(folder: folder, parentItemIdentifier: parent), nil)
+                    completionHandler(FileProviderItem(folder: folder, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle), nil)
                 } else {
                     let file: RemoteFile = try await services.api.get("/files/\(id).json")
                     let parentID = file.folderIDs.first
                     let parent: NSFileProviderItemIdentifier = parentID
                         .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
                         ?? .rootContainer
-                    completionHandler(FileProviderItem(file: file, parentItemIdentifier: parent), nil)
+                    completionHandler(FileProviderItem(file: file, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle), nil)
                 }
             } catch {
                 completionHandler(nil, error.asFileProviderError)
@@ -231,7 +231,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 let parent: NSFileProviderItemIdentifier = parentID
                     .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
                     ?? .rootContainer
-                let item = FileProviderItem(file: fileMeta, parentItemIdentifier: parent)
+                let item = FileProviderItem(file: fileMeta, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle)
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("iOS fetchContents failed for \(itemIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")

@@ -133,7 +133,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 } else if identifier == .trashContainer {
                     handler.value(FileProviderItem(containerIdentifier: .trashContainer, filename: "Trash"), nil)
                 } else if let tracked = try db.item(for: identifier.rawValue) {
-                    handler.value(FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked)), nil)
+                    handler.value(FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle), nil)
                 } else {
                     handler.value(nil, NSFileProviderError(.noSuchItem))
                 }
@@ -195,7 +195,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
 
-                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
+                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
                 handler.value(tempFile, item, nil)
             } catch {
                 logger.error("Download failed for \(itemIdentifier.rawValue): \(error.localizedDescription)")
@@ -259,7 +259,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     let tempFile = FileManager.default.temporaryDirectory
                         .appendingPathComponent(UUID().uuidString + "-" + tracked.name)
                     FileManager.default.createFile(atPath: tempFile.path, contents: nil)
-                    let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
+                    let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(tempFile, item, NSRange(location: 0, length: 0), [], nil)
                     return
                 }
@@ -313,7 +313,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 )
                 progress.completedUnitCount = 100
 
-                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
+                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
                 handler.value(tempFile, item, retrievedRange, [], nil)
             } catch {
                 logger.error("Partial fetch failed for \(itemIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -442,7 +442,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
 
-                    let item = FileProviderItem(trackedItem: tracked)
+                    let item = FileProviderItem(trackedItem: tracked, filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(item, [], false, nil)
                     self.signalLocalMutation(
                         affectedContainerIdentifiers: [itemTemplate.parentItemIdentifier],
@@ -501,7 +501,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: finalName, itemType: .file)
 
-                    let item = FileProviderItem(trackedItem: tracked)
+                    let item = FileProviderItem(trackedItem: tracked, filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(item, [], false, nil)
                     self.signalLocalMutation(
                         affectedContainerIdentifiers: [itemTemplate.parentItemIdentifier],
@@ -626,7 +626,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         )
 
                         // Tell the OS to re-fetch the remote canonical version.
-                        handler.value(FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked)), [.contents], false, nil)
+                        let resultItem = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
+                        handler.value(resultItem, [.contents], false, nil)
                         self.signalLocalMutation(
                             affectedContainerIdentifiers: [item.parentItemIdentifier],
                             reason: "uploaded conflict copy"
@@ -745,7 +746,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
 
                 try db.upsertItem(updated)
-                let resultItem = FileProviderItem(trackedItem: updated, syncState: self.syncState(for: updated))
+                let resultItem = FileProviderItem(trackedItem: updated, syncState: self.syncState(for: updated), filenameStyle: self.config.filenamePresentationStyle)
                 handler.value(resultItem, [], false, nil)
                 if mutatesRemote {
                     self.signalLocalMutation(
@@ -871,7 +872,29 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             case FileProviderAction.refreshFromImageRelay.rawValue:
                 await self.runRefreshAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.copyPublicLink.rawValue:
-                await self.runCopyPublicLinkAction(itemIdentifiers: itemIdentifiers, handler: handler)
+                await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "inline", expiresAtOverride: .yearOut, handler: handler)
+            case FileProviderAction.copyDownloadLink.rawValue:
+                await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "attachment", expiresAtOverride: .yearOut, handler: handler)
+            case FileProviderAction.copyImageRelayID.rawValue:
+                await self.runCopyImageRelayIDAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.copyFolderShareLink.rawValue:
+                await self.runCopyFolderShareLinkAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.copyMetadata.rawValue:
+                await self.runCopyMetadataAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.copyDiagnostics.rawValue:
+                await self.runCopyDiagnosticsAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.copyLongLivedLink.rawValue:
+                await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "inline", expiresAtOverride: .noExpiry, handler: handler)
+            case FileProviderAction.exportPublicLinkAsQR.rawValue:
+                await self.runExportPublicLinkQRAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.newMailWithPublicLink.rawValue:
+                await self.runNewMailWithPublicLinkAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.forceReDownload.rawValue:
+                await self.runForceReDownloadAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.editMetadata.rawValue:
+                await self.runEditMetadataAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.addToCollection.rawValue:
+                await self.runAddToCollectionAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.openFolderInWeb.rawValue:
                 await self.runOpenFolderInWebAction(itemIdentifiers: itemIdentifiers, handler: handler)
             default:
@@ -912,22 +935,46 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         }
     }
 
-    /// Resolve each selected file to an Image Relay quick link with inline disposition
-    /// and a year-out expiration, then write the URL(s) to the general pasteboard.
-    /// Folders and unknown items are rejected — Image Relay's quick-link primitive
-    /// is asset-scoped.
-    private func runCopyPublicLinkAction(
+    /// Quick-link expiry choice. `.yearOut` is the conservative default used by
+    /// Copy Public Link and Copy Download Link; `.noExpiry` is the Copy
+    /// Long-Lived Public Link variant. Image Relay treats an omitted `expires`
+    /// field as "never expires" — verified live 2026-05-17 (memory:
+    /// `reference_finder_copy_public_link.md`).
+    fileprivate enum QuickLinkExpiry: Sendable {
+        case yearOut
+        case noExpiry
+    }
+
+    /// Resolve each selected file to an Image Relay quick link with the given
+    /// disposition and expiration policy, then write the URL(s) to the general
+    /// pasteboard. Folders and unknown items are rejected — Image Relay's
+    /// quick-link primitive is asset-scoped.
+    ///
+    /// `disposition: "inline"` produces a browser-preview link (the Copy Public
+    /// Link action); `"attachment"` produces a force-download link (Copy
+    /// Download Link). The link URL is the same shape either way — the
+    /// disposition only affects the `Content-Disposition` header the CDN sends
+    /// when the link is followed.
+    private func runCopyQuickLinkAction(
         itemIdentifiers: [NSFileProviderItemIdentifier],
+        disposition: String,
+        expiresAtOverride: QuickLinkExpiry,
         handler: UncheckedBox<((any Error)?) -> Void>
     ) async {
         let logger = self.logger
+        let descriptor: String
+        switch (disposition, expiresAtOverride) {
+        case ("attachment", _): descriptor = "download link"
+        case (_, .noExpiry): descriptor = "long-lived public link"
+        default: descriptor = "public link"
+        }
         var resolvedAssetIDs: [(name: String, id: Int)] = []
 
         for identifier in itemIdentifiers {
             guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                   itemID.isFile,
                   let assetID = itemID.numericID else {
-                handler.value(fileProviderCannotSynchronize("Public links are only available for files."))
+                handler.value(fileProviderCannotSynchronize("\(descriptor.capitalized)s are only available for files."))
                 return
             }
             let tracked = try? db.item(for: identifier.rawValue)
@@ -939,16 +986,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             return
         }
 
-        // Image Relay's API doc describes `expires` as a date (not datetime); send
-        // a calendar-date string so the parameter parses on the server side.
-        let expiresFormatter = DateFormatter()
-        expiresFormatter.calendar = Calendar(identifier: .gregorian)
-        expiresFormatter.locale = Locale(identifier: "en_US_POSIX")
-        expiresFormatter.timeZone = TimeZone(identifier: "UTC")
-        expiresFormatter.dateFormat = "yyyy-MM-dd"
-        let expiresAt = expiresFormatter.string(
-            from: Date().addingTimeInterval(60 * 60 * 24 * 365)
-        )
+        let expiresAt: String?
+        switch expiresAtOverride {
+        case .yearOut:
+            expiresAt = Self.yearOutExpiryDateString()
+        case .noExpiry:
+            expiresAt = nil
+        }
 
         var urls: [URL] = []
         for resolved in resolvedAssetIDs {
@@ -956,14 +1000,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 let request = QuickLinkRequest(
                     asset_id: resolved.id,
                     purpose: "download",
-                    disposition: "inline",
+                    disposition: disposition,
                     expires: expiresAt
                 )
                 let quickLink: QuickLink = try await api.post("/quick_links.json", body: request)
                 urls.append(quickLink.url)
             } catch {
-                logger.error("Copy public link failed for \(resolved.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                handler.value(fileProviderCannotSynchronize("Image Relay could not create a public link for \(resolved.name)."))
+                logger.error("Copy \(descriptor, privacy: .public) failed for \(resolved.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(fileProviderCannotSynchronize("Image Relay could not create a \(descriptor) for \(resolved.name)."))
                 return
             }
         }
@@ -978,8 +1022,467 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             }
         }
 
-        logger.info("Copied \(urls.count, privacy: .public) public link(s) to pasteboard")
+        logger.info("Copied \(urls.count, privacy: .public) \(descriptor, privacy: .public)(s) to pasteboard")
         handler.value(nil)
+    }
+
+    /// Copy each selected item's Image Relay numeric ID to the pasteboard.
+    /// Multi-select joins IDs with newlines. Pure local — no API call.
+    private func runCopyImageRelayIDAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var ids: [Int] = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  let numeric = itemID.numericID else {
+                continue
+            }
+            ids.append(numeric)
+        }
+        guard !ids.isEmpty else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not find an ID for the selected items."))
+            return
+        }
+        let joined = ids.map(String.init).joined(separator: "\n")
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(joined, forType: .string)
+        }
+        logger.info("Copied \(ids.count, privacy: .public) Image Relay ID(s) to pasteboard")
+        handler.value(nil)
+    }
+
+    /// Create an Image Relay folder link for each selected folder and copy the
+    /// resulting URLs to the pasteboard. File selections are rejected because
+    /// folder links only target folders. Year-out expiry, downloads allowed,
+    /// purpose=share — matches the conservative defaults of Copy Public Link.
+    private func runCopyFolderShareLinkAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolvedFolders: [(name: String, id: Int)] = []
+
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFolder,
+                  let folderID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("Folder share links are only available for folders."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolvedFolders.append((tracked?.name ?? "\(folderID)", folderID))
+        }
+
+        guard !resolvedFolders.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        let expiresAt = Self.yearOutExpiryDateString()
+
+        var urls: [String] = []
+        for resolved in resolvedFolders {
+            do {
+                let request = FolderLinkCreate(
+                    folderID: resolved.id,
+                    purpose: "share",
+                    allowsDownload: true,
+                    expiresOn: expiresAt
+                )
+                let link: FolderLink = try await api.post("/folder_links.json", body: request)
+                guard let url = link.url, !url.isEmpty else {
+                    throw ExtensionError.remoteFolderNotConfirmed
+                }
+                urls.append(url)
+            } catch {
+                logger.error("Copy folder share link failed for \(resolved.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(fileProviderCannotSynchronize("Image Relay could not create a folder share link for \(resolved.name)."))
+                return
+            }
+        }
+
+        let joined = urls.joined(separator: "\n")
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(joined, forType: .string)
+            if urls.count == 1, let first = urls.first {
+                pasteboard.setString(first, forType: .URL)
+            }
+        }
+        logger.info("Copied \(urls.count, privacy: .public) folder share link(s) to pasteboard")
+        handler.value(nil)
+    }
+
+    /// Fetch rich metadata for each selected item and write a Markdown summary
+    /// to the pasteboard. Files use `GET /files/{id}.json` (returns
+    /// `RemoteFileDetail` with keywords + custom fields); folders fall back to
+    /// the local TrackedItem snapshot to avoid extra API round trips for fields
+    /// the folder endpoint doesn't expose.
+    private func runCopyMetadataAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var sections: [String] = []
+
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  let remoteID = itemID.numericID else {
+                continue
+            }
+            let trackedFallback = try? db.item(for: identifier.rawValue)
+            if itemID.isFile {
+                do {
+                    let detail: RemoteFileDetail = try await api.get("/files/\(remoteID).json")
+                    sections.append(ActionFormatting.markdownForFileMetadata(detail))
+                } catch {
+                    logger.error("Copy metadata fetch failed for file \(remoteID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    if let tracked = trackedFallback {
+                        sections.append(ActionFormatting.markdownForTrackedMetadata(tracked))
+                    }
+                }
+            } else if let tracked = trackedFallback {
+                sections.append(ActionFormatting.markdownForTrackedMetadata(tracked))
+            }
+        }
+
+        guard !sections.isEmpty else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not gather metadata for the selected items."))
+            return
+        }
+
+        let combined = sections.joined(separator: "\n\n---\n\n")
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(combined, forType: .string)
+        }
+        logger.info("Copied metadata for \(sections.count, privacy: .public) item(s) to pasteboard")
+        handler.value(nil)
+    }
+
+    /// Generate a year-from-now date string in `yyyy-MM-dd` form. Image Relay's
+    /// quick-link `expires` parameter is parsed as a calendar date, not a
+    /// datetime — verified live during the 1.2.0-beta.4 ship.
+    fileprivate static func yearOutExpiryDateString() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date().addingTimeInterval(60 * 60 * 24 * 365))
+    }
+
+    /// Pure-local diagnostic dump: identifier, remote ID, parent, type, sizes,
+    /// content / metadata versions, modification time, plus host-app context
+    /// (user agent, base URL, app version). Useful for filing bug reports
+    /// against this client without leaking API contents.
+    private func runCopyDiagnosticsAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        let trackedItems: [TrackedItem] = itemIdentifiers.compactMap { identifier in
+            try? db.item(for: identifier.rawValue)
+        }
+        let context = ActionFormatting.DiagnosticContext(
+            userAgent: config.userAgent,
+            baseURL: config.baseURL.absoluteString,
+            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+            generatedAt: Date()
+        )
+        let markdown = ActionFormatting.markdownForDiagnostics(items: trackedItems, context: context)
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(markdown, forType: .string)
+        }
+        logger.info("Copied diagnostic info for \(trackedItems.count, privacy: .public) item(s) to pasteboard")
+        handler.value(nil)
+    }
+
+    /// Generate one-year inline quick-links for each selected file and write a
+    /// QR PNG per asset to ~/Downloads. PNG filename derives from the asset's
+    /// canonical name (replacing the original extension with `.png`). If the
+    /// Downloads directory is unwritable we fall back to writing the link URLs
+    /// to the pasteboard so the action still produces something useful.
+    private func runExportPublicLinkQRAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolved: [(name: String, id: Int)] = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFile,
+                  let assetID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("QR codes are only available for files."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolved.append((tracked?.name ?? "asset-\(assetID)", assetID))
+        }
+        guard !resolved.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        let expiresAt = Self.yearOutExpiryDateString()
+        var generated: [(name: String, url: URL)] = []
+        for entry in resolved {
+            do {
+                let request = QuickLinkRequest(
+                    asset_id: entry.id,
+                    purpose: "download",
+                    disposition: "inline",
+                    expires: expiresAt
+                )
+                let quickLink: QuickLink = try await api.post("/quick_links.json", body: request)
+                generated.append((entry.name, quickLink.url))
+            } catch {
+                logger.error("QR export failed for \(entry.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(fileProviderCannotSynchronize("Image Relay could not create a QR code for \(entry.name)."))
+                return
+            }
+        }
+
+        let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        var savedPaths: [URL] = []
+        if let downloadsURL {
+            for (name, url) in generated {
+                let baseName = (name as NSString).deletingPathExtension
+                let safeBase = baseName.isEmpty ? "image-relay-link" : baseName
+                let target = downloadsURL.appendingPathComponent("\(safeBase).qr.png")
+                if let png = ActionFormatting.generateQRPNG(from: url) {
+                    do {
+                        try png.write(to: target, options: .atomic)
+                        savedPaths.append(target)
+                    } catch {
+                        logger.error("Could not write QR PNG for \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+            }
+        }
+
+        if savedPaths.isEmpty {
+            await MainActor.run {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(generated.map { $0.url.absoluteString }.joined(separator: "\n"), forType: .string)
+            }
+            logger.warning("QR PNG writes failed; link URL(s) copied to pasteboard instead")
+        } else {
+            logger.info("Saved \(savedPaths.count, privacy: .public) QR PNG(s) to Downloads")
+        }
+        handler.value(nil)
+    }
+
+    /// Generate a public link for the first selected file and open the user's
+    /// default mail client with a pre-filled subject and body. Multi-selection
+    /// is allowed; subsequent links are appended into the body separated by
+    /// blank lines. Truncation at a reasonable URL length prevents mailto from
+    /// failing silently when many links exceed mailto's practical limit.
+    private func runNewMailWithPublicLinkAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolved: [(name: String, id: Int)] = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFile,
+                  let assetID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("Mail-with-link is only available for files."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolved.append((tracked?.name ?? "asset-\(assetID)", assetID))
+        }
+        guard !resolved.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        let expiresAt = Self.yearOutExpiryDateString()
+        var links: [(name: String, url: URL)] = []
+        for entry in resolved {
+            do {
+                let request = QuickLinkRequest(
+                    asset_id: entry.id,
+                    purpose: "download",
+                    disposition: "inline",
+                    expires: expiresAt
+                )
+                let quickLink: QuickLink = try await api.post("/quick_links.json", body: request)
+                links.append((entry.name, quickLink.url))
+            } catch {
+                logger.error("New-mail link generation failed for \(entry.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(fileProviderCannotSynchronize("Image Relay could not create a public link for \(entry.name)."))
+                return
+            }
+        }
+
+        guard let mailtoURL = ActionFormatting.mailtoURLForPublicLinks(links) else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not build a mail URL for the selection."))
+            return
+        }
+
+        let opened = await MainActor.run { NSWorkspace.shared.open(mailtoURL) }
+        if opened {
+            logger.info("Opened mailto with \(links.count, privacy: .public) public link(s)")
+            handler.value(nil)
+            return
+        }
+
+        await MainActor.run {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(links.map { $0.url.absoluteString }.joined(separator: "\n"), forType: .string)
+        }
+        logger.warning("NSWorkspace declined mailto:; link URL(s) copied to pasteboard instead")
+        handler.value(nil)
+    }
+
+    /// Evict each selected file's local content and signal the enumerator for
+    /// the parent folder so Finder re-fetches on next access. Distinct from
+    /// Refresh from Image Relay, which only re-pulls metadata. File-only —
+    /// folders aren't materialized objects, so eviction is meaningless there.
+    private func runForceReDownloadAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        guard let manager = NSFileProviderManager(for: domain) else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not reach the File Provider manager."))
+            return
+        }
+
+        var fileTargets: [NSFileProviderItemIdentifier] = []
+        var parents: Set<NSFileProviderItemIdentifier> = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue), itemID.isFile else {
+                handler.value(fileProviderCannotSynchronize("Force Re-download is only available for files."))
+                return
+            }
+            fileTargets.append(identifier)
+            if let tracked = try? db.item(for: identifier.rawValue) {
+                parents.insert(tracked.parentIdentifier == "root" ? .rootContainer : NSFileProviderItemIdentifier(tracked.parentIdentifier))
+            }
+        }
+
+        var failures = 0
+        for target in fileTargets {
+            do {
+                try await manager.evictItem(identifier: target)
+            } catch {
+                failures += 1
+                logger.debug("Force re-download evict failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        for parent in parents {
+            try? await manager.signalEnumerator(for: parent)
+        }
+
+        if failures == fileTargets.count {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not evict the selected files."))
+        } else {
+            logger.info("Force re-download evicted \(fileTargets.count - failures, privacy: .public) of \(fileTargets.count, privacy: .public) item(s)")
+            handler.value(nil)
+        }
+    }
+
+    /// Open the host app's Edit Metadata window pre-loaded with the selected
+    /// files. Implementation: serialize file IDs + display names into a URL of
+    /// the form imagerelay-client://action/edit-metadata?file_ids=…&names=…
+    /// and let NSWorkspace launch/activate the host. The host app's onOpenURL
+    /// handler parses and routes to MetadataEditorState.load(targets:).
+    private func runEditMetadataAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolved: [(name: String, id: Int)] = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFile,
+                  let assetID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("Edit Metadata is only available for files."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolved.append((tracked?.name ?? "asset-\(assetID)", assetID))
+        }
+        guard !resolved.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        guard let url = ActionFormatting.hostAppActionURL(
+            host: "edit-metadata",
+            files: resolved
+        ) else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not construct the Edit Metadata URL."))
+            return
+        }
+
+        let opened = await MainActor.run { NSWorkspace.shared.open(url) }
+        if opened {
+            logger.info("Opened Edit Metadata in host app for \(resolved.count, privacy: .public) file(s)")
+            handler.value(nil)
+        } else {
+            logger.warning("NSWorkspace declined to open \(url.absoluteString, privacy: .public)")
+            handler.value(fileProviderCannotSynchronize("Image Relay could not launch the host app for Edit Metadata."))
+        }
+    }
+
+    /// Open the host app's Collections window pre-armed with the file IDs to
+    /// add. Delta-ADD via `PUT /collections/{id}.json` is the only working add
+    /// path on the v2 API (see `reference_v2_api_quirks` memory), so the host
+    /// app's CollectionsBrowserView is the place to pick a target collection
+    /// or create a new one.
+    private func runAddToCollectionAction(
+        itemIdentifiers: [NSFileProviderItemIdentifier],
+        handler: UncheckedBox<((any Error)?) -> Void>
+    ) async {
+        let logger = self.logger
+        var resolved: [(name: String, id: Int)] = []
+        for identifier in itemIdentifiers {
+            guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
+                  itemID.isFile,
+                  let assetID = itemID.numericID else {
+                handler.value(fileProviderCannotSynchronize("Add to Collection is only available for files."))
+                return
+            }
+            let tracked = try? db.item(for: identifier.rawValue)
+            resolved.append((tracked?.name ?? "asset-\(assetID)", assetID))
+        }
+        guard !resolved.isEmpty else {
+            handler.value(NSFileProviderError(.noSuchItem))
+            return
+        }
+
+        guard let url = ActionFormatting.hostAppActionURL(
+            host: "add-to-collection",
+            files: resolved
+        ) else {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not construct the Add-to-Collection URL."))
+            return
+        }
+
+        let opened = await MainActor.run { NSWorkspace.shared.open(url) }
+        if opened {
+            logger.info("Opened Add to Collection in host app for \(resolved.count, privacy: .public) file(s)")
+            handler.value(nil)
+        } else {
+            logger.warning("NSWorkspace declined to open \(url.absoluteString, privacy: .public)")
+            handler.value(fileProviderCannotSynchronize("Image Relay could not launch the host app for Add to Collection."))
+        }
     }
 
     /// Open the selected folder (or, for a file selection, its containing folder)
@@ -1624,7 +2127,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 #if compiler(>=6.2)
 extension Extension: NSFileProviderSearching {
     func searchEnumerator(for request: NSFileProviderStringSearchRequest) -> NSFileProviderSearchEnumerator {
-        SearchEnumerator(request: request, db: db)
+        SearchEnumerator(request: request, db: db, filenameStyle: config.filenamePresentationStyle)
     }
 }
 #endif

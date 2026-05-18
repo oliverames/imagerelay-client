@@ -152,7 +152,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 let item = FileProviderItem(
                     folder: folder,
                     parentItemIdentifier: containerIdentifier,
-                    syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+                    syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot),
+                    filenameStyle: config.filenamePresentationStyle
                 )
                 items.append(item)
             }
@@ -172,7 +173,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             let item = FileProviderItem(
                 file: file,
                 parentItemIdentifier: containerIdentifier,
-                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
+                filenameStyle: config.filenamePresentationStyle
             )
             items.append(item)
 
@@ -287,7 +289,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             items.append(FileProviderItem(
                 folder: folder,
                 parentItemIdentifier: .rootContainer,
-                syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+                syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot),
+                filenameStyle: config.filenamePresentationStyle
             ))
 
             try db.upsertItem(.makeFolder(from: folder, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
@@ -302,7 +305,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             items.append(FileProviderItem(
                 file: file,
                 parentItemIdentifier: .rootContainer,
-                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
+                filenameStyle: config.filenamePresentationStyle
             ))
 
             try db.upsertItem(.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
@@ -342,7 +346,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         items.append(FileProviderItem(
             folder: folder,
             parentItemIdentifier: parentIdentifier,
-            syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot)
+            syncState: syncState(for: folder.name, itemType: .folder, snapshot: syncSnapshot),
+            filenameStyle: config.filenamePresentationStyle
         ))
 
         try db.upsertItem(.makeFolder(from: folder, parent: parentIdentifier.rawValue))
@@ -365,7 +370,8 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
             items.append(FileProviderItem(
                 file: file,
                 parentItemIdentifier: NSFileProviderItemIdentifier(identifier),
-                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot)
+                syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
+                filenameStyle: config.filenamePresentationStyle
             ))
 
             try db.upsertItem(.makeFile(from: file, parent: identifier))
@@ -397,16 +403,17 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         if containerIdentifier == .trashContainer {
             return []
         }
+        let style = config.filenamePresentationStyle
         if containerIdentifier == .workingSet {
             let syncSnapshot = try itemSyncSnapshot()
             return try db.allItems()
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-                .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot)) }
+                .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot), filenameStyle: style) }
         }
         let syncSnapshot = try itemSyncSnapshot()
         return try db.children(of: containerIdentifier.rawValue)
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-            .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot)) }
+            .map { FileProviderItem(trackedItem: $0, syncState: syncState(for: $0, snapshot: syncSnapshot), filenameStyle: style) }
     }
 
     private func childFolders(of folderID: Int) async throws -> (folders: [RemoteFolder], unverified: Set<Int>) {

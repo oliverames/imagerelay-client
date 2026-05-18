@@ -50,6 +50,94 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-download-link</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Download Link</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-id</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Image Relay ID</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Folder Share Link</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-metadata</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Metadata</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Diagnostic Info</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Copy Long-Lived Public Link</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.export-qr</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Export Public Link as QR Code</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.new-mail-link</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>New Mail with Public Link</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.force-redownload</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Force Re-download</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.edit-metadata</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Edit Metadata in Image Relay…</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.add-to-collection</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Add to Collection…</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
 				<string>com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Open Folder in Image Relay Web</string>

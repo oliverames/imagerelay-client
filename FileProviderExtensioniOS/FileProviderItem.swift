@@ -55,13 +55,17 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         )
     }
 
-    convenience init(folder: RemoteFolder, parentItemIdentifier: NSFileProviderItemIdentifier) {
+    convenience init(
+        folder: RemoteFolder,
+        parentItemIdentifier: NSFileProviderItemIdentifier,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         let identifier = NSFileProviderItemIdentifier(ItemIdentifier.folder(folder.id).rawValue)
         let version = (folder.updatedOn ?? "0")
         self.init(
             itemIdentifier: identifier,
             parentItemIdentifier: parentItemIdentifier,
-            filename: folder.name,
+            filename: FilenamePresentation.display(folder.name, style: filenameStyle),
             contentType: .folder,
             documentSize: nil,
             itemVersion: NSFileProviderItemVersion(
@@ -74,7 +78,11 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         )
     }
 
-    convenience init(file: RemoteFile, parentItemIdentifier: NSFileProviderItemIdentifier) {
+    convenience init(
+        file: RemoteFile,
+        parentItemIdentifier: NSFileProviderItemIdentifier,
+        filenameStyle: FilenamePresentationStyle = .serverCanonical
+    ) {
         let identifier = NSFileProviderItemIdentifier(ItemIdentifier.file(file.id).rawValue)
         let version = (file.updatedOn ?? "0")
         let pathExtension = (file.name as NSString).pathExtension
@@ -82,7 +90,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem {
         self.init(
             itemIdentifier: identifier,
             parentItemIdentifier: parentItemIdentifier,
-            filename: file.name,
+            filename: FilenamePresentation.display(file.name, style: filenameStyle),
             contentType: utType,
             documentSize: NSNumber(value: file.size),
             itemVersion: NSFileProviderItemVersion(

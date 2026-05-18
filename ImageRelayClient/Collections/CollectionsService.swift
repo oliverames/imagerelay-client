@@ -170,6 +170,12 @@ final class CollectionsState {
     /// Surfaced to create/delete sheets so they can show error text without flipping `phase`.
     var lastActionError: String?
 
+    /// File IDs queued by a Finder "Add to Collection..." action. When non-empty,
+    /// CollectionsBrowserView shows a banner prompting the user to pick a target
+    /// collection. Cleared after `submitPendingAdd` completes.
+    var pendingAddFileIDs: [Int] = []
+    var pendingAddFileNames: [String] = []
+
     var selectedCollection: Collection? {
         guard let selectedID else { return nil }
         return collections.first { $0.id == selectedID }
@@ -224,6 +230,31 @@ final class CollectionsState {
             logger.warning("Add items to collection failed: \(error.localizedDescription)")
             itemsErrorByCollectionID[collection.id] = error.localizedDescription
         }
+    }
+
+    /// Run the queued Finder "Add to Collection..." selection against the given
+    /// collection. Clears the pending state on success or hard failure.
+    /// `targetCollection` may be a newly-created collection — callers are
+    /// responsible for inserting it into `collections` first (or relying on the
+    /// subsequent reload).
+    func submitPendingAdd(to collection: Collection) async {
+        guard !pendingAddFileIDs.isEmpty else { return }
+        let fileIDs = pendingAddFileIDs
+        await addItems(fileIDs, to: collection)
+        // Only clear if no error surfaced. The UI surfaces errors via
+        // `itemsErrorByCollectionID`; if one is set, leave pending state in
+        // place so the user can retry against a different collection.
+        if itemsErrorByCollectionID[collection.id] == nil {
+            pendingAddFileIDs = []
+            pendingAddFileNames = []
+        }
+    }
+
+    /// Drop the queued Finder "Add to Collection..." selection without acting
+    /// on it. Used by the banner's Cancel button.
+    func clearPendingAdd() {
+        pendingAddFileIDs = []
+        pendingAddFileNames = []
     }
 
     // MARK: - Create / Delete actions

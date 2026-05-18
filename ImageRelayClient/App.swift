@@ -68,6 +68,7 @@ struct ImageRelayClientApp: App {
                 .environment(webhooks)
                 .environment(products)
                 .environment(libraryAdmin)
+                .onOpenURL { url in handleIncoming(url) }
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
@@ -99,21 +100,23 @@ struct ImageRelayClientApp: App {
             .frame(width: 540, height: 460)
             .environment(domainManager)
             .environment(updateController)
-            .onOpenURL { url in
-                Task { await domainManager.completeOAuthCallback(url) }
-            }
+            .onOpenURL { url in handleIncoming(url) }
         }
 
         Window("Edit Metadata", id: "metadata-editor") {
             MetadataEditorView(state: metadataEditor)
+                .onOpenURL { url in handleIncoming(url) }
         }
         .defaultSize(width: 520, height: 480)
         .windowResizability(.contentMinSize)
+        .handlesExternalEvents(matching: ["edit-metadata"])
 
         Window("Collections", id: "collections-browser") {
             CollectionsBrowserView(state: collections)
+                .onOpenURL { url in handleIncoming(url) }
         }
         .defaultSize(width: 720, height: 540)
+        .handlesExternalEvents(matching: ["add-to-collection"])
 
         Window("Webhooks", id: "webhooks-admin") {
             WebhooksAdminView(state: webhooks)
@@ -129,5 +132,43 @@ struct ImageRelayClientApp: App {
             LibraryAdminView(state: libraryAdmin)
         }
         .defaultSize(width: 760, height: 560)
+    }
+
+    /// Route incoming URLs from Finder right-click actions and OAuth callbacks.
+    /// `imagerelay-client://oauth/...` goes to the OAuth flow;
+    /// `imagerelay-client://<action>` preloads the relevant state. The matching
+    /// `handlesExternalEvents` declaration on each Window takes care of
+    /// bringing the right window forward — this handler only mutates state.
+    /// Idempotent: SwiftUI may deliver the same URL multiple times to both the
+    /// MenuBarExtra and the matching Window, and re-pre-loading the same data
+    /// is harmless.
+    private func handleIncoming(_ url: URL) {
+        if url.host == "oauth" {
+            Task { await domainManager.completeOAuthCallback(url) }
+            return
+        }
+        guard let parsed = ActionFormatting.parseHostAppActionURL(url) else {
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        switch parsed.host {
+        case "edit-metadata":
+            let targets = parsed.files.map {
+                MetadataEditorState.Target(remoteID: $0.id, fileName: $0.name)
+            }
+            Task { @MainActor in
+                await metadataEditor.load(targets: targets)
+            }
+        case "add-to-collection":
+            collections.pendingAddFileIDs = parsed.files.map(\.id)
+            collections.pendingAddFileNames = parsed.files.map(\.name)
+            Task { @MainActor in
+                if collections.collections.isEmpty {
+                    await collections.load()
+                }
+            }
+        default:
+            break
+        }
     }
 }

@@ -1,9 +1,9 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    public static let currentServiceUserAgent = "ImageRelayClient/1.3.0-beta.1"
-    public static let currentMacUserAgent = "ImageRelayClient/1.3.0-beta.1 (macOS)"
-    public static let currentIOSUserAgent = "ImageRelayClient/1.3.0-beta.1 (iOS)"
+    public static let currentServiceUserAgent = "ImageRelayClient/1.3.0-beta.2"
+    public static let currentMacUserAgent = "ImageRelayClient/1.3.0-beta.2 (macOS)"
+    public static let currentIOSUserAgent = "ImageRelayClient/1.3.0-beta.2 (iOS)"
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -27,7 +27,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.2.0",
         "ImageRelayClient/1.2.0 (macOS)",
         "ImageRelayClient/1.2.1",
-        "ImageRelayClient/1.2.1 (macOS)"
+        "ImageRelayClient/1.2.1 (macOS)",
+        "ImageRelayClient/1.3.0-beta.1",
+        "ImageRelayClient/1.3.0-beta.1 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -44,7 +46,8 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.2.0-beta.3 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.1 (iOS)" {
+            userAgent == "ImageRelayClient/1.2.1 (iOS)" ||
+            userAgent == "ImageRelayClient/1.3.0-beta.1 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
@@ -77,6 +80,10 @@ public struct AppConfiguration: Codable, Sendable {
     /// in Image Relay Web") by probing `GET /users/me.json` once and persisting the
     /// `subdomain.http_base` value here. Nil until first action invocation.
     public var webBaseURL: URL?
+    /// How filenames returned by the API are presented in Finder. `.serverCanonical`
+    /// shows the exact server-canonical name; `.humanReadable` reverses the
+    /// dashes-and-lowercase canonicalization at the display layer only.
+    public var filenamePresentationStyle: FilenamePresentationStyle
 
     // Sensitive auth fields intentionally absent — they are never written to JSON.
     enum CodingKeys: String, CodingKey {
@@ -97,6 +104,7 @@ public struct AppConfiguration: Codable, Sendable {
         case fileProviderDisconnected = "file_provider_disconnected"
         case selectedFolderIDs = "selected_folder_ids"
         case webBaseURL = "web_base_url"
+        case filenamePresentationStyle = "filename_presentation_style"
     }
 
     public init(
@@ -119,7 +127,8 @@ public struct AppConfiguration: Codable, Sendable {
         showAdvancedInformation: Bool = false,
         fileProviderDisconnected: Bool = false,
         selectedFolderIDs: [Int] = [],
-        webBaseURL: URL? = nil
+        webBaseURL: URL? = nil,
+        filenamePresentationStyle: FilenamePresentationStyle = .serverCanonical
     ) {
         self.apiKey = apiKey
         self.authMethod = authMethod
@@ -141,6 +150,7 @@ public struct AppConfiguration: Codable, Sendable {
         self.fileProviderDisconnected = fileProviderDisconnected
         self.selectedFolderIDs = selectedFolderIDs
         self.webBaseURL = webBaseURL
+        self.filenamePresentationStyle = filenamePresentationStyle
     }
 
     public init(from decoder: Decoder) throws {
@@ -172,6 +182,8 @@ public struct AppConfiguration: Codable, Sendable {
         } else {
             webBaseURL = nil
         }
+        filenamePresentationStyle = try c.decodeIfPresent(FilenamePresentationStyle.self, forKey: .filenamePresentationStyle)
+            ?? .serverCanonical
     }
 
     public var isConfigured: Bool {
@@ -212,7 +224,8 @@ public struct AppConfiguration: Codable, Sendable {
         maxConcurrentFiles: 10,
         showAdvancedInformation: false,
         fileProviderDisconnected: false,
-        selectedFolderIDs: []
+        selectedFolderIDs: [],
+        filenamePresentationStyle: .serverCanonical
     )
 
     // MARK: - Persistence

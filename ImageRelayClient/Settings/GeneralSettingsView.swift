@@ -16,6 +16,7 @@ struct GeneralSettingsView: View {
     @State private var defaultFileTypeID = ""
     @State private var launchAtLogin = false
     @State private var syncUpload = true
+    @State private var beautifyFilenames = false
     @State private var saveError: String?
     @State private var containerAvailable = true
 
@@ -148,6 +149,21 @@ struct GeneralSettingsView: View {
                 .font(.caption)
             }
 
+            Section {
+                Toggle("Beautify Filenames", isOn: $beautifyFilenames)
+                    .onChange(of: beautifyFilenames) { _, _ in
+                        saveConfig()
+                    }
+            } header: {
+                Text("Display")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Replaces dashes with spaces and title-cases words in Finder, so an asset stored as **annual-report.pdf** appears as **Annual Report.pdf**.")
+                    Text("Cosmetic only — files on Image Relay still use their server-canonical names. Lossy for files with intentional hyphens (e.g. \"spider-man\") or originally-uppercase acronyms.")
+                }
+                .font(.caption)
+            }
+
             Section("Startup") {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
@@ -184,6 +200,7 @@ struct GeneralSettingsView: View {
         remoteRootFolderID = config.remoteRootFolderID.map(String.init) ?? (config.apiKey.isEmpty ? "" : "root")
         defaultFileTypeID = config.defaultFileTypeID.map(String.init) ?? ""
         syncUpload = config.syncUpload
+        beautifyFilenames = config.filenamePresentationStyle == .humanReadable
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -203,6 +220,7 @@ struct GeneralSettingsView: View {
             config.remoteRootFolderID = Int(trimmedRoot)
         }
         config.defaultFileTypeID = defaultFileTypeID.isEmpty ? nil : Int(defaultFileTypeID)
+        config.filenamePresentationStyle = beautifyFilenames ? .humanReadable : .serverCanonical
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
             saveError = nil
