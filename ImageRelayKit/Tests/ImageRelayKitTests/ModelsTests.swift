@@ -92,6 +92,30 @@ struct ModelsTests {
         #expect(file.folderIDs == [2910316])
         #expect(file.isDeleted == false)
         #expect(file.contentModifiedAt != nil)
+        #expect(file.shortLivedThumbnailURL == nil)
+    }
+
+    @Test("Decode RemoteFile with short_lived_thumbnail")
+    func decodeFileWithThumbnail() throws {
+        // Shape verified against the Image Relay API (synthetic fixture).
+        let json = """
+        {
+            "id": 100000001,
+            "filename": "example-presentation.pptx",
+            "size": 11629175,
+            "updated_on": "2024-08-14T20:05:30.000Z",
+            "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "file_type_id": 6096,
+            "folder_ids": [1923998],
+            "deleted": null,
+            "short_lived_thumbnail": "https://s3.amazonaws.com/example-bucket/client/0/assets/0/example_thumb.jpg?AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE&Expires=1700000000&Signature=EXAMPLESIG%3D"
+        }
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder.imageRelay.decode(RemoteFile.self, from: json)
+        #expect(file.shortLivedThumbnailURL != nil)
+        #expect(file.shortLivedThumbnailURL?.host == "s3.amazonaws.com")
+        #expect(file.shortLivedThumbnailURL?.path.hasSuffix("_thumb.jpg") == true)
     }
 
     @Test("Parse Image Relay date metadata")

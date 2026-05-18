@@ -88,8 +88,8 @@ final class CollectionsService {
             baseURL: config.baseURL,
             credential: config.credential,
             userAgent: AppConfiguration.currentServiceUserAgent,
-            // #16: host-app API clients share one 1 RPS lane so the FP extension can own the other 4.
-            rateLimiter: .hostAppShared,
+            // #16 fix: shared App Group limiter pools 5 RPS across host + FP extension.
+            rateLimiter: AppConfiguration.sharedOrPerProcessRateLimiter(),
             throttleStateStore: AppConfiguration.sharedThrottleStateStore()
         )
     }

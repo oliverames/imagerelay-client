@@ -1,6 +1,17 @@
 import Foundation
 
-public actor RateLimiter {
+/// Async rate-limiter abstraction. The default in-process `RateLimiter` and the
+/// cross-process `SharedRateLimiter` both conform; `APIClient` accepts either.
+public protocol AsyncRateLimiting: Sendable {
+    /// Block until the caller may issue a request.
+    func acquire() async
+    /// Called by `APIClient` after a 429 response so the limiter can tighten its budget.
+    func recordRateLimit() async
+    /// Called by `APIClient` after a successful request so the limiter can recover.
+    func recordSuccess() async
+}
+
+public actor RateLimiter: AsyncRateLimiting {
     public static let hostAppShared = RateLimiter(maxRequests: 1, period: 1.0)
     public static let fileProviderExtensionShared = RateLimiter(maxRequests: 4, period: 1.0)
 
@@ -30,4 +41,9 @@ public actor RateLimiter {
             }
         }
     }
+
+    // The in-process limiter is dumb on purpose — feedback hooks no-op so callers
+    // that target a single limiter type don't need to special-case the variant.
+    public func recordRateLimit() async {}
+    public func recordSuccess() async {}
 }

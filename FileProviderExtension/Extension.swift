@@ -3,7 +3,7 @@ import AppKit
 import ImageRelayKit
 import os.log
 
-final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProviderCustomAction, @unchecked Sendable {
+final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProviderCustomAction, NSFileProviderThumbnailing, NSFileProviderPartialContentFetching, @unchecked Sendable {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
     let domain: NSFileProviderDomain
 
@@ -34,8 +34,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 baseURL: AppConfiguration.default.baseURL,
                 credential: AppConfiguration.default.credential,
                 userAgent: "",
-                // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
-                rateLimiter: .fileProviderExtensionShared
+                // Degraded path: no container, so we can't share the limiter
+                // cross-process. Fall back to the per-process 4-RPS partition
+                // that pre-1.3 used (#16 belt-and-suspenders).
+                rateLimiter: RateLimiter.fileProviderExtensionShared
             )
             self.db = SyncDatabase.makeInMemory()
             super.init()
@@ -67,8 +69,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             baseURL: loadedConfig.baseURL,
             credential: loadedConfig.credential,
             userAgent: loadedConfig.userAgent,
-            // #16: the FP extension owns 4 RPS, leaving 1 RPS for the host app.
-            rateLimiter: .fileProviderExtensionShared,
+            // #16 fix: the App Group shared limiter pools 5 RPS across the host
+            // app + this extension, with a single-probe ramp protocol that
+            // recovers gracefully from a 429 in either process.
+            rateLimiter: AppConfiguration.sharedRateLimiter(in: container),
             throttleStateStore: throttleStore,
             telemetry: database
         )
@@ -204,6 +208,156 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
                 handler.value(nil, nil, error.asFileProviderError)
             }
+        }
+
+        return progress
+    }
+
+    // MARK: - Partial Content (Range)
+
+    /// Downloads a byte range of an asset using an HTTP Range request against the
+    /// Image Relay quick-link CDN. Returns a sparse temp file with only the
+    /// requested (aligned) range filled in.
+    ///
+    /// The CDN supports `Accept-Ranges: bytes` and responds 206 to a Range header
+    /// — verified live against the Image Relay v2 API on 2026-05-18. If the CDN
+    /// ever stops returning 206, the system treats that as a content-mismatch and
+    /// requests a fresh full fetch via `fetchContents`.
+    func fetchPartialContents(
+        for itemIdentifier: NSFileProviderItemIdentifier,
+        version requestedVersion: NSFileProviderItemVersion,
+        request: NSFileProviderRequest,
+        minimalRange requestedRange: NSRange,
+        aligningTo alignment: Int,
+        options: NSFileProviderFetchContentsOptions = [],
+        completionHandler: @escaping (URL?, NSFileProviderItem?, NSRange, NSFileProviderMaterializationFlags, (any Error)?) -> Void
+    ) -> Progress {
+        let progress = Progress(totalUnitCount: 100)
+        let db = self.db
+        let api = self.api
+        let logger = self.logger
+        let handler = UncheckedBox(value: completionHandler)
+        let fetcher = PartialContentFetcher(api: api, logger: logger)
+
+        Task {
+            await self.waitForFileOperationSlot()
+            defer { self.releaseFileOperationSlot() }
+
+            do {
+                guard let tracked = try db.item(for: itemIdentifier.rawValue),
+                      let itemID = ItemIdentifier(rawValue: itemIdentifier.rawValue),
+                      let fileID = itemID.numericID,
+                      tracked.itemType == .file else {
+                    handler.value(nil, nil, NSRange(location: 0, length: 0), [], NSFileProviderError(.noSuchItem))
+                    return
+                }
+
+                let totalSize = tracked.size
+                guard totalSize > 0 else {
+                    // Zero-byte file: serve an empty temp file so the system can
+                    // materialize it without a network round trip.
+                    let tempFile = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(UUID().uuidString + "-" + tracked.name)
+                    FileManager.default.createFile(atPath: tempFile.path, contents: nil)
+                    let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
+                    handler.value(tempFile, item, NSRange(location: 0, length: 0), [], nil)
+                    return
+                }
+
+                let alignedRange = PartialContentFetcher.alignedRange(
+                    covering: requestedRange,
+                    alignment: alignment,
+                    totalSize: totalSize
+                )
+
+                guard alignedRange.length > 0 else {
+                    // System asked for a range past EOF — surface as no-such-item-like
+                    // empty range rather than fabricating data.
+                    handler.value(nil, nil, alignedRange, [], NSFileProviderError(.noSuchItem))
+                    return
+                }
+
+                let url = try await fetcher.quickLinkURL(forFileID: fileID)
+                progress.completedUnitCount = 30
+
+                let lowerInclusive = Int64(alignedRange.location)
+                let upperInclusive = lowerInclusive + Int64(alignedRange.length) - 1
+                let (data, response) = try await api.downloadData(
+                    from: url,
+                    range: lowerInclusive...upperInclusive,
+                    countsAgainstRateLimit: false
+                )
+                progress.completedUnitCount = 80
+
+                // If the server didn't honor the Range (responded 200 with the full
+                // file), treat that as a fall-back to fetchContents — write the whole
+                // file out and return a full-range retrievedRange.
+                let retrievedRange: NSRange
+                let writtenOffset: Int64
+                if response.statusCode == 200 {
+                    retrievedRange = NSRange(location: 0, length: Int(totalSize))
+                    writtenOffset = 0
+                    logger.debug("Range request for \(itemIdentifier.rawValue, privacy: .public) returned 200 — falling back to full materialization")
+                } else {
+                    retrievedRange = NSRange(location: Int(lowerInclusive), length: data.count)
+                    writtenOffset = lowerInclusive
+                }
+
+                let tempFile = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString + "-" + tracked.name)
+                try fetcher.writePartialContent(
+                    data: data,
+                    offset: writtenOffset,
+                    totalSize: totalSize,
+                    to: tempFile
+                )
+                progress.completedUnitCount = 100
+
+                let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked))
+                handler.value(tempFile, item, retrievedRange, [], nil)
+            } catch {
+                logger.error("Partial fetch failed for \(itemIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                handler.value(nil, nil, NSRange(location: 0, length: 0), [], error.asFileProviderError)
+            }
+        }
+
+        return progress
+    }
+
+    // MARK: - Thumbnails
+
+    func fetchThumbnails(
+        for itemIdentifiers: [NSFileProviderItemIdentifier],
+        requestedSize size: CGSize,
+        perThumbnailCompletionHandler: @escaping (NSFileProviderItemIdentifier, Data?, (any Error)?) -> Void,
+        completionHandler: @escaping ((any Error)?) -> Void
+    ) -> Progress {
+        let progress = Progress(totalUnitCount: Int64(max(1, itemIdentifiers.count)))
+        let fetcher = ThumbnailFetcher(api: api, db: db, logger: logger)
+        let semaphore = AsyncSemaphore(value: ThumbnailFetcher.concurrency)
+        nonisolated(unsafe) let perItem = perThumbnailCompletionHandler
+        nonisolated(unsafe) let completion = completionHandler
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for identifier in itemIdentifiers {
+                    group.addTask {
+                        await semaphore.wait()
+                        defer { Task { await semaphore.signal() } }
+
+                        do {
+                            let data = try await fetcher.fetch(for: identifier)
+                            perItem(identifier, data, nil)
+                        } catch {
+                            // Non-fatal — report nil thumbnail with the error so the
+                            // system falls back to its built-in placeholder.
+                            perItem(identifier, nil, error)
+                        }
+                        progress.completedUnitCount += 1
+                    }
+                }
+            }
+            completion(nil)
         }
 
         return progress

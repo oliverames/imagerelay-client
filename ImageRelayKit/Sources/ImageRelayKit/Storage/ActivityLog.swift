@@ -40,12 +40,18 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
     public var contentVersion: String
     public var metadataVersion: String
     public var contentModifiedAt: Date?
+    /// Last-known presigned S3 URL pointing at a thumbnail JPEG for this asset.
+    /// Cached so the File Provider thumbnailing handler doesn't need to mint a
+    /// fresh `/files/{id}.json` per request. Nil for folders and for files
+    /// without a previewable content type.
+    public var shortLivedThumbnailURL: String?
 
     public init(
         identifier: String, parentIdentifier: String, remoteID: Int,
         itemType: TrackedItemType, name: String, size: Int64,
         contentVersion: String, metadataVersion: String,
-        contentModifiedAt: Date? = nil
+        contentModifiedAt: Date? = nil,
+        shortLivedThumbnailURL: String? = nil
     ) {
         self.identifier = identifier
         self.parentIdentifier = parentIdentifier
@@ -56,6 +62,7 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
         self.contentVersion = contentVersion
         self.metadataVersion = metadataVersion
         self.contentModifiedAt = contentModifiedAt
+        self.shortLivedThumbnailURL = shortLivedThumbnailURL
     }
 
     /// Builds a `TrackedItem` from a discovered remote folder. Use only for read paths
@@ -91,7 +98,8 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
             size: Int64(file.size),
             contentVersion: file.updatedOn ?? "0",
             metadataVersion: fileMetadataVersion(updatedOn: file.updatedOn, parentIdentifier: parent),
-            contentModifiedAt: file.contentModifiedAt
+            contentModifiedAt: file.contentModifiedAt,
+            shortLivedThumbnailURL: file.shortLivedThumbnailURL?.absoluteString
         )
     }
 

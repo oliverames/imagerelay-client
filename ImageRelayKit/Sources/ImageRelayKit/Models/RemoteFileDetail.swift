@@ -17,6 +17,8 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
     public let description: String?
     public let keywords: [String]
     public let customFields: [CustomField]
+    /// Presigned S3 URL to a JPEG thumbnail of the asset. See `RemoteFile.shortLivedThumbnailURL`.
+    public let shortLivedThumbnailURL: URL?
 
     public struct CustomField: Codable, Sendable, Hashable, Identifiable {
         public let id: Int?
@@ -70,6 +72,7 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
         case description
         case keywords
         case customFields = "custom_fields"
+        case shortLivedThumbnailURL = "short_lived_thumbnail"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -86,6 +89,12 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
         description = try c.decodeIfPresent(String.self, forKey: .description)
         keywords = try Self.decodeKeywords(from: c)
         customFields = try c.decodeIfPresent([CustomField].self, forKey: .customFields) ?? []
+        if let raw = try c.decodeIfPresent(String.self, forKey: .shortLivedThumbnailURL),
+           let url = URL(string: raw) {
+            shortLivedThumbnailURL = url
+        } else {
+            shortLivedThumbnailURL = nil
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -100,6 +109,7 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
         try c.encodeIfPresent(description, forKey: .description)
         try c.encode(keywords, forKey: .keywords)
         try c.encode(customFields, forKey: .customFields)
+        try c.encodeIfPresent(shortLivedThumbnailURL?.absoluteString, forKey: .shortLivedThumbnailURL)
     }
 
     public init(
@@ -112,7 +122,8 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
         folderIDs: [Int] = [],
         description: String? = nil,
         keywords: [String] = [],
-        customFields: [CustomField] = []
+        customFields: [CustomField] = [],
+        shortLivedThumbnailURL: URL? = nil
     ) {
         self.id = id
         self.name = name
@@ -124,6 +135,7 @@ public struct RemoteFileDetail: Codable, Sendable, Identifiable, Hashable {
         self.description = description
         self.keywords = keywords
         self.customFields = customFields
+        self.shortLivedThumbnailURL = shortLivedThumbnailURL
     }
 
     private static func decodeFolderIDs(from c: KeyedDecodingContainer<CodingKeys>) throws -> [Int] {

@@ -1,9 +1,9 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    public static let currentServiceUserAgent = "ImageRelayClient/1.2.1"
-    public static let currentMacUserAgent = "ImageRelayClient/1.2.1 (macOS)"
-    public static let currentIOSUserAgent = "ImageRelayClient/1.2.1 (iOS)"
+    public static let currentServiceUserAgent = "ImageRelayClient/1.3.0-beta.1"
+    public static let currentMacUserAgent = "ImageRelayClient/1.3.0-beta.1 (macOS)"
+    public static let currentIOSUserAgent = "ImageRelayClient/1.3.0-beta.1 (iOS)"
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -25,7 +25,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.2.0-beta.4",
         "ImageRelayClient/1.2.0-beta.4 (macOS)",
         "ImageRelayClient/1.2.0",
-        "ImageRelayClient/1.2.0 (macOS)"
+        "ImageRelayClient/1.2.0 (macOS)",
+        "ImageRelayClient/1.2.1",
+        "ImageRelayClient/1.2.1 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -41,7 +43,8 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.2.0-beta.2 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0-beta.3 (iOS)" ||
             userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0 (iOS)" {
+            userAgent == "ImageRelayClient/1.2.0 (iOS)" ||
+            userAgent == "ImageRelayClient/1.2.1 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
@@ -333,6 +336,22 @@ public struct AppConfiguration: Codable, Sendable {
 
     public static func sharedThrottleStateStore() -> ThrottleStateStore? {
         containerURL().map { throttleStateStore(in: $0) }
+    }
+
+    /// Builds the cross-process rate limiter shared by the host app and File
+    /// Provider extension. The container parameter must be the App Group root.
+    public static func sharedRateLimiter(in container: URL) -> SharedRateLimiter {
+        SharedRateLimiter(url: SharedRateLimiter.fileURL(in: container))
+    }
+
+    /// Returns the App Group shared limiter when the container is reachable, or
+    /// a per-process `RateLimiter()` fallback otherwise. Always non-nil so call
+    /// sites can wire directly into `APIClient(rateLimiter:)`.
+    public static func sharedOrPerProcessRateLimiter() -> any AsyncRateLimiting {
+        if let container = containerURL() {
+            return sharedRateLimiter(in: container)
+        }
+        return RateLimiter()
     }
 
     // MARK: - App Group

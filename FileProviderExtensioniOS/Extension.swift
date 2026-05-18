@@ -8,7 +8,7 @@ import os.log
 /// background poller, no upload/delete/move endpoints. Enumeration calls the
 /// Image Relay API live; content fetching mints a quick-link and downloads
 /// to a temp file. The system caches downloaded contents on its own.
-final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked Sendable {
+final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProviderThumbnailing, @unchecked Sendable {
     private let logger = Logger(
         subsystem: "com.oliverames.imagerelay-client.ios.fileprovider",
         category: "Extension"
@@ -109,6 +109,43 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, @unchecked S
         request: NSFileProviderRequest
     ) throws -> NSFileProviderEnumerator {
         Enumerator(containerIdentifier: containerItemIdentifier, services: services)
+    }
+
+    // MARK: - Thumbnails
+
+    func fetchThumbnails(
+        for itemIdentifiers: [NSFileProviderItemIdentifier],
+        requestedSize size: CGSize,
+        perThumbnailCompletionHandler: @escaping (NSFileProviderItemIdentifier, Data?, (any Error)?) -> Void,
+        completionHandler: @escaping ((any Error)?) -> Void
+    ) -> Progress {
+        let progress = Progress(totalUnitCount: Int64(max(1, itemIdentifiers.count)))
+        let fetcher = ThumbnailFetcher(api: services.api, logger: logger)
+        let semaphore = AsyncSemaphore(value: ThumbnailFetcher.concurrency)
+        nonisolated(unsafe) let perItem = perThumbnailCompletionHandler
+        nonisolated(unsafe) let completion = completionHandler
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for identifier in itemIdentifiers {
+                    group.addTask {
+                        await semaphore.wait()
+                        defer { Task { await semaphore.signal() } }
+
+                        do {
+                            let data = try await fetcher.fetch(for: identifier)
+                            perItem(identifier, data, nil)
+                        } catch {
+                            perItem(identifier, nil, error)
+                        }
+                        progress.completedUnitCount += 1
+                    }
+                }
+            }
+            completion(nil)
+        }
+
+        return progress
     }
 
     // MARK: - Mutation (read-only on iOS — every entry point fails fast)
@@ -238,7 +275,11 @@ struct ExtensionServices: Sendable {
         let api = APIClient(
             baseURL: config.baseURL,
             credential: config.credential,
-            userAgent: userAgent
+            userAgent: userAgent,
+            // Coordinate API calls with the macOS host counterpart via the App Group
+            // shared limiter (#16). iOS-only on this device, but the limiter file is
+            // safe to use even with a single process consuming the bucket.
+            rateLimiter: AppConfiguration.sharedRateLimiter(in: container)
         )
         return ExtensionServices(api: api, config: config)
     }

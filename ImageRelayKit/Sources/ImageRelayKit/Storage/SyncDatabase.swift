@@ -104,6 +104,15 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v7") { db in
+            // Cached presigned S3 thumbnail URL for File Provider thumbnailing (1.3.0).
+            // Nullable so existing rows continue to work; refreshed whenever a folder
+            // listing decodes a fresh URL.
+            try db.alter(table: "tracked_items") { t in
+                t.add(column: "shortLivedThumbnailURL", .text)
+            }
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -118,6 +127,32 @@ public final class SyncDatabase: Sendable {
     public func item(for identifier: String) throws -> TrackedItem? {
         try writer.read { db in
             try TrackedItem.fetchOne(db, key: identifier)
+        }
+    }
+
+    /// Reads the cached short-lived thumbnail URL for a tracked item. Returns
+    /// nil if the row is missing or has no cached URL.
+    public func thumbnailURL(forItemIdentifier identifier: String) throws -> URL? {
+        try writer.read { db in
+            guard let row = try Row.fetchOne(
+                db,
+                sql: "SELECT shortLivedThumbnailURL FROM tracked_items WHERE identifier = ?",
+                arguments: [identifier]
+            ) else { return nil }
+            let raw: String? = row["shortLivedThumbnailURL"]
+            return raw.flatMap(URL.init(string:))
+        }
+    }
+
+    /// Updates the cached short-lived thumbnail URL. Pass nil to clear.
+    /// No-op if the row doesn't exist (callers shouldn't be writing thumbnails
+    /// for items the system hasn't enumerated yet).
+    public func setThumbnailURL(_ url: URL?, forItemIdentifier identifier: String) throws {
+        try writer.write { db in
+            try db.execute(
+                sql: "UPDATE tracked_items SET shortLivedThumbnailURL = ? WHERE identifier = ?",
+                arguments: [url?.absoluteString, identifier]
+            )
         }
     }
 

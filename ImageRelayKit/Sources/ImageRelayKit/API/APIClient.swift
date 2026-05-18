@@ -8,7 +8,7 @@ public actor APIClient {
     private let credential: AuthCredential
     private let userAgent: String
     private let session: URLSession
-    private let rateLimiter: RateLimiter
+    private let rateLimiter: any AsyncRateLimiting
     private let throttleStateStore: ThrottleStateStore?
     private let telemetry: SyncDatabase?
     private let maxRetries: Int
@@ -20,7 +20,7 @@ public actor APIClient {
         apiKey: String,
         userAgent: String = AppConfiguration.currentServiceUserAgent,
         sessionConfiguration: URLSessionConfiguration = .default,
-        rateLimiter: RateLimiter = RateLimiter(),
+        rateLimiter: any AsyncRateLimiting = RateLimiter(),
         throttleStateStore: ThrottleStateStore? = nil,
         telemetry: SyncDatabase? = nil,
         maxRetries: Int = 3,
@@ -44,7 +44,7 @@ public actor APIClient {
         credential: AuthCredential,
         userAgent: String = AppConfiguration.currentServiceUserAgent,
         sessionConfiguration: URLSessionConfiguration = .default,
-        rateLimiter: RateLimiter = RateLimiter(),
+        rateLimiter: any AsyncRateLimiting = RateLimiter(),
         throttleStateStore: ThrottleStateStore? = nil,
         telemetry: SyncDatabase? = nil,
         maxRetries: Int = 3,
@@ -130,6 +130,46 @@ public actor APIClient {
         }
         try checkStatus(httpResponse, data: nil)
         try FileManager.default.moveItem(at: tempURL, to: destination)
+    }
+
+    /// Fetches `url` and returns the body as Data. Optionally honors a
+    /// `Range` header so callers can do partial-content reads.
+    ///
+    /// `countsAgainstRateLimit` lets callers bypass the shared limiter when the
+    /// URL targets the CDN/S3 layer rather than the Image Relay API itself
+    /// (presigned thumbnail URLs and quick-link CDN URLs are served outside
+    /// the 5-RPS API bucket).
+    public func downloadData(
+        from url: URL,
+        range: ClosedRange<Int64>? = nil,
+        countsAgainstRateLimit: Bool = true
+    ) async throws -> (data: Data, response: HTTPURLResponse) {
+        if countsAgainstRateLimit {
+            await rateLimiter.acquire()
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let range {
+            request.setValue("bytes=\(range.lowerBound)-\(range.upperBound)", forHTTPHeaderField: "Range")
+        }
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        // Accept 200 (full content) AND 206 (partial). Anything else is treated
+        // as a typed API error.
+        switch httpResponse.statusCode {
+        case 200, 206:
+            if countsAgainstRateLimit {
+                await rateLimiter.recordSuccess()
+            }
+            return (data, httpResponse)
+        default:
+            try checkStatus(httpResponse, data: data)
+            // checkStatus throws on non-2xx — if we somehow fall through, treat as invalid.
+            throw APIError.invalidResponse
+        }
     }
 
     public func upload(data: Data, to path: String, contentType: String = "application/octet-stream") async throws {
@@ -318,12 +358,26 @@ public actor APIClient {
             do {
                 try checkStatus(httpResponse, data: data)
                 throttleStateStore?.recordSuccess()
+                await rateLimiter.recordSuccess()
                 try? telemetry?.recordSuccessfulAPI()
                 return (data, httpResponse)
             } catch let error as APIError where error.isRetryable && attempt < maxRetries {
+                if case .rateLimited = error {
+                    // Snap the shared limiter into single-probe mode immediately —
+                    // the only way for the other process to see we're throttled.
+                    await rateLimiter.recordRateLimit()
+                }
                 logger.warning("\(method) \(path) retryable error: \(error.userMessage)")
                 lastError = error
                 continue
+            } catch let error as APIError {
+                // Non-retryable, or final attempt. Still inform the shared limiter
+                // about 429s so the other process can see the throttle signal
+                // before the error escapes to the caller.
+                if case .rateLimited = error {
+                    await rateLimiter.recordRateLimit()
+                }
+                throw error
             }
         }
 

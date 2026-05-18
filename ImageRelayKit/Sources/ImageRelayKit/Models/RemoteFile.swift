@@ -9,6 +9,9 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
     public let fileTypeID: Int?
     public let folderIDs: [Int]
     public let isDeleted: Bool
+    /// Presigned S3 URL to a JPEG thumbnail of the asset. Present whenever the
+    /// asset has a rendered preview; nil for non-previewable content types.
+    public let shortLivedThumbnailURL: URL?
 
     public var contentModifiedAt: Date? {
         updatedOn.flatMap(ImageRelayDateParser.date)
@@ -24,6 +27,7 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         case fileTypeID = "file_type_id"
         case folderIDs = "folder_ids"
         case isDeleted = "deleted"
+        case shortLivedThumbnailURL = "short_lived_thumbnail"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -38,6 +42,12 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         fileTypeID = try c.decodeIfPresent(Int.self, forKey: .fileTypeID)
         folderIDs = try Self.decodeFolderIDs(from: c)
         isDeleted = try c.decodeIfPresent(Bool.self, forKey: .isDeleted) ?? false
+        if let raw = try c.decodeIfPresent(String.self, forKey: .shortLivedThumbnailURL),
+           let url = URL(string: raw) {
+            shortLivedThumbnailURL = url
+        } else {
+            shortLivedThumbnailURL = nil
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -50,12 +60,14 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         try c.encodeIfPresent(fileTypeID, forKey: .fileTypeID)
         try c.encode(folderIDs, forKey: .folderIDs)
         try c.encode(isDeleted, forKey: .isDeleted)
+        try c.encodeIfPresent(shortLivedThumbnailURL?.absoluteString, forKey: .shortLivedThumbnailURL)
     }
 
     public init(
         id: Int, name: String, size: Int, updatedOn: String?,
         contentType: String?, fileTypeID: Int?, folderIDs: [Int] = [],
-        isDeleted: Bool = false
+        isDeleted: Bool = false,
+        shortLivedThumbnailURL: URL? = nil
     ) {
         self.id = id
         self.name = name
@@ -65,6 +77,7 @@ public struct RemoteFile: Codable, Sendable, Identifiable, Hashable {
         self.fileTypeID = fileTypeID
         self.folderIDs = folderIDs
         self.isDeleted = isDeleted
+        self.shortLivedThumbnailURL = shortLivedThumbnailURL
     }
 
     private static func decodeFolderIDs(from c: KeyedDecodingContainer<CodingKeys>) throws -> [Int] {
