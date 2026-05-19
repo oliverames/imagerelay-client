@@ -91,9 +91,9 @@ struct ActionFormattingTests {
     @Test("Diagnostics include host context and per-item fields")
     func diagnosticsWithItems() {
         let context = ActionFormatting.DiagnosticContext(
-            userAgent: "ImageRelayClient/1.3.0-beta.3 (macOS)",
+            userAgent: "ImageRelayClient/1.3.0 (macOS)",
             baseURL: "https://api.imagerelay.com/api/v2",
-            appVersion: "1.3.0-beta.3",
+            appVersion: "1.3.0",
             generatedAt: Date(timeIntervalSince1970: 1_715_000_000)
         )
         let tracked = TrackedItem(
@@ -112,8 +112,8 @@ struct ActionFormattingTests {
         let markdown = ActionFormatting.markdownForDiagnostics(items: [tracked], context: context)
 
         #expect(markdown.contains("# Image Relay Client Diagnostics"))
-        #expect(markdown.contains("- **App Version**: 1.3.0-beta.3"))
-        #expect(markdown.contains("- **User Agent**: ImageRelayClient/1.3.0-beta.3 (macOS)"))
+        #expect(markdown.contains("- **App Version**: 1.3.0"))
+        #expect(markdown.contains("- **User Agent**: ImageRelayClient/1.3.0 (macOS)"))
         #expect(markdown.contains("- **API Base URL**: https://api.imagerelay.com/api/v2"))
         #expect(markdown.contains("## logo.png"))
         #expect(markdown.contains("- **Identifier**: `file-99`"))
@@ -129,7 +129,7 @@ struct ActionFormattingTests {
     @Test("Diagnostics work with no selected items")
     func diagnosticsEmptySelection() {
         let context = ActionFormatting.DiagnosticContext(
-            userAgent: "ImageRelayClient/1.3.0-beta.3 (macOS)",
+            userAgent: "ImageRelayClient/1.3.0 (macOS)",
             baseURL: "https://api.imagerelay.com/api/v2",
             appVersion: nil,
             generatedAt: Date(timeIntervalSince1970: 1_715_000_000)

@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-05-19 - 1.3.0 stable release
+
+**What changed**: Promoted `1.3.0-beta.3` to stable `1.3.0` / build `39`. This is the public release for the 1.3 line: Finder right-click actions, metadata editing handoff, collections/product/admin browsing, diagnostic export improvements, display-name presentation controls, and the iOS read-only Files surface all carry forward from the beta cycle. The stable cut also adds the beta 3 macOS and iOS User-Agent defaults to the legacy migration list so beta installs roll forward to the current built-in defaults without resetting user-customized configuration.
+
+One final API coverage fix landed during release prep: `CollectionsService.list()` now uses `APIClient.getAllPages("/collections.json")` instead of fetching a single response page. That brings collections in line with the other list surfaces and avoids silently truncating larger libraries at the first page.
+
+**Validation**: `scripts/run-release-candidate-checks.sh 1.3.0` passed, including patch whitespace, 163 ImageRelayKit package tests across 22 suites, Xcode scheme tests, unsigned macOS build, and unsigned iOS simulator build. `xcodebuild analyze -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO` passed. `scripts/build-developer-id-release.sh --version 1.3.0 --smoke-install` produced a Developer ID signed, notarized, stapled DMG with SHA-256 `115257df201f6a8b5ec7cbb001699a509d92abedd19dd9cfb3567953c38db57a`. App ZIP notarization submission `e3172dbc-fd6f-4191-9aa3-310c39ebd501` and DMG notarization submission `565a2de4-39a1-455b-b8de-0daacff70dd0` were both Accepted.
+
+The smoke install replaced `/Applications/Image Relay.app`, confirmed app version `1.3.0` build `39`, passed Gatekeeper validation, and registered `com.oliverames.imagerelay-client.fileprovider(1.3.0)`. The full live sync matrix passed inside `Oliver's Stuff` (`2907644`): create, modify, delete, rename, zero-byte create/delete, 6 MB file create/delete, file move between folders, and folder create/rename/move/delete all verified against the remote API with cleanup. `Casks/image-relay.rb` was advanced from `1.2.1` to `1.3.0` by the release script.
+
+**Open questions**: No 1.3.0 release blocker remains. The older App Store Connect API key rotation note still carries forward because a prior repo-local copy was treated as exposed. Longer-term candidates after 1.3 are explicit beta-channel appcast behavior, thumbnail/partial-content support if Image Relay exposes a documented safe endpoint, and further API pagination audits as new admin surfaces are added.
+
 ## 2026-05-18 - 1.3.0-beta.3 final beta
 
 **What changed**: Advanced the final beta to `1.3.0-beta.3` / build `38` and tightened the release path before publishing. The built-in User-Agent defaults now derive from the running bundle's `CFBundleShortVersionString` for the known Image Relay app and extension bundle IDs, with a beta-3 fallback for tests and non-app contexts. That removes the recurring manual drift between `Project.yml`, appcast metadata, diagnostic output, and API User-Agent strings. The legacy migration list now covers the 1.3.0 beta 1 and beta 2 macOS/iOS defaults so existing installs still roll forward without resetting customized values.

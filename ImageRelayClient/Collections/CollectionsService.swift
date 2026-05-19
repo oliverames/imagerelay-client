@@ -31,8 +31,7 @@ final class CollectionsService {
 
     func list() async throws -> [Collection] {
         let api = try makeClient()
-        let response: ListResponse = try await api.get("/collections.json")
-        return response.collections ?? []
+        return try await api.getAllPages("/collections.json")
     }
 
     func create(name: String) async throws -> Collection {
@@ -99,27 +98,6 @@ final class CollectionsService {
             forSecurityApplicationGroupIdentifier: appGroupIdentifier
         ) else { return .default }
         return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-    }
-
-    private struct ListResponse: Decodable, Sendable {
-        let collections: [Collection]?
-
-        init(from decoder: any Decoder) throws {
-            if let container = try? decoder.container(keyedBy: CodingKeys.self),
-               let array = try container.decodeIfPresent([Collection].self, forKey: .collections) {
-                collections = array
-                return
-            }
-            // Try bare array
-            var unkeyed = try decoder.unkeyedContainer()
-            var collected: [Collection] = []
-            while !unkeyed.isAtEnd {
-                collected.append(try unkeyed.decode(Collection.self))
-            }
-            collections = collected
-        }
-
-        enum CodingKeys: String, CodingKey { case collections }
     }
 
     /// Accepts either `{"collection": {...}}` or a bare object, matching the
