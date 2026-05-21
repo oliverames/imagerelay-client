@@ -126,6 +126,11 @@ public struct ActivityEntry: Codable, Sendable, FetchableRecord, PersistableReco
     public var timestamp: Date
     public var errorMessage: String?
 
+    public var isAutomaticRetryFailure: Bool {
+        guard action.isFailure, let errorMessage else { return false }
+        return errorMessage.localizedCaseInsensitiveContains("client will retry automatically")
+    }
+
     public init(
         action: SyncAction,
         itemName: String,

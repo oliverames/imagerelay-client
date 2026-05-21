@@ -7,6 +7,9 @@ currently uses or intentionally leaves out.
 
 - `GET /folders/{id}/children`
   Used for remote folder discovery and polling-based change detection.
+- `GET /folders/{id}`
+  Used as a direct confirmation fallback when child-folder listings lag after create,
+  rename, or move operations.
 - `GET /folders/root.json`
   Used during init when the sync root is auto-detected.
 - `POST /folders/{id}/children`
@@ -124,10 +127,14 @@ currently uses or intentionally leaves out.
 
 ## Important Edge-Case Decisions
 
-- Finder folder create maps to `POST /folders/{parent_id}/children`, then waits for the
-  new folder to appear in `GET /folders/{parent_id}/children` before updating local tracking.
-  If confirmation times out, the client attempts to delete the newly-created remote folder
-  and reports the operation as failed.
+- Finder folder create maps to `POST /folders/{parent_id}/children`. Before creating, and
+  again after a 409/422 create response, the client checks `GET /folders/{parent_id}/children`
+  for an existing same-name folder so File Provider retries attach to the already-created
+  remote folder instead of looping forever. Confirmation accepts either the child listing or
+  direct `GET /folders/{id}` detail before updating local tracking. Folder create and update
+  names are normalized before sending to Image Relay because the live folder API rejects
+  `/`, `&`, `<`, and `>` in folder names. For example, a local `RAWs & XMPs` folder is written
+  remotely as `RAWs and XMPs` and treated as the same folder during confirmation.
 - Finder file create maps to upload jobs, then waits for `GET /folders/{id}/files.json`
   to report the expected size before updating local tracking. If confirmation times out,
   the client attempts to delete the newly-created remote file and reports the operation as

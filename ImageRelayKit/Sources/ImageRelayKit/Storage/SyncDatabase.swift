@@ -560,7 +560,7 @@ public final class SyncDatabase: Sendable {
     }
 
     public static func activityResolutionKey(itemName: String, itemType: TrackedItemType) -> String {
-        "\(itemType.rawValue):\(canonicalActivityName(itemName))"
+        "\(itemType.rawValue):\(canonicalActivityName(itemName, itemType: itemType))"
     }
 
     private static func unresolvedFailureLookup(from entries: [ActivityEntry]) -> [String: ActivityEntry] {
@@ -569,6 +569,9 @@ public final class SyncDatabase: Sendable {
         for entry in entries {
             let key = Self.activityResolutionKey(for: entry)
             if entry.action.isFailure {
+                if entry.isAutomaticRetryFailure {
+                    continue
+                }
                 unresolved[key] = entry
             } else if entry.action.resolvesFailures {
                 unresolved.removeValue(forKey: key)
@@ -578,8 +581,19 @@ public final class SyncDatabase: Sendable {
         return unresolved
     }
 
-    private static func canonicalActivityName(_ value: String) -> String {
-        var canonical = value
+    private static func canonicalActivityName(_ value: String, itemType: TrackedItemType) -> String {
+        let normalized: String
+        if itemType == .folder {
+            normalized = value
+                .replacingOccurrences(of: "&", with: " and ")
+                .replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(of: "<", with: "-")
+                .replacingOccurrences(of: ">", with: "-")
+        } else {
+            normalized = value
+        }
+
+        var canonical = normalized
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
             .replacingOccurrences(of: "_", with: "-")

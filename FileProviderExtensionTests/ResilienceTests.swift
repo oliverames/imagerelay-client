@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import FileProvider
 import Testing
 @testable import ImageRelayKit
 
@@ -61,6 +62,44 @@ struct ResilienceTests {
     @Test("Folder delete path matches documented Image Relay endpoint")
     func folderDeletePathUsesSingularFolderEndpoint() {
         #expect(ImageRelayAPIPath.deleteFolder(2_907_644) == "/folder/2907644")
+    }
+
+    @Test("Folder create conflicts resolve against existing remote folder")
+    func folderCreateConflictCanResolveExistingRemote() {
+        #expect(Extension.folderCreateShouldResolveExistingRemote(after: APIError.serverError(statusCode: 409, message: nil)))
+        #expect(Extension.folderCreateShouldResolveExistingRemote(after: APIError.serverError(statusCode: 422, message: nil)))
+        #expect(!Extension.folderCreateShouldResolveExistingRemote(after: APIError.serverError(statusCode: 500, message: nil)))
+        #expect(!Extension.folderCreateShouldResolveExistingRemote(after: APIError.rateLimited(retryAfter: nil)))
+    }
+
+    @Test("Folder names are sanitized for Image Relay folder writes")
+    func folderNamesAreSanitizedForFolderWrites() throws {
+        #expect(Extension.remoteFolderName(forLocalName: "RAWs & XMPs") == "RAWs and XMPs")
+        #expect(Extension.remoteFolderName(forLocalName: "Spring/Summer") == "Spring-Summer")
+        #expect(Extension.remoteFolderName(forLocalName: "A < B > C") == "A - B - C")
+        #expect(Extension.remoteFolderName(forLocalName: "   ") == "Untitled Folder")
+        #expect(Extension.folderNamesMatch("RAWs and XMPs", "RAWs & XMPs"))
+
+        let request = UpdateFolderRequest(
+            name: Extension.remoteFolderName(forLocalName: "RAWs & XMPs"),
+            parent_id: 2_907_644
+        )
+        let data = try JSONEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(object["name"] as? String == "RAWs and XMPs")
+        #expect(object["parent_id"] as? Int == 2_907_644)
+    }
+
+    @Test("Validation API errors are not reported as server-unreachable retries")
+    func validationErrorsMapToCannotSynchronize() {
+        let validation = APIError.serverError(statusCode: 422, message: nil).asFileProviderError as NSError
+        let outage = APIError.serverError(statusCode: 503, message: nil).asFileProviderError as NSError
+
+        #expect(validation.domain == NSFileProviderErrorDomain)
+        #expect(validation.code == NSFileProviderError.Code.cannotSynchronize.rawValue)
+        #expect(outage.domain == NSFileProviderErrorDomain)
+        #expect(outage.code == NSFileProviderError.Code.serverUnreachable.rawValue)
     }
 
     @Test("Recent 429 state delays first File Provider batch")

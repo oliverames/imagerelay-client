@@ -490,6 +490,41 @@ struct SyncDatabaseTests {
         #expect(try db.recentUnresolvedFailures().isEmpty)
     }
 
+    @Test("Folder failures resolve when Image Relay normalizes rejected folder punctuation")
+    func folderFailuresResolveRejectedFolderPunctuation() throws {
+        let db = try makeDB()
+        try db.logActivity(
+            action: .uploadFailed,
+            itemName: "RAWs & XMPs",
+            itemType: .folder,
+            errorMessage: "Image Relay rejected this change (422). Check the item and try again."
+        )
+        try db.logActivity(action: .created, itemName: "RAWs and XMPs", itemType: .folder)
+
+        #expect(try db.unresolvedFailureCount() == 0)
+        #expect(try db.recentUnresolvedFailures().isEmpty)
+    }
+
+    @Test("Automatic retry failures do not require user attention")
+    func automaticRetryFailuresDoNotRequireAttention() throws {
+        let db = try makeDB()
+        try db.logActivity(
+            action: .downloadFailed,
+            itemName: "temporarily-throttled.pdf",
+            itemType: .file,
+            errorMessage: APIError.rateLimited(retryAfter: nil).userMessage
+        )
+        try db.logActivity(
+            action: .uploadFailed,
+            itemName: "validation-error",
+            itemType: .folder,
+            errorMessage: APIError.serverError(statusCode: 422, message: nil).userMessage
+        )
+
+        #expect(try db.unresolvedFailureCount() == 1)
+        #expect(try db.recentUnresolvedFailures().map(\.itemName) == ["validation-error"])
+    }
+
     @Test("Unresolved failure lookup returns canonicalized item failure")
     func unresolvedFailureLookupReturnsCanonicalizedItemFailure() throws {
         let db = try makeDB()

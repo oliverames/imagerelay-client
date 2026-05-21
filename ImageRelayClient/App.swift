@@ -29,7 +29,7 @@ struct ImageRelayClientApp: App {
         if let exportIndex = arguments.firstIndex(of: "--export-diagnostics") {
             Task { @MainActor in
                 let manager = DomainManager(autoBootstrap: false)
-                manager.refreshStatus()
+                await manager.refreshRegistrationStatus()
                 do {
                     let destination: URL
                     if arguments.indices.contains(exportIndex + 1),

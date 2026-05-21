@@ -98,6 +98,21 @@ final class DomainManager {
         recentActivity = (try? db.recentActivity(limit: 5)) ?? []
     }
 
+    func refreshRegistrationStatus() async {
+        do {
+            isDomainActive = try await isDomainRegistered()
+            if isDomainActive {
+                lastError = nil
+            }
+        } catch {
+            isDomainActive = false
+            lastError = error.localizedDescription
+            logger.error("Failed to refresh File Provider domain registration: \(error.localizedDescription, privacy: .public)")
+        }
+
+        refreshStatus()
+    }
+
     func setPause(choice: PauseDuration?) {
         guard let db = ensureDatabase() else { return }
         if let choice {

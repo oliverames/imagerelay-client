@@ -411,36 +411,34 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename)
                     defer { self.incrementProgress() }
 
-                    let createRequest = CreateFolderRequest(name: itemTemplate.filename)
-                    let folder: RemoteFolder = try await api.post(
-                        "/folders/\(parentFolderID)/children",
-                        body: createRequest
+                    let (folder, resolvedExisting) = try await self.createOrResolveRemoteFolder(
+                        named: itemTemplate.filename,
+                        parentFolderID: parentFolderID
                     )
-                    do {
-                        try await self.waitForRemoteFolder(
-                            remoteID: folder.id,
-                            parentFolderID: parentFolderID,
-                            expectedName: folder.name
-                        )
-                    } catch {
-                        try? await self.deleteRemoteFolder(remoteID: folder.id, parentFolderID: parentFolderID)
-                        throw error
-                    }
+                    let confirmed = try await self.waitForRemoteFolder(
+                        remoteID: folder.id,
+                        parentFolderID: parentFolderID,
+                        expectedName: folder.name
+                    )
 
                     let tracked = TrackedItem(
-                        identifier: ItemIdentifier.folder(folder.id).rawValue,
+                        identifier: ItemIdentifier.folder(confirmed.id).rawValue,
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
-                        remoteID: folder.id, itemType: .folder, name: folder.name,
-                        size: 0, contentVersion: folder.updatedOn ?? "0",
+                        remoteID: confirmed.id, itemType: .folder, name: confirmed.name,
+                        size: 0, contentVersion: confirmed.updatedOn ?? "0",
                         metadataVersion: TrackedItem.folderMetadataVersion(
-                            updatedOn: folder.updatedOn,
+                            updatedOn: confirmed.updatedOn,
                             parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
-                            childCount: folder.childCount
+                            childCount: confirmed.childCount
                         ),
-                        contentModifiedAt: folder.contentModifiedAt
+                        contentModifiedAt: confirmed.contentModifiedAt
                     )
                     try db.upsertItem(tracked)
-                    try? db.logActivity(action: .created, itemName: folder.name, itemType: .folder)
+                    try? db.logActivity(
+                        action: resolvedExisting ? .discovered : .created,
+                        itemName: confirmed.name,
+                        itemType: .folder
+                    )
 
                     let item = FileProviderItem(trackedItem: tracked, filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(item, [], false, nil)
@@ -694,26 +692,29 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         ? try await self.resolveParentFolderID(item.parentItemIdentifier)
                         : oldParentID
                     let expectedParentID = newParentID
+                    let remoteName = Self.remoteFolderName(forLocalName: item.filename)
                     self.updateProgress(state: .syncing, phase: "Updating folder", currentItem: tracked.name)
                     let folder: RemoteFolder = try await api.put(
                         "/folders/\(remoteID).json",
-                        body: UpdateFolderRequest(name: item.filename, parent_id: newParentID)
+                        body: UpdateFolderRequest(name: remoteName, parent_id: newParentID)
                     )
                     guard folder.id == remoteID else {
                         throw ExtensionError.remoteFolderNotConfirmed
                     }
-                    try await self.waitForRemoteFolder(
+                    let confirmed = try await self.waitForRemoteFolder(
                         remoteID: remoteID,
                         parentFolderID: expectedParentID,
-                        expectedName: item.filename
+                        expectedName: remoteName
                     )
-                    updated.name = item.filename
+                    updated.name = confirmed.name
+                    updated.contentVersion = confirmed.updatedOn ?? UUID().uuidString
+                    updated.contentModifiedAt = confirmed.contentModifiedAt
                     if changedFields.contains(.parentItemIdentifier) {
                         updated.parentIdentifier = item.parentItemIdentifier.rawValue
-                        try? db.logActivity(action: .moved, itemName: item.filename, itemType: .folder)
+                        try? db.logActivity(action: .moved, itemName: confirmed.name, itemType: .folder)
                     }
                     if changedFields.contains(.filename) {
-                        try? db.logActivity(action: .renamed, itemName: item.filename, itemType: .folder)
+                        try? db.logActivity(action: .renamed, itemName: confirmed.name, itemType: .folder)
                     }
                     updated.metadataVersion = TrackedItem.folderMetadataVersion(
                         updatedOn: updated.contentVersion,
@@ -1620,6 +1621,41 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         return min(TimeInterval(state.consecutiveFailures * 30), 300)
     }
 
+    static func folderCreateShouldResolveExistingRemote(after error: any Error) -> Bool {
+        guard case APIError.serverError(let statusCode, _) = error else {
+            return false
+        }
+        return statusCode == 409 || statusCode == 422
+    }
+
+    static func remoteFolderName(forLocalName name: String) -> String {
+        let replaced = name
+            .replacingOccurrences(of: "&", with: " and ")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "<", with: "-")
+            .replacingOccurrences(of: ">", with: "-")
+        let collapsed = replaced
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return collapsed.isEmpty ? "Untitled Folder" : collapsed
+    }
+
+    static func folderNamesMatch(_ lhs: String, _ rhs: String) -> Bool {
+        lhs == rhs || canonicalFolderName(lhs) == canonicalFolderName(rhs)
+    }
+
+    private static func canonicalFolderName(_ value: String) -> String {
+        var canonical = remoteFolderName(forLocalName: value)
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+        while canonical.contains("--") {
+            canonical = canonical.replacingOccurrences(of: "--", with: "-")
+        }
+        return canonical.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
+
     private func waitForFileOperationSlot() async {
         await startupThrottleGate.waitIfNeeded()
         await fileOperationSemaphore.wait()
@@ -1628,6 +1664,31 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     private func releaseFileOperationSlot() {
         Task {
             await fileOperationSemaphore.signal()
+        }
+    }
+
+    private func createOrResolveRemoteFolder(
+        named name: String,
+        parentFolderID: Int
+    ) async throws -> (folder: RemoteFolder, resolvedExisting: Bool) {
+        let remoteName = Self.remoteFolderName(forLocalName: name)
+        if let existing = try await remoteFolder(named: name, parentFolderID: parentFolderID) {
+            return (existing, true)
+        }
+
+        do {
+            let createRequest = CreateFolderRequest(name: remoteName)
+            let folder: RemoteFolder = try await api.post(
+                "/folders/\(parentFolderID)/children",
+                body: createRequest
+            )
+            return (folder, false)
+        } catch {
+            if Self.folderCreateShouldResolveExistingRemote(after: error),
+               let existing = try await remoteFolder(named: name, parentFolderID: parentFolderID) {
+                return (existing, true)
+            }
+            throw error
         }
     }
 
@@ -1794,16 +1855,24 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         throw ExtensionError.remoteMoveNotConfirmed
     }
 
+    @discardableResult
     private func waitForRemoteFolder(
         remoteID: Int,
         parentFolderID: Int,
         expectedName: String
-    ) async throws {
+    ) async throws -> RemoteFolder {
         let maxAttempts = 24
         for attempt in 1...maxAttempts {
             if let folder = try await remoteFolder(remoteID: remoteID, parentFolderID: parentFolderID),
-               folder.name == expectedName {
-                return
+               Self.folderNamesMatch(folder.name, expectedName) {
+                return folder
+            }
+
+            if let folder = try? await remoteFolder(remoteID: remoteID),
+               folder.parentID == parentFolderID,
+               Self.folderNamesMatch(folder.name, expectedName) {
+                logger.debug("Remote folder \(remoteID, privacy: .public) confirmed by direct folder lookup before child listing caught up")
+                return folder
             }
 
             guard attempt < maxAttempts else { break }
@@ -1935,6 +2004,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             "/folders/\(parentFolderID)/children"
         )
         return folders.first { $0.id == remoteID }
+    }
+
+    private func remoteFolder(named name: String, parentFolderID: Int) async throws -> RemoteFolder? {
+        let folders: [RemoteFolder] = try await api.getAllPages(
+            "/folders/\(parentFolderID)/children"
+        )
+        return folders.first { Self.folderNamesMatch($0.name, name) }
+    }
+
+    private func remoteFolder(remoteID: Int) async throws -> RemoteFolder {
+        try await api.get("/folders/\(remoteID)")
     }
 
     private func remoteFileIsVisible(remoteID: Int, parentFolderID: Int) async throws -> Bool {

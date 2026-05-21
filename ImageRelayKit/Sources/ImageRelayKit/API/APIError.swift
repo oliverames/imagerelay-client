@@ -32,6 +32,9 @@ public enum APIError: Error, LocalizedError, Sendable {
         case .rateLimited:
             return "Too many requests. The client will retry automatically."
         case .serverError(let code, _):
+            if code < 500 {
+                return "Image Relay rejected this change (\(code)). Check the item and try again."
+            }
             return "Image Relay returned an error (\(code)). Will retry shortly."
         case .networkError:
             return "Cannot reach Image Relay. Check your internet connection."

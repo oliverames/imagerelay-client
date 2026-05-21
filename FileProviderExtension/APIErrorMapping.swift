@@ -13,8 +13,13 @@ extension Error {
             return NSFileProviderError(.notAuthenticated)
         case .notFound:
             return NSFileProviderError(.noSuchItem)
-        case .rateLimited, .serverError, .networkError:
+        case .rateLimited, .networkError:
             return NSFileProviderError(.serverUnreachable)
+        case .serverError(let statusCode, _):
+            if statusCode >= 500 {
+                return NSFileProviderError(.serverUnreachable)
+            }
+            return fileProviderCannotSynchronize(localizedDescription)
         case .forbidden, .decodingError, .invalidResponse, .invalidURL:
             return NSFileProviderError(.cannotSynchronize)
         }

@@ -1,5 +1,19 @@
 # Worklog
 
+## 2026-05-21 - 1.3.2 sync attention release
+
+**What changed**: Shipped `1.3.2` / build `41` as a follow-up sync correctness release grounded in the current Image Relay API docs and live API behavior. Folder create is now idempotent from Finder: before `POST /folders/{parent_id}/children`, the File Provider extension checks for an existing child folder by name, and after a `409` or `422` validation response it rechecks the remote folder listing before deciding the local mutation failed. Folder confirmation now accepts either the paginated child listing or the documented direct folder detail endpoint, `GET /folders/{id}`, so a newly-created remote folder is not deleted just because the child listing lags.
+
+Image Relay rejects folder names containing `/`, `&`, `<`, or `>`, so folder create and folder rename/move now normalize those characters before sending the documented create/update requests. The live failure `RAWs & XMPs` now writes remotely as `RAWs and XMPs` and reconciles against the later successful folder and file uploads instead of remaining stuck as "needs attention." Activity reconciliation uses the same folder-name canonicalization so historical rejected-name failures clear when the successful normalized remote item appears.
+
+The attention count was also tightened for rate-limit fallout. 429 failures that explicitly say the client will retry automatically no longer count as user-actionable unresolved failures, while non-5xx API rejections map to `.cannotSynchronize` instead of retryable `.serverUnreachable`. That keeps validation problems visible without causing Finder to spin retryable work forever. A final diagnostics fix makes `--export-diagnostics` query File Provider registration before writing `manifest.json`, so exported diagnostics now report the real active-domain state in utility mode.
+
+**Validation**: `scripts/run-release-candidate-checks.sh 1.3.2` passed after the final diagnostics fix, including patch whitespace, ImageRelayKit package tests, Xcode scheme tests, unsigned macOS build, and unsigned iOS simulator build. `scripts/build-developer-id-release.sh --version 1.3.2 --smoke-install` produced a Developer ID signed, notarized, stapled DMG with SHA-256 `55f2ca0d7a12c40c45eab3abe836a3bf48bf96516c0c0f9aeb9f4f387626d8c3`. App ZIP notarization submission `a916d589-f397-47eb-85f4-9b468e93a74b` and DMG notarization submission `db33c7e5-feba-4ad5-ae6e-c02b6d7696c6` were both Accepted.
+
+The smoke install replaced `/Applications/Image Relay.app`, confirmed app version `1.3.2` build `41`, passed Gatekeeper validation, and registered `com.oliverames.imagerelay-client.fileprovider(1.3.2)` from `/Applications` with timestamp `2026-05-21 10:49:38 +0000`. The final installed app passed the full live sync matrix inside `Photography/Blue Cross Photos` (`1924042`): file create, modify, rename, delete, zero-byte create/delete, 6 MB upload/delete, file move between generated folders, and folder create/rename/move/delete all verified against the remote API with cleanup. Final diagnostics exported from the installed app reported `isDomainActive: true`, `unresolved-failures.json` as `[]`, sync state `idle`, `rateLimitInFlight: 0`, last successful API at `2026-05-21T10:52:39Z`, and File Provider PID `48816`.
+
+**Open questions**: No 1.3.2 release blocker remains. The older App Store Connect API key rotation note still carries forward because a prior repo-local copy was treated as exposed.
+
 ## 2026-05-20 - 1.3.1 sync reliability release
 
 **What changed**: Shipped `1.3.1` / build `40` as a focused sync reliability release. The release is grounded in the current Image Relay API docs: folder deletes now use the documented `DELETE /folder/{folder_id}` endpoint instead of the older plural `.json` path, which was leaving Finder deletions stuck as failed pending work. The pre-existing pending delete for `B2B Events` completed after this fix.
