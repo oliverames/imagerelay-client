@@ -239,7 +239,7 @@ if command == "delete-folder-name":
     deleted = 0
     item = find_folder(sys.argv[2], sys.argv[3])
     if item:
-        request("DELETE", f"/folders/{item['id']}.json")
+        request("DELETE", f"/folder/{item['id']}")
         deleted += 1
     print(deleted)
     sys.exit(0)

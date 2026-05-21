@@ -221,7 +221,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
                 let tempDir = FileManager.default.temporaryDirectory
                 let tempFile = tempDir.appendingPathComponent("\(UUID().uuidString)-\(fileMeta.name)")
-                try await services.api.download(quickLink.url, to: tempFile)
+                try await services.api.download(quickLink.url, to: tempFile, countsAgainstRateLimit: false)
                 progress.completedUnitCount = 90
 
                 try? await services.api.delete("/quick_links/\(quickLink.id).json")

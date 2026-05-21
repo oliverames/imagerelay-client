@@ -45,8 +45,7 @@ struct SharedRateLimiterTests {
         let state = await limiter.readState()
         #expect(state.rampPhase == 4)
         #expect(state.consecutiveSuccesses == 0)
-        // recordRateLimit always clears the probe token even if this process didn't hold it,
-        // so a stuck lock from a prior run can never wedge the next probe attempt.
+        // No in-flight probe was held, so recording the 429 should not create a lock.
         #expect(state.probeToken == nil)
     }
 
@@ -96,6 +95,145 @@ struct SharedRateLimiterTests {
         #expect(elapsed < 0.5, "Expired probe lock should be stealable immediately")
 
         let after = await limiter.readState()
-        #expect(after.probeToken == "process-B")
+        #expect(after.probeToken?.hasPrefix("process-B:") == true)
+    }
+
+    @Test("Phase 4 does not allow the same limiter to reacquire while a probe is in flight")
+    func phaseFourBlocksReentrantAcquireUntilOutcomeRecorded() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiter = SharedRateLimiter(
+            url: url,
+            maxRequests: 1,
+            period: 0.1,
+            probeLockTTL: 5,
+            processIdentifier: "process-A"
+        )
+        await limiter.writeState(SharedRateLimiterState(rampPhase: 4))
+
+        await limiter.acquire()
+
+        let flag = CompletionFlag()
+        let secondAcquire = Task {
+            await limiter.acquire()
+            await flag.markCompleted()
+        }
+        defer { secondAcquire.cancel() }
+
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await flag.isCompleted == false)
+
+        await limiter.recordSuccess()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await flag.isCompleted == true)
+        await limiter.recordSuccess()
+    }
+
+    @Test("429 cooldown gates the next phase 4 probe across limiter instances")
+    func rateLimitCooldownGatesQueuedProbes() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let first = SharedRateLimiter(
+            url: url,
+            maxRequests: 1,
+            period: 0.1,
+            rateLimitCooldownBase: 0.25,
+            maxRateLimitCooldown: 0.25,
+            processIdentifier: "process-A"
+        )
+        let second = SharedRateLimiter(
+            url: url,
+            maxRequests: 1,
+            period: 0.1,
+            rateLimitCooldownBase: 0.25,
+            maxRateLimitCooldown: 0.25,
+            processIdentifier: "process-B"
+        )
+        await first.writeState(SharedRateLimiterState(rampPhase: 4))
+
+        await first.acquire()
+        await first.recordRateLimit()
+
+        let flag = CompletionFlag()
+        let queuedProbe = Task {
+            await second.acquire()
+            await flag.markCompleted()
+        }
+        defer { queuedProbe.cancel() }
+
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await flag.isCompleted == false)
+
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(await flag.isCompleted == true)
+        await second.recordSuccess()
+    }
+
+    @Test("Expired local phase 4 probe does not wedge later acquires")
+    func expiredLocalProbeDoesNotWedgeAcquire() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiter = SharedRateLimiter(
+            url: url,
+            maxRequests: 1,
+            period: 0.1,
+            probeLockTTL: 0.1,
+            processIdentifier: "process-A"
+        )
+        await limiter.writeState(SharedRateLimiterState(rampPhase: 4))
+        await limiter.acquire()
+
+        let heldToken = await limiter.readState().probeToken
+        await limiter.writeState(SharedRateLimiterState(
+            rampPhase: 4,
+            probeToken: heldToken,
+            probeTokenExpires: Date().timeIntervalSince1970 - 1
+        ))
+
+        let flag = CompletionFlag()
+        let nextAcquire = Task {
+            await limiter.acquire()
+            await flag.markCompleted()
+        }
+        defer { nextAcquire.cancel() }
+
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(await flag.isCompleted == true)
+        await limiter.recordSuccess()
+    }
+
+    @Test("Pre-throttle success does not clear phase 4 cooldown")
+    func staleSuccessDoesNotClearCooldown() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiter = SharedRateLimiter(
+            url: url,
+            processIdentifier: "process-A"
+        )
+        let cooldownUntil = Date().timeIntervalSince1970 + 60
+        await limiter.writeState(SharedRateLimiterState(
+            rampPhase: 4,
+            consecutiveSuccesses: 0,
+            nextProbeAfter: cooldownUntil,
+            consecutiveRateLimits: 2
+        ))
+
+        await limiter.recordSuccess()
+
+        let state = await limiter.readState()
+        #expect(state.rampPhase == 4)
+        #expect(state.consecutiveSuccesses == 0)
+        #expect(state.nextProbeAfter == cooldownUntil)
+        #expect(state.consecutiveRateLimits == 2)
+    }
+}
+
+private actor CompletionFlag {
+    private var completed = false
+
+    var isCompleted: Bool { completed }
+
+    func markCompleted() {
+        completed = true
     }
 }

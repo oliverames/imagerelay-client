@@ -21,19 +21,27 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
     /// without releasing the lock, the next acquire after this point steals
     /// the slot rather than wedging the whole client.
     public var probeTokenExpires: Double?
+    /// Earliest Unix-epoch timestamp when another deep-throttle probe may run.
+    public var nextProbeAfter: Double?
+    /// Consecutive 429 responses observed while trying to recover.
+    public var consecutiveRateLimits: Int
 
     public init(
         timestamps: [Double] = [],
         rampPhase: Int = 0,
         consecutiveSuccesses: Int = 0,
         probeToken: String? = nil,
-        probeTokenExpires: Double? = nil
+        probeTokenExpires: Double? = nil,
+        nextProbeAfter: Double? = nil,
+        consecutiveRateLimits: Int = 0
     ) {
         self.timestamps = timestamps
         self.rampPhase = max(0, min(4, rampPhase))
         self.consecutiveSuccesses = max(0, consecutiveSuccesses)
         self.probeToken = probeToken
         self.probeTokenExpires = probeTokenExpires
+        self.nextProbeAfter = nextProbeAfter
+        self.consecutiveRateLimits = max(0, consecutiveRateLimits)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -42,6 +50,8 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
         case consecutiveSuccesses = "consecutive_successes"
         case probeToken = "probe_token"
         case probeTokenExpires = "probe_token_expires"
+        case nextProbeAfter = "next_probe_after"
+        case consecutiveRateLimits = "consecutive_rate_limits"
     }
 
     public init(from decoder: Decoder) throws {
@@ -51,6 +61,8 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
         consecutiveSuccesses = max(0, try c.decodeIfPresent(Int.self, forKey: .consecutiveSuccesses) ?? 0)
         probeToken = try c.decodeIfPresent(String.self, forKey: .probeToken)
         probeTokenExpires = try c.decodeIfPresent(Double.self, forKey: .probeTokenExpires)
+        nextProbeAfter = try c.decodeIfPresent(Double.self, forKey: .nextProbeAfter)
+        consecutiveRateLimits = max(0, try c.decodeIfPresent(Int.self, forKey: .consecutiveRateLimits) ?? 0)
     }
 }
 
@@ -76,13 +88,20 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     /// Maximum time a single probe is allowed to hold the in-flight lock. If the
     /// holder dies without releasing, the next acquire after this elapses steals.
     public static let defaultProbeLockTTL: TimeInterval = 30
+    /// First cooldown after a 429 when Image Relay omits Retry-After.
+    public static let defaultRateLimitCooldownBase: TimeInterval = 15
+    /// Upper bound for coordinated recovery probes after repeated 429s.
+    public static let defaultMaxRateLimitCooldown: TimeInterval = 10 * 60
 
     let url: URL
     let maxRequests: Int
     let period: Double
     let recoveryHysteresis: Int
     let probeLockTTL: TimeInterval
+    let rateLimitCooldownBase: TimeInterval
+    let maxRateLimitCooldown: TimeInterval
     let processIdentifier: String
+    private var activeProbeToken: String?
 
     public init(
         url: URL,
@@ -90,6 +109,8 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         period: Double = SharedRateLimiter.defaultPeriodSeconds,
         recoveryHysteresis: Int = SharedRateLimiter.defaultRecoveryHysteresis,
         probeLockTTL: TimeInterval = SharedRateLimiter.defaultProbeLockTTL,
+        rateLimitCooldownBase: TimeInterval = SharedRateLimiter.defaultRateLimitCooldownBase,
+        maxRateLimitCooldown: TimeInterval = SharedRateLimiter.defaultMaxRateLimitCooldown,
         processIdentifier: String = UUID().uuidString
     ) {
         self.url = url
@@ -97,6 +118,8 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         self.period = max(0.1, period)
         self.recoveryHysteresis = max(1, recoveryHysteresis)
         self.probeLockTTL = max(1.0, probeLockTTL)
+        self.rateLimitCooldownBase = max(0.1, rateLimitCooldownBase)
+        self.maxRateLimitCooldown = max(self.rateLimitCooldownBase, maxRateLimitCooldown)
         self.processIdentifier = processIdentifier
     }
 
@@ -118,16 +141,24 @@ public actor SharedRateLimiter: AsyncRateLimiting {
                 rampPhase: state.rampPhase,
                 fullMax: maxRequests
             )
+            let cooldownWait = state.nextProbeAfter.map { max(0, $0 - now) } ?? 0
+            let windowIsFull = state.timestamps.count >= effectiveMax
 
             if state.rampPhase == 4 {
-                // Single-probe lock semantics: one in-flight request total. If we
-                // already hold the lock OR the previous holder's lease has expired,
-                // grab it; otherwise spin-wait until the next chance.
+                if let activeProbeToken {
+                    let tokenStillLeased = state.probeToken == activeProbeToken
+                        && (state.probeTokenExpires ?? 0) > now
+                    if !tokenStillLeased {
+                        self.activeProbeToken = nil
+                    }
+                }
+                // Single-probe lock semantics: one in-flight request total. If
+                // the previous holder's lease has expired, grab it; otherwise wait until
+                // the next chance. The same actor is not allowed to reacquire while
+                // its previous probe is still awaiting an API outcome.
                 let lockIsFree: Bool
-                if let token = state.probeToken {
-                    if token == processIdentifier {
-                        lockIsFree = true
-                    } else if let expires = state.probeTokenExpires, expires < now {
+                if state.probeToken != nil {
+                    if let expires = state.probeTokenExpires, expires < now {
                         // Stale lease — steal.
                         lockIsFree = true
                     } else {
@@ -137,63 +168,95 @@ public actor SharedRateLimiter: AsyncRateLimiting {
                     lockIsFree = true
                 }
 
-                if lockIsFree {
-                    state.probeToken = processIdentifier
+                if cooldownWait <= 0, lockIsFree, !windowIsFull, activeProbeToken == nil {
+                    let token = "\(processIdentifier):\(UUID().uuidString)"
+                    activeProbeToken = token
+                    state.probeToken = token
                     state.probeTokenExpires = now + probeLockTTL
+                    state.nextProbeAfter = nil
                     state.timestamps.append(now)
                     writeState(state)
                     return
                 }
             } else {
-                if state.timestamps.count < effectiveMax {
+                if cooldownWait <= 0, !windowIsFull {
+                    state.nextProbeAfter = nil
                     state.timestamps.append(now)
                     writeState(state)
                     return
                 }
             }
 
-            // Sleep until either the oldest timestamp ages out OR the probe lock TTL
-            // could have expired, whichever is sooner.
-            let oldestAge: Double
-            if let oldest = state.timestamps.first {
-                oldestAge = max(0.01, period - (now - oldest))
-            } else {
-                oldestAge = 0.05
+            var sleepCandidates: [Double] = []
+            if cooldownWait > 0 {
+                sleepCandidates.append(cooldownWait)
             }
-            var sleepFor = oldestAge
-            if state.rampPhase == 4, let expires = state.probeTokenExpires {
-                sleepFor = min(sleepFor, max(0.05, expires - now))
+            if windowIsFull, let oldest = state.timestamps.first {
+                sleepCandidates.append(max(0.01, period - (now - oldest)))
             }
-            try? await Task.sleep(for: .seconds(min(sleepFor, period)))
+            if state.rampPhase == 4, activeProbeToken != nil {
+                sleepCandidates.append(0.05)
+            } else if state.rampPhase == 4,
+                      let expires = state.probeTokenExpires,
+                      expires > now {
+                sleepCandidates.append(max(0.05, expires - now))
+            }
+            let sleepFor = sleepCandidates.min() ?? 0.05
+            try? await Task.sleep(for: .seconds(sleepFor))
         }
     }
 
     public func recordRateLimit() async {
         var state = readState()
+        let now = Date().timeIntervalSince1970
         // Snap straight to the deepest ramp on any observed 429 — we have empirical
         // evidence (2026-05-13 storm) that Image Relay does not signal Retry-After
         // and the account-level penalty lasts much longer than per-request backoff.
         state.rampPhase = 4
         state.consecutiveSuccesses = 0
+        state.consecutiveRateLimits = min(state.consecutiveRateLimits + 1, 20)
+        state.nextProbeAfter = now + Self.rateLimitCooldown(
+            consecutiveRateLimits: state.consecutiveRateLimits,
+            base: rateLimitCooldownBase,
+            maximum: maxRateLimitCooldown
+        )
         // Releasing whatever probe token we may have held; the next probe will compete
         // for the lock fresh.
-        if state.probeToken == processIdentifier {
+        if let activeProbeToken, state.probeToken == activeProbeToken {
             state.probeToken = nil
             state.probeTokenExpires = nil
+            self.activeProbeToken = nil
         }
         writeState(state)
     }
 
     public func recordSuccess() async {
         var state = readState()
+        let hadRecoveryState = state.consecutiveRateLimits != 0 || state.nextProbeAfter != nil
+        let holdsActiveProbe = state.rampPhase == 4
+            && activeProbeToken != nil
+            && state.probeToken == activeProbeToken
+
+        if state.rampPhase == 4 && !holdsActiveProbe {
+            // A success from a request that was already in flight before another
+            // process observed a 429 must not clear the shared cooldown.
+            if activeProbeToken != nil {
+                activeProbeToken = nil
+            }
+            return
+        }
+
         // Release single-probe lock if we hold it — the next request can compete.
-        if state.rampPhase == 4, state.probeToken == processIdentifier {
+        if holdsActiveProbe {
             state.probeToken = nil
             state.probeTokenExpires = nil
+            self.activeProbeToken = nil
         }
+        state.consecutiveRateLimits = 0
+        state.nextProbeAfter = nil
         guard state.rampPhase > 0 else {
             // Already at full rate — nothing to recover.
-            if state.consecutiveSuccesses != 0 {
+            if state.consecutiveSuccesses != 0 || hadRecoveryState {
                 state.consecutiveSuccesses = 0
                 writeState(state)
             }
@@ -217,6 +280,16 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         case 3: return 1
         default: return 1
         }
+    }
+
+    public static func rateLimitCooldown(
+        consecutiveRateLimits: Int,
+        base: TimeInterval = SharedRateLimiter.defaultRateLimitCooldownBase,
+        maximum: TimeInterval = SharedRateLimiter.defaultMaxRateLimitCooldown
+    ) -> TimeInterval {
+        let failures = max(1, consecutiveRateLimits)
+        let exponent = min(failures - 1, 10)
+        return min(base * pow(2.0, Double(exponent)), maximum)
     }
 
     /// Reads the persisted state with `NSFileCoordinator`, falling back to a

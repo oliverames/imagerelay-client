@@ -13,7 +13,7 @@ currently uses or intentionally leaves out.
   Used for local folder creation mirrored upstream.
 - `PUT /folders/{id}.json`
   Used for in-place folder renames and folder moves through `parent_id`.
-- `DELETE /folders/{id}.json`
+- `DELETE /folder/{id}`
   Used for folder deletions mirrored upstream.
 - `GET /folders/{id}/files.json`
   Used for recursive remote file polling.

@@ -30,11 +30,37 @@ private struct ChunkAck: Decodable, Sendable {
     let ok: Bool
 }
 
+private actor RecordingRateLimiter: AsyncRateLimiting {
+    private var acquireCount = 0
+    private var rateLimitCount = 0
+    private var successCount = 0
+
+    func acquire() async {
+        acquireCount += 1
+    }
+
+    func recordRateLimit() async {
+        rateLimitCount += 1
+    }
+
+    func recordSuccess() async {
+        successCount += 1
+    }
+
+    func snapshot() -> (acquires: Int, rateLimits: Int, successes: Int) {
+        (acquireCount, rateLimitCount, successCount)
+    }
+}
+
 @Suite("APIClient", .serialized)
 struct APIClientTests {
     let baseURL = URL(string: "https://api.test.imagerelay.com/api/v2")!
 
-    func makeClient(maxRetries: Int = 3, maxRetryDelay: TimeInterval = 30) -> APIClient {
+    func makeClient(
+        maxRetries: Int = 3,
+        maxRetryDelay: TimeInterval = 30,
+        rateLimiter: any AsyncRateLimiting = RateLimiter(maxRequests: 100, period: 1.0)
+    ) -> APIClient {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockURLProtocol.self]
         return APIClient(
@@ -42,7 +68,7 @@ struct APIClientTests {
             apiKey: "test-key",
             userAgent: "TestAgent/1.0",
             sessionConfiguration: config,
-            rateLimiter: RateLimiter(maxRequests: 100, period: 1.0),
+            rateLimiter: rateLimiter,
             maxRetries: maxRetries,
             maxRetryDelay: maxRetryDelay
         )
@@ -424,6 +450,69 @@ struct APIClientTests {
 
         #expect(folders.isEmpty)
         #expect(requestCount == 2)
+    }
+
+    @Test("Download reports 429 outcomes to the rate limiter")
+    func downloadReportsRateLimitOutcome() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 429,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        let limiter = RecordingRateLimiter()
+        let client = makeClient(rateLimiter: limiter)
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("download-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        do {
+            try await client.download(URL(string: "https://files.test/download")!, to: destination)
+            Issue.record("Expected rate limit error")
+        } catch let error as APIError {
+            guard case .rateLimited = error else {
+                Issue.record("Expected rateLimited, got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+
+        let counts = await limiter.snapshot()
+        #expect(counts.acquires == 1)
+        #expect(counts.rateLimits == 1)
+        #expect(counts.successes == 0)
+    }
+
+    @Test("Download can bypass API rate limiter for external CDN URLs")
+    func downloadBypassesLimiterForExternalURLs() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("file-body".utf8))
+        }
+
+        let limiter = RecordingRateLimiter()
+        let client = makeClient(rateLimiter: limiter)
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("download-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        try await client.download(
+            URL(string: "https://cdn.test/download")!,
+            to: destination,
+            countsAgainstRateLimit: false
+        )
+
+        let counts = await limiter.snapshot()
+        #expect(counts.acquires == 0)
+        #expect(counts.rateLimits == 0)
+        #expect(counts.successes == 0)
+        #expect(try String(contentsOf: destination, encoding: .utf8) == "file-body")
     }
 
     @Test("getAllPages handles wrapper-keyed responses without pagination metadata")

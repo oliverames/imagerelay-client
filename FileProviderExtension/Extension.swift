@@ -1744,7 +1744,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
     private func deleteRemoteFolder(remoteID: Int, parentFolderID: Int?) async throws {
         do {
-            try await api.delete("/folders/\(remoteID).json")
+            try await api.delete(ImageRelayAPIPath.deleteFolder(remoteID))
         } catch let apiError as APIError {
             if case .notFound = apiError { return }
             throw apiError
@@ -2014,7 +2014,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         var lastError: Error?
         for attempt in 1...maxAttempts {
             do {
-                try await api.download(url, to: destination)
+                try await api.download(url, to: destination, countsAgainstRateLimit: false)
                 return
             } catch {
                 lastError = error

@@ -122,13 +122,29 @@ public actor APIClient {
         let _: EmptyResponse = try await execute(request)
     }
 
-    public func download(_ url: URL, to destination: URL) async throws {
-        await rateLimiter.acquire()
+    public func download(
+        _ url: URL,
+        to destination: URL,
+        countsAgainstRateLimit: Bool = true
+    ) async throws {
+        if countsAgainstRateLimit {
+            await rateLimiter.acquire()
+        }
         let (tempURL, response) = try await session.download(from: url)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-        try checkStatus(httpResponse, data: nil)
+        do {
+            try checkStatus(httpResponse, data: nil)
+            if countsAgainstRateLimit {
+                await rateLimiter.recordSuccess()
+            }
+        } catch let error as APIError {
+            if countsAgainstRateLimit, case .rateLimited = error {
+                await rateLimiter.recordRateLimit()
+            }
+            throw error
+        }
         try FileManager.default.moveItem(at: tempURL, to: destination)
     }
 
@@ -166,7 +182,14 @@ public actor APIClient {
             }
             return (data, httpResponse)
         default:
-            try checkStatus(httpResponse, data: data)
+            do {
+                try checkStatus(httpResponse, data: data)
+            } catch let error as APIError {
+                if countsAgainstRateLimit, case .rateLimited = error {
+                    await rateLimiter.recordRateLimit()
+                }
+                throw error
+            }
             // checkStatus throws on non-2xx — if we somehow fall through, treat as invalid.
             throw APIError.invalidResponse
         }

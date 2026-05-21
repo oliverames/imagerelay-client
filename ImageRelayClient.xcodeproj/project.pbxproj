@@ -29,6 +29,7 @@
 		38408F6DD2EFE27C384909D4 /* DiagnosticsExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */; };
 		3903ABC0508F39FBEC7269F0 /* LibraryAdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F073384C166485C57856B16A /* LibraryAdminService.swift */; };
 		3B2BE3713D6DD4F8B1B11282 /* FileProviderExtensioniOS.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3F126195F08D4777BBBBE091 /* ImageRelayAPIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0BEE8BC80FC1A5C797F4B /* ImageRelayAPIPath.swift */; };
 		462B4ED65D6CC3D8A2411FE1 /* Thumbnailing.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2224D56C23E028B6761BD4 /* Thumbnailing.swift */; };
 		4949A71A7BF547E8E2E1C854 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = EA55A5F80292B27EC2A4FAFB /* ImageRelayKit */; };
 		4B63D3FA832D274532192D3E /* MetadataEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */; };
@@ -36,6 +37,7 @@
 		596AF611CF0D654188390AED /* FinderSelectionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D17F2D1E59CF74B34C4633C /* FinderSelectionReader.swift */; };
 		5B8711EF0CBDC3B49D19143D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4ACFCF895BE3EF6017459B2B /* AppIcon.icon */; };
 		5E176CE222C64F1164385243 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 70F34D5A8C76987F13E836E2 /* Sparkle */; };
+		606F852B4406A758BECAA7F5 /* ImageRelayAPIPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0BEE8BC80FC1A5C797F4B /* ImageRelayAPIPath.swift */; };
 		6133A31DE66194B43990F655 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8DC1E00B04FE23A41E220AAF /* Assets.xcassets */; };
 		712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */; };
 		74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */; };
@@ -203,6 +205,7 @@
 		F43D66C196BA9E0171106E32 /* PartialContentFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialContentFetcherTests.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FileProviderExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAC0BEE8BC80FC1A5C797F4B /* ImageRelayAPIPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageRelayAPIPath.swift; sourceTree = "<group>"; };
 		FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStore.swift; sourceTree = "<group>"; };
 		FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorState.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -295,6 +298,7 @@
 				1907D94A32A3AE0968238BFE /* Extension.swift */,
 				B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */,
 				E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */,
+				FAC0BEE8BC80FC1A5C797F4B /* ImageRelayAPIPath.swift */,
 				B2FE83D474ABB6C82A35F22A /* Info.plist */,
 				DDD835267C9E6B9423321FB4 /* PartialContentFetching.swift */,
 				4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */,
@@ -674,6 +678,7 @@
 				DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */,
 				960B40F8B168A16893E05254 /* Extension.swift in Sources */,
 				2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */,
+				606F852B4406A758BECAA7F5 /* ImageRelayAPIPath.swift in Sources */,
 				A6F9A9FE587F3635E97E9AEF /* PartialContentFetching.swift in Sources */,
 				CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */,
 				2900C7DBC463365A0C0C54FA /* SearchEnumerator.swift in Sources */,
@@ -739,6 +744,7 @@
 				771B118B1B769C84723C4175 /* Extension.swift in Sources */,
 				8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */,
 				BE0F2FF21949D0E2DA83F925 /* FileProviderItemTests.swift in Sources */,
+				3F126195F08D4777BBBBE091 /* ImageRelayAPIPath.swift in Sources */,
 				A31BF259C598C672D346A597 /* PartialContentFetcherTests.swift in Sources */,
 				ABA4106160B19B23434B5491 /* PartialContentFetching.swift in Sources */,
 				B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */,
@@ -819,7 +825,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -841,7 +847,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.3.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -922,7 +928,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -938,7 +944,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.0;
+				MARKETING_VERSION = 1.3.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

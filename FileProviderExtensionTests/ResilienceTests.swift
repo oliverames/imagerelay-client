@@ -58,6 +58,11 @@ struct ResilienceTests {
         #expect(object["parent_id"] as? Int == 2_907_644)
     }
 
+    @Test("Folder delete path matches documented Image Relay endpoint")
+    func folderDeletePathUsesSingularFolderEndpoint() {
+        #expect(ImageRelayAPIPath.deleteFolder(2_907_644) == "/folder/2907644")
+    }
+
     @Test("Recent 429 state delays first File Provider batch")
     func recent429DelaysFirstBatch() {
         let state = PersistedThrottleState(

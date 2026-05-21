@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-05-20 - 1.3.1 sync reliability release
+
+**What changed**: Shipped `1.3.1` / build `40` as a focused sync reliability release. The release is grounded in the current Image Relay API docs: folder deletes now use the documented `DELETE /folder/{folder_id}` endpoint instead of the older plural `.json` path, which was leaving Finder deletions stuck as failed pending work. The pre-existing pending delete for `B2B Events` completed after this fix.
+
+The shared API limiter now coordinates Image Relay recovery more defensively. Any 429 keeps the shared limiter in the deepest recovery phase, applies a persisted exponential cooldown before the next probe, and prevents successful requests that were already in flight from clearing that cooldown prematurely. The File Provider extension also clears expired local phase-4 probe state before later acquires, fixing the live-test wedge where a stale local token could leave Finder showing an upload in progress while no API call was being issued. Quick-link/CDN downloads now bypass the Image Relay API request limiter so file downloads and thumbnails do not consume the documented API request budget.
+
+**Validation**: `scripts/run-release-candidate-checks.sh 1.3.1` passed, including patch whitespace, ImageRelayKit package tests, Xcode scheme tests, unsigned macOS build, and unsigned iOS simulator build. `scripts/build-developer-id-release.sh --version 1.3.1 --smoke-install` produced a Developer ID signed, notarized, stapled DMG with SHA-256 `915bab9e95032c06beb1aacbdfb63a56bdd1fae9da5ce8a637a1ba10d2e4bcf5`. App ZIP notarization submission `2d7d9c63-4ab2-4972-8bf1-e5e082aa3a07` and DMG notarization submission `2b91a8dd-3592-4098-9a88-dfaab671332f` were both Accepted.
+
+The smoke install replaced `/Applications/Image Relay.app`, confirmed app version `1.3.1` build `40`, passed Gatekeeper validation, and registered `com.oliverames.imagerelay-client.fileprovider(1.3.1)` with UUID `A46A03F9-A1C2-4B5C-9C64-0C2A7E0D0B6C`. The full live sync matrix passed inside `Photography/Blue Cross Photos` (`1924042`): file create, modify, delete, rename, zero-byte create/delete, 6 MB upload/delete, file move between generated folders, and folder create/rename/move/delete all verified against the remote API with cleanup. `Casks/image-relay.rb` was advanced from `1.3.0` to `1.3.1` by the release script.
+
+**Open questions**: No 1.3.1 release blocker remains. The older App Store Connect API key rotation note still carries forward because a prior repo-local copy was treated as exposed.
+
 ## 2026-05-19 - 1.3.0 stable release
 
 **What changed**: Promoted `1.3.0-beta.3` to stable `1.3.0` / build `39`. This is the public release for the 1.3 line: Finder right-click actions, metadata editing handoff, collections/product/admin browsing, diagnostic export improvements, display-name presentation controls, and the iOS read-only Files surface all carry forward from the beta cycle. The stable cut also adds the beta 3 macOS and iOS User-Agent defaults to the legacy migration list so beta installs roll forward to the current built-in defaults without resetting user-customized configuration.

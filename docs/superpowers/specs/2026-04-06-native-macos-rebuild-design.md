@@ -106,7 +106,7 @@ Both the host app and extension access data through an **App Group container** (
 | Delete file | `deleteItem()` | `DELETE /files/{id}.json` |
 | Create folder | `createItem()` | `POST /folders.json` |
 | Rename folder | `modifyItem()` | `PUT /folders/{id}.json` |
-| Delete folder | `deleteItem()` | `DELETE /folders/{id}.json` |
+| Delete folder | `deleteItem()` | `DELETE /folder/{id}` |
 | Move file | `modifyItem()` | `POST /files/{id}/move.json` |
 
 **Remote change detection:**
