@@ -9,7 +9,7 @@ Eliminated the disruptive inter-process Keychain password prompt storms occurrin
 - **Selective Authentication Gating**: Optimized `AppConfiguration.load` to only read credentials matching the active `authMethod` (API Key or OAuth), saving up to 66% of Keychain read calls on startup.
 - **Keychain Bypass for Idle Operations (`loadWithoutSecrets`)**: Created `AppConfiguration.loadWithoutSecrets` to read the config from disk without hitting the Keychain. Refactored the File Provider extension's `init(domain:)` and `RemoteChangePoller`'s `currentConfig()` to use this, dropping idle background Keychain queries to absolute zero.
 - **Premium Light-Mode Marketing Site Overhaul**: Re-designed `docs/index.html` to align exactly with Canto's real corporate identity (using signature Navy `#0c2340` and Canto Teal `#00b2a9` / `#00c5b4` brand colors) and embedded the official Image Relay mark (vertical stem + diamond dot lowercase "i" logo). Created an immersive, CSS-rendered pixel-perfect macOS Finder window mockup inside the Hero section that visualizes favorites, sidebar folders, and virtual cloud-placeholder status badges (`☁️`/`✓`) next to the Image Relay mount point.
-- **Documentation**: Updated `README.md`, `CLAUDE.md`, and `AGENTS.md` to synchronize accurate test counts (230 tests total: 174 `ImageRelayKit` package tests + 56 `FileProviderExtension` tests).
+- **Documentation**: Updated `README.md`, `CLAUDE.md`, and `AGENTS.md` to synchronize accurate test counts (233 tests total: 176 `ImageRelayKit` package tests + 57 `FileProviderExtension` tests).
 
 **Decisions made**: 
 - Chose an in-memory `testStore` dictionary for the test runner because Xcode test binaries are unsigned, sandboxed executables that do not have access to provisioning-profile Keychain entitlements. Running tests against the live macOS Keychain is inherently prone to prompt storms and test flaky timeouts; shifting to memory-only state is completely secure, thread-safe, and incredibly fast.
@@ -18,7 +18,7 @@ Eliminated the disruptive inter-process Keychain password prompt storms occurrin
 - Replaced the template mesh gradient backgrounds and capital letter "P" placeholders with professional corporate design grids and native Finder interface representations. This shifts the landing page from looking like a generic template to looking like an official, polished product page built by the Canto design team.
 
 **Left off at**: 
-- All 230 unit tests (174 ImageRelayKit + 56 FileProviderExtension) are passing cleanly and rapidly with zero Keychain prompts.
+- All 233 unit tests (176 ImageRelayKit + 57 FileProviderExtension) are passing cleanly and rapidly with zero Keychain prompts.
 - The premium light-mode marketing page is successfully deployed under `/docs/index.html` with real brand assets and is fully live on GitHub Pages.
 - Branch `main` is completely clean and pushed to `origin/main`.
 

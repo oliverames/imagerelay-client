@@ -75,6 +75,9 @@ enum DiagnosticsExporter {
             syncDownload: config.syncDownload,
             userAgent: config.userAgent,
             selectedFolderIDs: config.selectedFolderIDs,
+            webhookRelayConfigured: config.webhookRelayURL != nil,
+            webhookRelayHost: config.webhookRelayURL?.host,
+            webhookRelayIntervalSeconds: config.webhookRelayIntervalSeconds,
             hasAPIKey: !config.apiKey.isEmpty
         )
         try writeJSON(sanitized, to: directory.appendingPathComponent("config.json"))
@@ -105,6 +108,10 @@ enum DiagnosticsExporter {
         try writeJSON(try db.recentUnresolvedFailures(limit: 100), to: directory.appendingPathComponent("unresolved-failures.json"))
         try writeJSON(try db.cachedRootFolders(), to: directory.appendingPathComponent("root-folders-cache.json"))
         try writeJSON(try db.cachedUploadLinks(), to: directory.appendingPathComponent("upload-links-cache.json"))
+        try writeJSON(
+            WebhookRelayDiagnostics(cursorPresent: (try db.webhookRelayCursor())?.isEmpty == false),
+            to: directory.appendingPathComponent("webhook-relay.json")
+        )
     }
 
     @MainActor
@@ -273,7 +280,14 @@ private struct SanitizedConfiguration: Encodable {
     let syncDownload: Bool
     let userAgent: String
     let selectedFolderIDs: [Int]
+    let webhookRelayConfigured: Bool
+    let webhookRelayHost: String?
+    let webhookRelayIntervalSeconds: Int
     let hasAPIKey: Bool
+}
+
+private struct WebhookRelayDiagnostics: Encodable {
+    let cursorPresent: Bool
 }
 
 private struct DomainStatus: Encodable {

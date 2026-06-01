@@ -15,6 +15,7 @@ actor RemoteChangePoller {
     // so the menu bar UI can surface it to the user.
     private static let failureThreshold = 3
     static let maxBackoffInterval: TimeInterval = 10 * 60
+    static let webhookRelaySafetyPollIntervalSeconds = 300
     private var consecutiveFailures = 0
 
     init(
@@ -50,7 +51,7 @@ actor RemoteChangePoller {
         while !Task.isCancelled {
             let sleepConfig = currentConfig()
             let sleepInterval = Self.pollDelay(
-                baseIntervalSeconds: sleepConfig.pollIntervalSeconds,
+                baseIntervalSeconds: Self.effectiveBaseIntervalSeconds(config: sleepConfig),
                 consecutiveFailures: effectiveConsecutiveFailures()
             )
             markNextPollScheduled(after: sleepInterval)
@@ -123,6 +124,12 @@ actor RemoteChangePoller {
 
     static func shouldSignalRemoteChanges(config: AppConfiguration, pauseState: SyncPauseState) -> Bool {
         config.syncDownload && !config.fileProviderDisconnected && !pauseState.isActive
+    }
+
+    static func effectiveBaseIntervalSeconds(config: AppConfiguration) -> Int {
+        config.webhookRelayURL == nil
+            ? config.pollIntervalSeconds
+            : max(config.pollIntervalSeconds, webhookRelaySafetyPollIntervalSeconds)
     }
 
     private func currentConfig() -> AppConfiguration {

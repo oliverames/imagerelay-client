@@ -42,6 +42,9 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Check patch whitespace
+        run: git diff --check
+
       - name: Resolve Xcode package dependencies
         run: |
           xcodebuild \
@@ -49,11 +52,28 @@ jobs:
             -project ImageRelayClient.xcodeproj \
             -scheme ImageRelayClient
 
+      - name: Test ImageRelayClient scheme
+        run: |
+          xcodebuild \
+            -project ImageRelayClient.xcodeproj \
+            -scheme ImageRelayClient \
+            -destination "platform=macOS" \
+            test
+
       - name: Build ImageRelayClient
         run: |
           xcodebuild \
             -project ImageRelayClient.xcodeproj \
             -scheme ImageRelayClient \
             -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Build ImageRelayClientiOS
+        run: |
+          xcodebuild \
+            -project ImageRelayClient.xcodeproj \
+            -scheme ImageRelayClientiOS \
+            -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
             build

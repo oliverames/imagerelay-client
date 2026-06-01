@@ -27,6 +27,8 @@ final class DomainManager {
     var recentActivity: [ActivityEntry] = []
     private var db: SyncDatabase?
     private var remotePollingTask: Task<Void, Never>?
+    private var webhookRelayTask: Task<Void, Never>?
+    private let webhookRelayClient = WebhookRelayClient()
 
     init(autoBootstrap: Bool = true) {
         guard autoBootstrap else { return }
@@ -86,6 +88,7 @@ final class DomainManager {
         }
 
         startRemotePolling()
+        startWebhookRelayPolling()
         refreshStatus()
     }
 
@@ -309,6 +312,13 @@ final class DomainManager {
         }
     }
 
+    private func startWebhookRelayPolling() {
+        guard webhookRelayTask == nil else { return }
+        webhookRelayTask = Task { @MainActor [weak self] in
+            await self?.webhookRelayLoop()
+        }
+    }
+
     private func remotePollLoop() async {
         while !Task.isCancelled {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) {
@@ -334,6 +344,59 @@ final class DomainManager {
                 logger.debug("Remote watchdog signal failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+    }
+
+    private func webhookRelayLoop() async {
+        var consecutiveFailures = 0
+        while !Task.isCancelled {
+            refreshStatus()
+            let config = loadConfiguration()
+            let interval = max(5, config.webhookRelayIntervalSeconds)
+
+            guard let relayURL = config.webhookRelayURL,
+                  config.isConfigured,
+                  isDomainActive,
+                  config.syncDownload,
+                  !config.fileProviderDisconnected,
+                  !pauseState.isActive else {
+                await sleepWebhookRelayInterval(interval)
+                continue
+            }
+
+            do {
+                guard let db = ensureDatabase() else {
+                    await sleepWebhookRelayInterval(interval)
+                    continue
+                }
+                let result = try await webhookRelayClient.poll(
+                    url: relayURL,
+                    cursor: try? db.webhookRelayCursor(),
+                    timeoutSeconds: interval
+                )
+                if let cursor = result.cursor {
+                    try? db.setWebhookRelayCursor(cursor)
+                }
+                if result.hasChanges {
+                    try await signalEnumerators(config: config)
+                    markRemotePollSucceeded(intervalSeconds: interval)
+                    logger.info("Webhook relay reported \(result.events.count, privacy: .public) change event(s)")
+                }
+                consecutiveFailures = 0
+            } catch {
+                consecutiveFailures += 1
+                if consecutiveFailures >= 3 {
+                    logger.warning("Webhook relay polling failed \(consecutiveFailures, privacy: .public) times: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    logger.debug("Webhook relay polling failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+
+            await sleepWebhookRelayInterval(interval)
+        }
+    }
+
+    private func sleepWebhookRelayInterval(_ interval: Int) async {
+        try? await Task.sleep(for: .seconds(max(5, interval)))
     }
 
     private func markRemotePollSucceeded(config: AppConfiguration) {
@@ -403,6 +466,8 @@ final class DomainManager {
             try await manager.disconnect(reason: "Stopped by user from Image Relay", options: .temporary)
             remotePollingTask?.cancel()
             remotePollingTask = nil
+            webhookRelayTask?.cancel()
+            webhookRelayTask = nil
             updateConfiguration { config in
                 config.fileProviderDisconnected = true
             }
@@ -429,6 +494,7 @@ final class DomainManager {
             syncDisconnected = false
             lastError = nil
             startRemotePolling()
+            startWebhookRelayPolling()
             await signalSync()
             refreshStatus()
         } catch {

@@ -17,7 +17,7 @@ https://github.com/oliverames/imagerelay-client/issues
 
 Open **Image Relay > Settings > Advanced > Export Diagnostics**.
 
-The export includes app version, macOS version, sanitized configuration, recent activity, sync progress, File Provider domain status, crash-report summaries, and recent Image Relay logs. API keys are not exported.
+The export includes app version, macOS version, sanitized configuration, recent activity, unresolved sync failures, webhook relay state, sync progress, File Provider domain status, crash-report summaries, and recent Image Relay logs. API keys and full relay URLs are not exported.
 
 For command-line support, this launch argument writes a diagnostics folder and prints its path:
 

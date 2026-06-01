@@ -6,6 +6,7 @@ struct SettingsiOSView: View {
     @Environment(FileProviderDomainController.self) private var domain
     @State private var savedNotice: String?
     @State private var isSaving = false
+    @State private var setupOptions = SetupOptionsiOSState()
 
     var body: some View {
         @Bindable var configuration = configuration
@@ -17,8 +18,35 @@ struct SettingsiOSView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
 
-                TextField("Root folder ID", text: $configuration.draftRootFolderID, prompt: Text("root or 2907644"))
-                    .keyboardType(.numberPad)
+                Button {
+                    Task {
+                        await setupOptions.load(apiKey: configuration.draftAPIKey)
+                        if configuration.draftRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            configuration.draftRootFolderID = "root"
+                        }
+                    }
+                } label: {
+                    if setupOptions.isLoading {
+                        Label("Loading folder choices", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Load folder choices", systemImage: "folder.badge.gearshape")
+                    }
+                }
+                .disabled(configuration.draftAPIKey.isEmpty || setupOptions.isLoading)
+
+                setupOptionsMessage
+
+                if !setupOptions.rootFolders.isEmpty {
+                    Picker("Root folder", selection: $configuration.draftRootFolderID) {
+                        Text("Account root").tag("root")
+                        ForEach(setupOptions.rootFolders) { folder in
+                            Text(folder.name).tag(String(folder.id))
+                        }
+                    }
+                }
+
+                TextField("Manual root folder ID", text: $configuration.draftRootFolderID, prompt: Text("root or 2907644"))
+                    .keyboardType(.numbersAndPunctuation)
                     .autocorrectionDisabled()
             } header: {
                 Text("Account")
@@ -77,6 +105,26 @@ struct SettingsiOSView: View {
             }
         }
         .navigationTitle("Settings")
+    }
+
+    @ViewBuilder
+    private var setupOptionsMessage: some View {
+        switch setupOptions.phase {
+        case .idle:
+            EmptyView()
+        case .loading:
+            Text("Fetching top-level folders from Image Relay...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .loaded:
+            Text("Loaded \(setupOptions.rootFolders.count) folder choices.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .failed(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
     }
 
     private var bindingForSyncDownload: Binding<Bool> {

@@ -9,6 +9,8 @@ struct AdvancedSettingsView: View {
     @State private var syncDownload = true
     @State private var showAdvancedInformation = false
     @State private var userAgent = ""
+    @State private var webhookRelayURL = ""
+    @State private var webhookRelayInterval: Double = 15
     @State private var saveError: String?
     @State private var isResettingDomain = false
     @State private var isExportingDiagnostics = false
@@ -45,6 +47,24 @@ struct AdvancedSettingsView: View {
                     .help("Custom User-Agent header sent with all API requests. Leave blank to use the default.")
             } header: {
                 Text("Network")
+            }
+
+            Section {
+                TextField("Webhook Relay URL", text: $webhookRelayURL)
+                    .help("Optional HTTPS endpoint that long-polls Image Relay webhook events and returns a cursor.")
+
+                VStack(alignment: .leading) {
+                    Text("Relay Check: \(Int(webhookRelayInterval))s")
+                    Slider(value: $webhookRelayInterval, in: 5...60, step: 5) {
+                        Text("Relay Check")
+                    }
+                    .labelsHidden()
+                }
+            } header: {
+                Text("Webhook Relay")
+            } footer: {
+                Text("When configured, the host app checks the relay for change events and refreshes Finder immediately. The File Provider extension keeps a slower safety poll.")
+                    .font(.caption)
             }
 
             Section {
@@ -111,6 +131,8 @@ struct AdvancedSettingsView: View {
         syncDownload = config.syncDownload
         showAdvancedInformation = config.showAdvancedInformation
         userAgent = config.userAgent
+        webhookRelayURL = config.webhookRelayURL?.absoluteString ?? ""
+        webhookRelayInterval = Double(config.webhookRelayIntervalSeconds)
     }
 
     private func saveConfig() {
@@ -121,6 +143,16 @@ struct AdvancedSettingsView: View {
         config.syncDownload = syncDownload
         config.showAdvancedInformation = showAdvancedInformation
         config.userAgent = userAgent
+        let relayURL = webhookRelayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if relayURL.isEmpty {
+            config.webhookRelayURL = nil
+        } else if let url = URL(string: relayURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            config.webhookRelayURL = url
+        } else {
+            saveError = "Webhook Relay URL must be a valid HTTP or HTTPS URL."
+            return
+        }
+        config.webhookRelayIntervalSeconds = Int(webhookRelayInterval)
         do {
             try config.save(to: AppConfiguration.fileURL(in: container))
             saveError = nil

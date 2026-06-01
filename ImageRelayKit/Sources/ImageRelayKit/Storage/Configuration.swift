@@ -1,7 +1,7 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    private static let fallbackAppVersion = "1.3.0"
+    private static let fallbackAppVersion = "1.4.0-beta.1"
     private static let versionedBundleIdentifiers: Set<String> = [
         "com.oliverames.imagerelay-client",
         "com.oliverames.imagerelay-client.fileprovider",
@@ -51,7 +51,13 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.3.0-beta.2",
         "ImageRelayClient/1.3.0-beta.2 (macOS)",
         "ImageRelayClient/1.3.0-beta.3",
-        "ImageRelayClient/1.3.0-beta.3 (macOS)"
+        "ImageRelayClient/1.3.0-beta.3 (macOS)",
+        "ImageRelayClient/1.3.0",
+        "ImageRelayClient/1.3.0 (macOS)",
+        "ImageRelayClient/1.3.1",
+        "ImageRelayClient/1.3.1 (macOS)",
+        "ImageRelayClient/1.3.2",
+        "ImageRelayClient/1.3.2 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -71,7 +77,10 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.2.1 (iOS)" ||
             userAgent == "ImageRelayClient/1.3.0-beta.1 (iOS)" ||
             userAgent == "ImageRelayClient/1.3.0-beta.2 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0-beta.3 (iOS)" {
+            userAgent == "ImageRelayClient/1.3.0-beta.3 (iOS)" ||
+            userAgent == "ImageRelayClient/1.3.0 (iOS)" ||
+            userAgent == "ImageRelayClient/1.3.1 (iOS)" ||
+            userAgent == "ImageRelayClient/1.3.2 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
@@ -104,6 +113,14 @@ public struct AppConfiguration: Codable, Sendable {
     /// in Image Relay Web") by probing `GET /users/me.json` once and persisting the
     /// `subdomain.http_base` value here. Nil until first action invocation.
     public var webBaseURL: URL?
+    /// Optional webhook relay endpoint. When set, the host app polls this relay
+    /// for Image Relay webhook cursors and signals File Provider immediately
+    /// when a change arrives. The extension still keeps a slow safety poll.
+    public var webhookRelayURL: URL?
+    /// Seconds between host-side relay checks. Kept separate from
+    /// `pollIntervalSeconds` because relay polling is cheap and does not hit
+    /// Image Relay's API unless a change is reported.
+    public var webhookRelayIntervalSeconds: Int
     /// How filenames returned by the API are presented in Finder. `.serverCanonical`
     /// shows the exact server-canonical name; `.humanReadable` reverses the
     /// dashes-and-lowercase canonicalization at the display layer only.
@@ -128,6 +145,8 @@ public struct AppConfiguration: Codable, Sendable {
         case fileProviderDisconnected = "file_provider_disconnected"
         case selectedFolderIDs = "selected_folder_ids"
         case webBaseURL = "web_base_url"
+        case webhookRelayURL = "webhook_relay_url"
+        case webhookRelayIntervalSeconds = "webhook_relay_interval_seconds"
         case filenamePresentationStyle = "filename_presentation_style"
     }
 
@@ -152,6 +171,8 @@ public struct AppConfiguration: Codable, Sendable {
         fileProviderDisconnected: Bool = false,
         selectedFolderIDs: [Int] = [],
         webBaseURL: URL? = nil,
+        webhookRelayURL: URL? = nil,
+        webhookRelayIntervalSeconds: Int = 15,
         filenamePresentationStyle: FilenamePresentationStyle = .serverCanonical
     ) {
         self.apiKey = apiKey
@@ -174,6 +195,8 @@ public struct AppConfiguration: Codable, Sendable {
         self.fileProviderDisconnected = fileProviderDisconnected
         self.selectedFolderIDs = selectedFolderIDs
         self.webBaseURL = webBaseURL
+        self.webhookRelayURL = webhookRelayURL
+        self.webhookRelayIntervalSeconds = max(5, webhookRelayIntervalSeconds)
         self.filenamePresentationStyle = filenamePresentationStyle
     }
 
@@ -206,6 +229,13 @@ public struct AppConfiguration: Codable, Sendable {
         } else {
             webBaseURL = nil
         }
+        if let raw = try c.decodeIfPresent(String.self, forKey: .webhookRelayURL),
+           let url = URL(string: raw) {
+            webhookRelayURL = url
+        } else {
+            webhookRelayURL = nil
+        }
+        webhookRelayIntervalSeconds = max(5, try c.decodeIfPresent(Int.self, forKey: .webhookRelayIntervalSeconds) ?? 15)
         filenamePresentationStyle = try c.decodeIfPresent(FilenamePresentationStyle.self, forKey: .filenamePresentationStyle)
             ?? .serverCanonical
     }
@@ -249,6 +279,8 @@ public struct AppConfiguration: Codable, Sendable {
         showAdvancedInformation: false,
         fileProviderDisconnected: false,
         selectedFolderIDs: [],
+        webhookRelayURL: nil,
+        webhookRelayIntervalSeconds: 15,
         filenamePresentationStyle: .serverCanonical
     )
 

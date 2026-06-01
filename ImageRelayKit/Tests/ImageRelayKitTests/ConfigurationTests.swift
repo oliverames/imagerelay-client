@@ -132,6 +132,8 @@ struct ConfigurationTests {
         #expect(config.syncDownload == true)
         #expect(config.userAgent == AppConfiguration.currentMacUserAgent)
         #expect(config.maxConcurrentFiles == 10)
+        #expect(config.webhookRelayURL == nil)
+        #expect(config.webhookRelayIntervalSeconds == 15)
         #expect(config.authMethod == .apiKey)
         #expect(config.credential == .apiKey(""))
     }
@@ -182,7 +184,13 @@ struct ConfigurationTests {
             "ImageRelayClient/1.3.0-beta.2",
             "ImageRelayClient/1.3.0-beta.2 (macOS)",
             "ImageRelayClient/1.3.0-beta.3",
-            "ImageRelayClient/1.3.0-beta.3 (macOS)"
+            "ImageRelayClient/1.3.0-beta.3 (macOS)",
+            "ImageRelayClient/1.3.0",
+            "ImageRelayClient/1.3.0 (macOS)",
+            "ImageRelayClient/1.3.1",
+            "ImageRelayClient/1.3.1 (macOS)",
+            "ImageRelayClient/1.3.2",
+            "ImageRelayClient/1.3.2 (macOS)"
         ]
 
         for userAgent in previousBuiltInDefaults {
@@ -215,6 +223,9 @@ struct ConfigurationTests {
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.0-beta.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.0-beta.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.0-beta.3 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
     }
 
@@ -235,6 +246,36 @@ struct ConfigurationTests {
 
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.userAgent == "ImageRelayClient/Oliver-Test")
+    }
+
+    @Test("Webhook relay settings default and round trip")
+    func webhookRelaySettingsRoundTrip() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        var config = AppConfiguration.default
+        config.webhookRelayURL = URL(string: "https://relay.example.com/imagerelay")
+        config.webhookRelayIntervalSeconds = 20
+
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.webhookRelayURL?.absoluteString == "https://relay.example.com/imagerelay")
+        #expect(loaded.webhookRelayIntervalSeconds == 20)
+
+        let legacyJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/Oliver-Test","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let legacy = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(legacy.webhookRelayURL == nil)
+        #expect(legacy.webhookRelayIntervalSeconds == 15)
     }
 
     @Test("Legacy config without max_concurrent_files defaults to 10")

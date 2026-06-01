@@ -367,6 +367,36 @@ public final class SyncDatabase: Sendable {
         }
     }
 
+    public func webhookRelayCursor() throws -> String? {
+        try writer.read { db in
+            try Row.fetchOne(
+                db,
+                sql: "SELECT value FROM settings WHERE key = ?",
+                arguments: [Self.webhookRelayCursorKey]
+            )?["value"]
+        }
+    }
+
+    public func setWebhookRelayCursor(_ cursor: String?) throws {
+        try writer.write { db in
+            if let cursor, !cursor.isEmpty {
+                try db.execute(
+                    sql: """
+                    INSERT INTO settings (key, value)
+                    VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    arguments: [Self.webhookRelayCursorKey, cursor]
+                )
+            } else {
+                try db.execute(
+                    sql: "DELETE FROM settings WHERE key = ?",
+                    arguments: [Self.webhookRelayCursorKey]
+                )
+            }
+        }
+    }
+
     // MARK: - Sync Progress
 
     public func getProgress() throws -> SyncProgressState {
@@ -678,6 +708,7 @@ public final class SyncDatabase: Sendable {
 
     private static let rootFoldersCacheKey = "settings_root_folders_cache"
     private static let uploadLinksCacheKey = "settings_upload_links_cache"
+    private static let webhookRelayCursorKey = "webhook_relay_cursor"
 
     private static func updateItemETA(_ progress: inout SyncProgressState, now: Date) {
         if let lastIncrementAt = progress.lastIncrementAt {

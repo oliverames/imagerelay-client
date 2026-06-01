@@ -15,6 +15,7 @@
 		1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */; };
 		1726F39FDAED2060443427E7 /* StartupThrottleGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90CE0FCF6D31E9B7FAFD9D0 /* StartupThrottleGate.swift */; };
 		1EFBDC3067A3706986893FA3 /* ProductsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */; };
+		24002B6423E98BC29A68043A /* SyncIssuesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A321CF7B8895FECD59048AD7 /* SyncIssuesSettingsView.swift */; };
 		24BEB7C0CB875FE2BDC28583 /* EnumeratorDataLossTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */; };
 		25DD667F825D909ED3798728 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B768EB375011997B202B6FF /* Assets.xcassets */; };
 		2900C7DBC463365A0C0C54FA /* SearchEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C2D5387F93605F3CB6B424 /* SearchEnumerator.swift */; };
@@ -42,6 +43,7 @@
 		712007C378282E834D2E991A /* MetadataEditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA2DFC0E6635D1FC87DC540 /* MetadataEditorState.swift */; };
 		74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */; };
 		75DE4CDC04A5F462BA38C431 /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
+		75F0C897C6C6A7DDE7C8AF75 /* SetupOptionsiOSState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2C9198BD6DFB73E9ACBE34 /* SetupOptionsiOSState.swift */; };
 		770C3AB226C22A6A1D1B0CD1 /* StartupThrottleGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90CE0FCF6D31E9B7FAFD9D0 /* StartupThrottleGate.swift */; };
 		771B118B1B769C84723C4175 /* Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1907D94A32A3AE0968238BFE /* Extension.swift */; };
 		786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */; };
@@ -50,6 +52,7 @@
 		7F145372D694E4765CBC2120 /* SearchEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C2D5387F93605F3CB6B424 /* SearchEnumerator.swift */; };
 		83FCA1A5E566EE87F8AF27BD /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1F29EDBF47C83AC5414A490E /* ImageRelayKit */; };
 		8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
+		86FFAD4C2419C0EC10B9C36A /* SetupOptionsState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 667FA0761021040AD28310A0 /* SetupOptionsState.swift */; };
 		894EBEA3886CDD2B030EA09C /* FileProviderDomainController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */; };
 		89AE15BD1F5A37F28715F554 /* ActionFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70839E86A67E6491DD18FAAB /* ActionFormatting.swift */; };
 		8AB418BDB208E2A27860CD02 /* FileProviderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -87,6 +90,7 @@
 		E3B82D96C94827F513DD5A5E /* ResilienceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51367DFA880452804C918C49 /* ResilienceTests.swift */; };
 		E44C1C0E30FB29D0E5AE30D0 /* ActionFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70839E86A67E6491DD18FAAB /* ActionFormatting.swift */; };
 		E490E1FBEEDD9CF4D06756BC /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 605A842907034C3D0729CACD /* ImageRelayKit */; };
+		F24A531DEE6758FB57272F30 /* WebhookRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D26F70F4D8B1EDD04D2FA65 /* WebhookRelayClient.swift */; };
 		F7E97E14C2C6166EDA091B50 /* UploadLinksState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */; };
 		F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43BFF79E08904BFEC78A777 /* Enumerator.swift */; };
 		F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0CA6FB5CB8A04A06B32540E /* RootView.swift */; };
@@ -148,6 +152,7 @@
 		24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListiOSView.swift; sourceTree = "<group>"; };
 		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
 		2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksService.swift; sourceTree = "<group>"; };
+		2D26F70F4D8B1EDD04D2FA65 /* WebhookRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhookRelayClient.swift; sourceTree = "<group>"; };
 		336DBC3887926D6E12C41EB1 /* WebhooksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhooksService.swift; sourceTree = "<group>"; };
 		354821ECFF0127BC8CC280A1 /* Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extension.swift; sourceTree = "<group>"; };
 		395C5774C2A7EB2F00839EFA /* Thumbnailing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thumbnailing.swift; sourceTree = "<group>"; };
@@ -164,6 +169,7 @@
 		5C4A081323BAAC70B71F0A05 /* FileProviderDomainController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderDomainController.swift; sourceTree = "<group>"; };
 		60CD7692B13F2EE83A828429 /* ProductsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsBrowserView.swift; sourceTree = "<group>"; };
 		61C991CBDB38CB267176D0B4 /* MetadataEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditorView.swift; sourceTree = "<group>"; };
+		667FA0761021040AD28310A0 /* SetupOptionsState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupOptionsState.swift; sourceTree = "<group>"; };
 		66E79A8CCDC204940416820E /* DomainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainManager.swift; sourceTree = "<group>"; };
 		687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsService.swift; sourceTree = "<group>"; };
 		6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
@@ -181,6 +187,7 @@
 		8DC1E00B04FE23A41E220AAF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		91E6A2C15BD4E7EBFA2BAA11 /* FileProviderExtensioniOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtensioniOS.entitlements; sourceTree = "<group>"; };
 		9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksSettingsView.swift; sourceTree = "<group>"; };
+		A321CF7B8895FECD59048AD7 /* SyncIssuesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIssuesSettingsView.swift; sourceTree = "<group>"; };
 		A5EBFD21DED0779DC0B30930 /* MetadataEditingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataEditingService.swift; sourceTree = "<group>"; };
 		B0CA6FB5CB8A04A06B32540E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FileProviderExtension.entitlements; sourceTree = "<group>"; };
@@ -193,6 +200,7 @@
 		D54E95DF24AB7E959164B4AF /* ImageRelayClient.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ImageRelayClient.entitlements; sourceTree = "<group>"; };
 		D71BBC85B861D2A03985929E /* DiagnosticsExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsExporter.swift; sourceTree = "<group>"; };
 		D8174F47023DC5F681694A0D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DB2C9198BD6DFB73E9ACBE34 /* SetupOptionsiOSState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupOptionsiOSState.swift; sourceTree = "<group>"; };
 		DDD835267C9E6B9423321FB4 /* PartialContentFetching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialContentFetching.swift; sourceTree = "<group>"; };
 		DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIDirectoryiOSView.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
@@ -325,6 +333,8 @@
 				71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */,
 				24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */,
 				6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */,
+				667FA0761021040AD28310A0 /* SetupOptionsState.swift */,
+				A321CF7B8895FECD59048AD7 /* SyncIssuesSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -439,6 +449,7 @@
 			isa = PBXGroup;
 			children = (
 				FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */,
+				DB2C9198BD6DFB73E9ACBE34 /* SetupOptionsiOSState.swift */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -462,6 +473,7 @@
 				7C160FB06088707BA4C4992A /* Info.plist */,
 				8474CE4312626B6DF40DEB47 /* MenuBarView.swift */,
 				1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */,
+				2D26F70F4D8B1EDD04D2FA65 /* WebhookRelayClient.swift */,
 			);
 			path = ImageRelayClient;
 			sourceTree = "<group>";
@@ -710,10 +722,13 @@
 				4B63D3FA832D274532192D3E /* MetadataEditorView.swift in Sources */,
 				1EFBDC3067A3706986893FA3 /* ProductsBrowserView.swift in Sources */,
 				BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */,
+				86FFAD4C2419C0EC10B9C36A /* SetupOptionsState.swift in Sources */,
+				24002B6423E98BC29A68043A /* SyncIssuesSettingsView.swift in Sources */,
 				1593AFE9AADE43F7A2A99C24 /* UpdateController.swift in Sources */,
 				74681099C6A8E91F925601E2 /* UploadLinksService.swift in Sources */,
 				786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */,
 				F7E97E14C2C6166EDA091B50 /* UploadLinksState.swift in Sources */,
+				F24A531DEE6758FB57272F30 /* WebhookRelayClient.swift in Sources */,
 				0950333D2FBD0A0B7ACFD780 /* WebhooksAdminView.swift in Sources */,
 				8F8F64B8B4FC610E865DC1B5 /* WebhooksService.swift in Sources */,
 			);
@@ -772,6 +787,7 @@
 				75DE4CDC04A5F462BA38C431 /* ProductsService.swift in Sources */,
 				F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */,
 				9FFC6D0E1823F299FA694432 /* SettingsiOSView.swift in Sources */,
+				75F0C897C6C6A7DDE7C8AF75 /* SetupOptionsiOSState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -825,7 +841,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -847,7 +863,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = "1.4.0-beta.1";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -928,7 +944,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PV3W52NDZ3;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -944,7 +960,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.3.2;
+				MARKETING_VERSION = "1.4.0-beta.1";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

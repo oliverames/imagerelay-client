@@ -19,7 +19,7 @@
   <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
     <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
-  <img src="https://img.shields.io/badge/status-1.2-f5a542?style=flat-square" alt="1.2">
+  <img src="https://img.shields.io/badge/status-1.4.0--beta.1-f5a542?style=flat-square" alt="1.4.0-beta.1">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
     <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
@@ -35,7 +35,7 @@ Explore the features, visual workflow, and architecture of the client on our pre
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.2 release**: Image Relay Client deepens the Finder integration on macOS 26 (Tahoe). Finder shows native upload/download state, child counts, and needs-attention decorations; right-click adds Refresh from Image Relay, Copy Public Link, and Open Folder in Image Relay Web. The menu bar surfaces ETA, throughput, rate-limit state, and failed-upload counts; you can retry failed uploads, OAuth-authenticate developer apps, or Stop Sync Completely without a Terminal. All 1.1 capabilities (metadata editing, upload links, Collections, Products, Webhooks, Library Admin) carry forward unchanged.
+> **1.4 beta**: Image Relay Client now focuses on smoother setup, clearer sync issue recovery, Keychain prompt-storm prevention, and better release automation. The latest stable release remains 1.3.2 until the 1.4 beta is packaged and published.
 
 ## Why This Exists
 
@@ -73,11 +73,14 @@ brew install --cask image-relay
 - **Download on open** — files are dataless placeholders until you touch them; only what you open is fetched
 - **Upload on save** — drop a file into the Finder location and it uploads automatically in 5 MB chunks
 - **Selective sync** — choose which top-level folders appear in Finder; unselected folders stay invisible
+- **Guided setup** - load folder and file-type choices from the account instead of copying raw IDs from the web app
 - **Conflict preservation** — if a file changes remotely while you're editing locally, your version is uploaded as a conflict copy and the remote version takes the canonical slot; nothing is silently discarded
 - **Pause controls** — pause sync for 30 minutes, 1 hour, until tomorrow, or indefinitely from the menu bar; pause also stops the remote poller
 - **Stop / reconnect** — Stop Sync Completely disconnects the File Provider domain from the menu bar; Reconnect Sync brings it back
 - **Live status with ETA** — menu bar shows sync state, batch progress, time remaining, throughput, recent activity, and rate-limit waits
+- **Sync issue recovery** - Settings > Issues groups unresolved sync failures with retry and copy-report actions
 - **Bulk retry** — Retry N Failed Uploads in the menu bar re-queues every failed item in one click
+- **Webhook relay support** - optional relay polling wakes Finder quickly from Image Relay webhook events while preserving the slower safety poll
 - **OAuth Security** — connect via classic API key or an Image Relay Developer-app OAuth flow featuring process-safe coordinated refresh and anti-prompt Keychain caching
 - **Update checks** — Sparkle-backed Check for Updates action from the menu bar
 - **Diagnostics export** - export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
@@ -118,6 +121,8 @@ Settings are stored as JSON in a shared App Group container, readable by both th
 | Sync Upload | Push local changes to Image Relay | on |
 | Sync Download | Pull remote changes into Finder | on |
 | Poll Interval | Seconds between remote change checks | 60 |
+| Webhook Relay URL | Optional relay endpoint that returns Image Relay webhook event cursors | none |
+| Webhook Relay Interval | Seconds between host-side relay checks | 15 |
 
 ### Maintenance Flags
 
@@ -131,7 +136,7 @@ open -a "Image Relay" --args --reset-file-provider-domain
 open -a "Image Relay" --args --export-diagnostics
 ```
 
-`--export-diagnostics` writes `manifest.json`, `system.json`, `config.json` (API key redacted), `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt` to the app sandbox temporary directory, then exits. The Settings UI still lets you choose a destination folder through the standard security-scoped folder picker.
+`--export-diagnostics` writes `manifest.json`, `system.json`, `config.json` (API key redacted), `activity.json`, `sync-progress.json`, `unresolved-failures.json`, `webhook-relay.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt` to the app sandbox temporary directory, then exits. The Settings UI still lets you choose a destination folder through the standard security-scoped folder picker.
 
 ## Architecture & Cross-Platform Design
 
@@ -186,8 +191,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (230 tests across 27 suites:
-# 174 ImageRelayKitTests + 56 FileProviderExtensionTests)
+# Run the unit test suite (233 tests across 27 suites:
+# 176 ImageRelayKitTests + 57 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -196,19 +201,19 @@ xcodebuild test \
 # SwiftPM-only fallback for ImageRelayKit (kit-level tests only)
 swift test --package-path ImageRelayKit
 
-# Run the release-candidate validation set
-scripts/run-release-candidate-checks.sh 1.2.1
+# Run the release-candidate validation set for Project.yml's MARKETING_VERSION
+scripts/run-release-candidate-checks.sh
 
 # Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.1
+RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.2.1 --smoke-install
+scripts/build-developer-id-release.sh --version 1.4.0-beta.1 --smoke-install
 ```
 
 ## Known Limitations
 
-- **Remote change detection** is polling-based. Webhook consumption needs a public relay that can receive Image Relay POSTs and push events to the desktop app.
+- **Remote change detection** still keeps a safety poll. For faster remote updates, configure a webhook relay endpoint in Settings > Advanced. The relay should receive Image Relay webhook POSTs, expose a long-poll `GET` endpoint, and return JSON shaped like `{"events":[{"id":"evt_123","resource":"file","action":"update"}],"next_cursor":"evt_123"}`.
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 - **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 

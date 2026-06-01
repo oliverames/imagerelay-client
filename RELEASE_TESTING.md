@@ -16,6 +16,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 - Open Settings > General.
 - Enter a valid Image Relay API key.
+- Click Load Account Choices and confirm folder and file-type pickers populate.
 - Choose the remote root folder and default file type if prompted.
 - Close and reopen Settings.
 - Confirm the saved settings persist.
@@ -105,8 +106,21 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 - Open Settings > Advanced.
 - Click Export Diagnostics and choose a local folder.
-- Confirm the exported folder contains `manifest.json`, `system.json`, `config.json`, `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt`.
+- Confirm the exported folder contains `manifest.json`, `system.json`, `config.json`, `activity.json`, `sync-progress.json`, `unresolved-failures.json`, `webhook-relay.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt`.
 - Confirm `config.json` contains only sanitized configuration and never includes the API key value.
+
+## Sync Issues
+
+- Open Settings > Issues.
+- Confirm existing unresolved failures appear with item name, action, timestamp, and error text.
+- Click Copy Report and confirm the pasteboard contains the issue details.
+- Click Retry All only when the test account has safe retryable failures.
+
+## Webhook Relay
+
+- Open Settings > Advanced.
+- Leave Webhook Relay URL blank and confirm the app keeps the normal polling behavior.
+- If a test relay is available, enter its HTTPS URL, set Relay Check to 15s, save, and confirm `webhook-relay.json` in diagnostics reports whether a cursor is present without exposing the full relay URL.
 
 ## Collections (1.1)
 
@@ -139,8 +153,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Release Automation
 
-- Run `scripts/run-release-candidate-checks.sh 1.2.1` on a macOS 26 machine with Xcode 26.
-- Run `scripts/run-release-candidate-checks.sh` as the current-release shorthand; it defaults to 1.2.1.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh 1.2.1`.
-- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh 1.2.1`.
+- Run `scripts/run-release-candidate-checks.sh` on a macOS 26 machine with Xcode 26. With no argument, it validates Project.yml's `MARKETING_VERSION`.
+- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh`.
+- For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

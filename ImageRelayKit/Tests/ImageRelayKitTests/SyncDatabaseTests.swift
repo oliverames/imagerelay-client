@@ -581,6 +581,22 @@ struct SyncDatabaseTests {
         #expect(loaded == snapshot)
     }
 
+    @Test("Webhook relay cursor round trips through settings")
+    func webhookRelayCursorRoundTrip() throws {
+        let db = try makeDB()
+
+        #expect(try db.webhookRelayCursor() == nil)
+
+        try db.setWebhookRelayCursor("evt_123")
+        #expect(try db.webhookRelayCursor() == "evt_123")
+
+        try db.setWebhookRelayCursor("evt_456")
+        #expect(try db.webhookRelayCursor() == "evt_456")
+
+        try db.setWebhookRelayCursor(nil)
+        #expect(try db.webhookRelayCursor() == nil)
+    }
+
     @Test("Cache snapshots decode legacy payloads with defaults")
     func cacheSnapshotsDecodeLegacyPayloadsWithDefaults() throws {
         let rootData = Data(#"{"folders":[{"id":12,"name":"Root"}]}"#.utf8)

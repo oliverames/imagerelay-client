@@ -3,7 +3,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-1.2.1}"
 RUN_LIVE_SYNC="${RUN_LIVE_SYNC:-0}"
 RUN_PACKAGE="${RUN_PACKAGE:-0}"
 XCODE_CLONED_SOURCE_PACKAGES_DIR="${XCODE_CLONED_SOURCE_PACKAGES_DIR:-}"
@@ -20,6 +19,13 @@ for tool in git swift xcodegen xcodebuild; do
 done
 
 cd "$ROOT_DIR"
+
+PROJECT_MARKETING_VERSION="$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' Project.yml)"
+if [[ -z "$PROJECT_MARKETING_VERSION" ]]; then
+  echo "Project.yml MARKETING_VERSION could not be read." >&2
+  exit 65
+fi
+VERSION="${1:-$PROJECT_MARKETING_VERSION}"
 
 XCODE_PACKAGE_ARGS=()
 if [[ -n "$XCODE_CLONED_SOURCE_PACKAGES_DIR" ]]; then
@@ -63,7 +69,7 @@ echo "Running unsigned iOS simulator build..."
 run_xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClientiOS \
-  -destination 'platform=iOS Simulator,name=iPhone 17e' \
+  -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO
 
 if [[ "$RUN_LIVE_SYNC" == "1" ]]; then

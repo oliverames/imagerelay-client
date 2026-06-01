@@ -90,6 +90,9 @@ struct ImageRelayClientApp: App {
                 Tab("Upload Links", systemImage: "link") {
                     UploadLinksSettingsView()
                 }
+                Tab("Issues", systemImage: "exclamationmark.triangle") {
+                    SyncIssuesSettingsView()
+                }
                 Tab("Activity", systemImage: "clock") {
                     ActivitySettingsView()
                 }
@@ -97,7 +100,7 @@ struct ImageRelayClientApp: App {
                     AdvancedSettingsView()
                 }
             }
-            .frame(width: 540, height: 460)
+            .frame(width: 600, height: 520)
             .environment(domainManager)
             .environment(updateController)
             .onOpenURL { url in handleIncoming(url) }

@@ -19,6 +19,7 @@ struct GeneralSettingsView: View {
     @State private var beautifyFilenames = false
     @State private var saveError: String?
     @State private var containerAvailable = true
+    @State private var setupOptions = SetupOptionsState()
 
     private var container: URL? { AppConfiguration.containerURL() }
 
@@ -109,8 +110,30 @@ struct GeneralSettingsView: View {
                     }
                 }
 
+                Button {
+                    Task { await loadSetupOptions() }
+                } label: {
+                    if setupOptions.isLoading {
+                        Label("Loading Account Choices", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Load Account Choices", systemImage: "list.bullet.rectangle")
+                    }
+                }
+                .disabled(!credentialsPresent || setupOptions.isLoading)
+
+                setupOptionsMessage
+
                 VStack(alignment: .leading, spacing: 2) {
-                    TextField("Root Folder ID", text: $remoteRootFolderID)
+                    if !setupOptions.rootFolders.isEmpty {
+                        Picker("Root Folder", selection: $remoteRootFolderID) {
+                            Text("Account Root").tag("root")
+                            ForEach(setupOptions.rootFolders) { folder in
+                                Text(folderChoiceLabel(folder)).tag(String(folder.id))
+                            }
+                        }
+                    }
+
+                    TextField("Manual Root Folder ID", text: $remoteRootFolderID)
                     if !rootFolderIDValid {
                         Text("Enter a positive integer (e.g. 12345), \"root\", or leave blank")
                             .font(.caption)
@@ -119,7 +142,16 @@ struct GeneralSettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    TextField("Default File Type ID", text: $defaultFileTypeID)
+                    if !setupOptions.fileTypes.isEmpty {
+                        Picker("Default File Type", selection: $defaultFileTypeID) {
+                            Text("None").tag("")
+                            ForEach(setupOptions.fileTypes) { fileType in
+                                Text("\(fileType.name) (\(fileType.id))").tag(String(fileType.id))
+                            }
+                        }
+                    }
+
+                    TextField("Manual Default File Type ID", text: $defaultFileTypeID)
                     if !defaultFileTypeIDValid {
                         Text("Must be a positive integer, or leave blank")
                             .font(.caption)
@@ -184,6 +216,26 @@ struct GeneralSettingsView: View {
         .onDisappear { saveConfig() }
     }
 
+    @ViewBuilder
+    private var setupOptionsMessage: some View {
+        switch setupOptions.phase {
+        case .idle:
+            EmptyView()
+        case .loading:
+            Text("Fetching folders and file types from Image Relay...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .loaded:
+            Text(setupOptions.warning ?? "Loaded \(setupOptions.rootFolders.count) folder choices and \(setupOptions.fileTypes.count) file types.")
+                .font(.caption)
+                .foregroundStyle(setupOptions.warning == nil ? Color.secondary : Color.orange)
+        case .failed(let message):
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+    }
+
     private func loadConfig() {
         guard let container else {
             containerAvailable = false
@@ -204,9 +256,22 @@ struct GeneralSettingsView: View {
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
+    private func loadSetupOptions() async {
+        let saved = loadStoredConfiguration()
+        await setupOptions.load(
+            authMethod: authMethod,
+            apiKey: apiKey,
+            oauthTenant: oauthTenant,
+            savedOAuthTokens: saved.oauthTokens
+        )
+        if remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            remoteRootFolderID = "root"
+        }
+    }
+
     private func saveConfig() {
         guard let container, !hasValidationError else { return }
-        var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        var config = loadStoredConfiguration()
         config.authMethod = authMethod
         config.apiKey = apiKey
         config.oauthTenant = oauthTenant
@@ -231,6 +296,18 @@ struct GeneralSettingsView: View {
         } catch {
             saveError = error.localizedDescription
         }
+    }
+
+    private func loadStoredConfiguration() -> AppConfiguration {
+        guard let container else { return .default }
+        return (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+    }
+
+    private func folderChoiceLabel(_ folder: RemoteFolder) -> String {
+        if folder.path.isEmpty {
+            return "\(folder.name) (\(folder.id))"
+        }
+        return "\(folder.name) - \(folder.path) (\(folder.id))"
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

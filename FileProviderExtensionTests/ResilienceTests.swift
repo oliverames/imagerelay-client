@@ -27,6 +27,20 @@ struct ResilienceTests {
         #expect(delay == 600)
     }
 
+    @Test("Webhook relay config slows extension safety poll")
+    func webhookRelayConfigSlowsExtensionSafetyPoll() {
+        var config = AppConfiguration.default
+        config.pollIntervalSeconds = 60
+
+        #expect(RemoteChangePoller.effectiveBaseIntervalSeconds(config: config) == 60)
+
+        config.webhookRelayURL = URL(string: "https://relay.example.com/imagerelay")
+        #expect(RemoteChangePoller.effectiveBaseIntervalSeconds(config: config) == 300)
+
+        config.pollIntervalSeconds = 600
+        #expect(RemoteChangePoller.effectiveBaseIntervalSeconds(config: config) == 600)
+    }
+
     @Test("Remote poller skips when download sync is disabled or paused")
     func pollerSkipsDisabledOrPausedSync() {
         var config = AppConfiguration.default
