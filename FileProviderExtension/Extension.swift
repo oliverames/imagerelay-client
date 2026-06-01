@@ -45,7 +45,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         }
 
         let configURL = AppConfiguration.fileURL(in: container)
-        let loadedConfig = (try? AppConfiguration.load(from: configURL)) ?? .default
+        let loadedConfig = (try? AppConfiguration.loadWithoutSecrets(from: configURL)) ?? .default
         self.config = loadedConfig
         self.fileOperationSemaphore = AsyncSemaphore(value: loadedConfig.maxConcurrentFiles)
 

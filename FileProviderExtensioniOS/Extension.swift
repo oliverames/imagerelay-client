@@ -278,7 +278,7 @@ struct ExtensionServices: Sendable {
             )
         }
 
-        let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
+        let config = (try? AppConfiguration.loadWithoutSecrets(from: AppConfiguration.fileURL(in: container))) ?? .default
         let userAgent = AppConfiguration.normalizedIOSUserAgent(config.userAgent)
         let cache = CredentialCache(
             url: AppConfiguration.fileURL(in: container),

@@ -127,7 +127,7 @@ actor RemoteChangePoller {
 
     private func currentConfig() -> AppConfiguration {
         guard let configURL else { return config }
-        return (try? AppConfiguration.load(from: configURL)) ?? config
+        return (try? AppConfiguration.loadWithoutSecrets(from: configURL)) ?? config
     }
 
     private func effectiveConsecutiveFailures() -> Int {

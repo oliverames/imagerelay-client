@@ -296,6 +296,17 @@ public struct AppConfiguration: Codable, Sendable {
         )
     }
 
+    /// Loads config from `url` without loading any sensitive credentials from the Keychain.
+    /// Ideal for background polling and status checks that do not execute API calls.
+    public static func loadWithoutSecrets(from url: URL) throws -> AppConfiguration {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return .default
+        }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder.imageRelay.decode(AppConfiguration.self, from: data)
+    }
+
+
     /// Loads the configuration and atomic-refreshes the OAuth tokens if they are close to expiration.
     /// Uses a lock file in the same directory as the config to ensure only one process performs the
     /// refresh at a time, preventing token invalidation/revocation race conditions.

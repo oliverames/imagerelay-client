@@ -17,14 +17,29 @@ public enum KeychainStore {
     private static let service = "com.oliverames.imagerelay-client"
 
     /// Saves or replaces `value` for `account`. Returns true on success.
+    /// Uses SecItemUpdate if the item already exists to preserve the Access Control List (ACL)
+    /// and prevent macOS from losing the user's 'Always Allow' authorization across updates.
     @discardableResult
     public static func save(_ value: String, account: String, accessGroup: String? = sharedAccessGroup) -> Bool {
         let data = Data(value.utf8)
-        var query = baseQuery(account: account, accessGroup: accessGroup)
-        SecItemDelete(query as CFDictionary)
-        query[kSecValueData] = data
-        query[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
-        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+        let query = baseQuery(account: account, accessGroup: accessGroup)
+        
+        var checkQuery = query
+        checkQuery[kSecReturnData] = false
+        let status = SecItemCopyMatching(checkQuery as CFDictionary, nil)
+        
+        if status == errSecSuccess {
+            let attributesToUpdate: [CFString: Any] = [
+                kSecValueData: data
+            ]
+            let updateStatus = SecItemUpdate(query as CFDictionary, attributesToUpdate as CFDictionary)
+            return updateStatus == errSecSuccess
+        } else {
+            var newQuery = query
+            newQuery[kSecValueData] = data
+            newQuery[kSecAttrAccessible] = kSecAttrAccessibleAfterFirstUnlock
+            return SecItemAdd(newQuery as CFDictionary, nil) == errSecSuccess
+        }
     }
 
     /// Returns the stored string for `account`, or nil if not found.
