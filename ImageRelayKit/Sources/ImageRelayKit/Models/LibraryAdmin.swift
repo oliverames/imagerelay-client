@@ -219,6 +219,46 @@ public struct UserInvite: Codable, Sendable {
     }
 }
 
+/// POST body for `POST /users/sso_user`.
+public struct SSOUserCreate: Codable, Sendable {
+    public let firstName: String
+    public let lastName: String
+    public let email: String
+    public let company: String?
+    public let permissionID: Int
+
+    public init(
+        firstName: String,
+        lastName: String,
+        email: String,
+        company: String? = nil,
+        permissionID: Int
+    ) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.company = company
+        self.permissionID = permissionID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case email
+        case company
+        case permissionID = "permission_id"
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(firstName, forKey: .firstName)
+        try c.encode(lastName, forKey: .lastName)
+        try c.encode(email, forKey: .email)
+        try c.encodeIfPresent(company, forKey: .company)
+        try c.encode(permissionID, forKey: .permissionID)
+    }
+}
+
 /// A permission group / role definition returned by `GET /permission_groups.json`.
 /// The Image Relay API exposes only the `id` and `name` fields meaningfully —
 /// the permission matrix lives behind the admin UI and isn't part of the

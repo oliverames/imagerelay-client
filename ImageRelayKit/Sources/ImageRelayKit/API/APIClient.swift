@@ -242,7 +242,16 @@ public actor APIClient {
     }
 
     public func upload(data: Data, to path: String, contentType: String = "application/octet-stream") async throws {
-        var request = try buildRequest(method: "POST", path: path)
+        try await upload(data: data, to: path, query: [:], contentType: contentType)
+    }
+
+    public func upload(
+        data: Data,
+        to path: String,
+        query: [String: String] = [:],
+        contentType: String = "application/octet-stream"
+    ) async throws {
+        var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
         let _: EmptyResponse = try await execute(request)
@@ -251,9 +260,10 @@ public actor APIClient {
     public func upload<T: Decodable & Sendable>(
         data: Data,
         to path: String,
+        query: [String: String] = [:],
         contentType: String = "application/octet-stream"
     ) async throws -> T {
-        var request = try buildRequest(method: "POST", path: path)
+        var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
         return try await execute(request)
@@ -262,9 +272,10 @@ public actor APIClient {
     public func uploadIfPresent<T: Decodable & Sendable>(
         data: Data,
         to path: String,
+        query: [String: String] = [:],
         contentType: String = "application/octet-stream"
     ) async throws -> T? {
-        var request = try buildRequest(method: "POST", path: path)
+        var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
         let (responseData, _) = try await executeRaw(request)

@@ -51,10 +51,11 @@ public struct Webhook: Codable, Sendable, Identifiable, Hashable {
             ?? Self.displayName(resource: resource, action: action)
         events = try Self.decodeEvents(from: c)
         // Multiple field names show up across deployments.
+        let decodedState = try c.decodeIfPresent(String.self, forKey: .state)?.lowercased()
         isActive = try c.decodeIfPresent(Bool.self, forKey: .isActive)
             ?? c.decodeIfPresent(Bool.self, forKey: .active)
             ?? c.decodeIfPresent(Bool.self, forKey: .enabled)
-            ?? (try c.decodeIfPresent(String.self, forKey: .state)).map { $0.lowercased() == "active" }
+            ?? decodedState.map { $0 == "normal" || $0 == "active" }
             ?? true
         createdOn = try c.decodeIfPresent(String.self, forKey: .createdOn)
             ?? c.decodeIfPresent(String.self, forKey: .createdAt)
@@ -157,6 +158,21 @@ public struct WebhookCreate: Codable, Sendable {
         try c.encode(resource, forKey: .resource)
         try c.encode(action, forKey: .action)
         try c.encodeIfPresent(notificationEmails, forKey: .notificationEmails)
+    }
+}
+
+public enum WebhookState: String, Codable, Sendable, Hashable {
+    case normal
+    case paused
+    case error
+}
+
+/// PUT body for `PUT /webhooks/{id}`.
+public struct WebhookUpdate: Codable, Sendable {
+    public let state: WebhookState
+
+    public init(state: WebhookState) {
+        self.state = state
     }
 }
 
