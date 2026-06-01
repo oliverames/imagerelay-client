@@ -16,11 +16,40 @@ public enum KeychainStore {
 
     private static let service = "com.oliverames.imagerelay-client"
 
+    // Thread-safe in-memory storage fallback for unit testing to prevent Keychain popup storms
+    private static let testLock = NSRecursiveLock()
+    private nonisolated(unsafe) static var testStore: [String: String] = [:]
+
+    public static let isTesting: Bool = {
+        if NSClassFromString("XCTest") != nil {
+            return true
+        }
+        let env = ProcessInfo.processInfo.environment
+        if env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil {
+            return true
+        }
+        let args = ProcessInfo.processInfo.arguments
+        for arg in args {
+            let lower = arg.lowercased()
+            if lower.contains("test") || lower.contains("xctest") {
+                return true
+            }
+        }
+        return false
+    }()
+
     /// Saves or replaces `value` for `account`. Returns true on success.
     /// Uses SecItemUpdate if the item already exists to preserve the Access Control List (ACL)
     /// and prevent macOS from losing the user's 'Always Allow' authorization across updates.
     @discardableResult
     public static func save(_ value: String, account: String, accessGroup: String? = sharedAccessGroup) -> Bool {
+        if isTesting {
+            testLock.lock()
+            defer { testLock.unlock() }
+            testStore["\(accessGroup ?? "nil"):\(account)"] = value
+            return true
+        }
+
         let data = Data(value.utf8)
         let query = baseQuery(account: account, accessGroup: accessGroup)
         
@@ -44,6 +73,12 @@ public enum KeychainStore {
 
     /// Returns the stored string for `account`, or nil if not found.
     public static func load(account: String, accessGroup: String? = sharedAccessGroup) -> String? {
+        if isTesting {
+            testLock.lock()
+            defer { testLock.unlock() }
+            return testStore["\(accessGroup ?? "nil"):\(account)"]
+        }
+
         var query = baseQuery(account: account, accessGroup: accessGroup)
         query[kSecReturnData] = true
         query[kSecMatchLimit] = kSecMatchLimitOne
@@ -56,6 +91,17 @@ public enum KeychainStore {
     /// Deletes the item for `account`. Returns true if deleted, false if not found.
     @discardableResult
     public static func delete(account: String, accessGroup: String? = sharedAccessGroup) -> Bool {
+        if isTesting {
+            testLock.lock()
+            defer { testLock.unlock() }
+            let key = "\(accessGroup ?? "nil"):\(account)"
+            if testStore.keys.contains(key) {
+                testStore.removeValue(forKey: key)
+                return true
+            }
+            return true
+        }
+
         let query = baseQuery(account: account, accessGroup: accessGroup)
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
