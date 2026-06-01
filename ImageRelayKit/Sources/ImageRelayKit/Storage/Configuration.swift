@@ -407,22 +407,18 @@ public struct AppConfiguration: Codable, Sendable {
         let storedUserAgent = raw?["user_agent"] as? String
         let userAgentNeedsRewrite = storedUserAgent != nil && storedUserAgent != config.userAgent
 
-        // Primary path: API key already in Keychain.
-        if let stored = KeychainStore.load(account: keychainAccount, accessGroup: keychainAccessGroup), !stored.isEmpty {
-            config.apiKey = stored
+        if config.authMethod == .oauth {
+            // Under OAuth, load only OAuth secrets. No API Key Keychain query.
             config.loadOAuthSecrets(accessGroup: keychainAccessGroup)
-            if containsLegacyAPIKey || userAgentNeedsRewrite {
-                try? rewriteJSONWithoutAPIKey(config, to: url)
+        } else {
+            // Under API Key method, load only the API key. No OAuth Secrets Keychain queries.
+            if let stored = KeychainStore.load(account: keychainAccount, accessGroup: keychainAccessGroup), !stored.isEmpty {
+                config.apiKey = stored
+            } else if let legacyKey, !legacyKey.isEmpty {
+                config.apiKey = legacyKey
+                KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
             }
-            return config
         }
-
-        // Migration path: key still in legacy JSON under "api_key".
-        if let legacyKey, !legacyKey.isEmpty {
-            config.apiKey = legacyKey
-            KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
-        }
-        config.loadOAuthSecrets(accessGroup: keychainAccessGroup)
 
         if containsLegacyAPIKey || userAgentNeedsRewrite {
             try? rewriteJSONWithoutAPIKey(config, to: url)
