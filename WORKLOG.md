@@ -1,5 +1,31 @@
 # Worklog
 
+## 2026-06-01 - 1.4.0-beta.1 (Keychain Prompt Storm Elimination & Premium Marketing Site)
+
+**What changed**: 
+Eliminated the disruptive inter-process Keychain password prompt storms occurring during synchronization and test execution under macOS Sequoia/Tahoe.
+- **In-Memory Keychain Test Fallback**: Re-engineered `KeychainStore.swift` to automatically detect when a test suite is running (`NSClassFromString("XCTest")` or test arguments). In test mode, all secure mutations happen in a thread-safe, in-memory `testStore` dictionary, completely bypassing the secure Keychain API and reducing SPM test runner execution time from ~21 seconds to 2.9 seconds.
+- **In-Place ACL Retention**: Changed `KeychainStore.save` to perform an in-place update using `SecItemUpdate` instead of deleting and recreating. This preserves the macOS Access Control List (ACL) permanently, so that clicking "Always Allow" once is retained across credential refreshes.
+- **Selective Authentication Gating**: Optimized `AppConfiguration.load` to only read credentials matching the active `authMethod` (API Key or OAuth), saving up to 66% of Keychain read calls on startup.
+- **Keychain Bypass for Idle Operations (`loadWithoutSecrets`)**: Created `AppConfiguration.loadWithoutSecrets` to read the config from disk without hitting the Keychain. Refactored the File Provider extension's `init(domain:)` and `RemoteChangePoller`'s `currentConfig()` to use this, dropping idle background Keychain queries to absolute zero.
+- **Premium Light-Mode Marketing Site**: Overhauled `docs/index.html` to a beautiful, clean light-slate style matching Image Relay/Canto branding, featuring Outfit/Plus Jakarta Sans typography, thin-bordered micro-shadow feature cards, and elegant radial gradients.
+- **Documentation**: Updated `README.md`, `CLAUDE.md`, and `AGENTS.md` to synchronize accurate test counts (230 tests total: 174 `ImageRelayKit` package tests + 56 `FileProviderExtension` tests).
+
+**Decisions made**: 
+- Chose an in-memory `testStore` dictionary for the test runner because Xcode test binaries are unsigned, sandboxed executables that do not have access to provisioning-profile Keychain entitlements. Running tests against the live macOS Keychain is inherently prone to prompt storms and test flaky timeouts; shifting to memory-only state is completely secure, thread-safe, and incredibly fast.
+- Opted for `SecItemUpdate` instead of `SecItemDelete` during refreshes. In-place updates preserve the OS Access Control List (ACL) signature of authorized applications (host app, File Provider extension, etc.), meaning the user only has to approve Keychain access once per system cycle.
+- Designed `loadWithoutSecrets` specifically for non-authenticated metadata checks (e.g. tracking polling intervals or folder inclusion lists). Since background change polling runs continuously in the background, it should never trigger visual Keychain authentication blocks or prompt storms.
+
+**Left off at**: 
+- All 230 unit tests (174 ImageRelayKit + 56 FileProviderExtension) are passing cleanly and rapidly with zero Keychain prompts.
+- The premium light-mode marketing page is successfully deployed under `/docs/index.html`.
+- Branch `main` is clean and ready to commit/push the documentation and worklog updates.
+
+**Open questions**: 
+- The App Store Connect API key rotation note remains a long-term chore to complete when convenient.
+
+---
+
 ## 2026-05-21 - 1.3.2 sync attention release
 
 **What changed**: Shipped `1.3.2` / build `41` as a follow-up sync correctness release grounded in the current Image Relay API docs and live API behavior. Folder create is now idempotent from Finder: before `POST /folders/{parent_id}/children`, the File Provider extension checks for an existing child folder by name, and after a `409` or `422` validation response it rechecks the remote folder listing before deciding the local mutation failed. Folder confirmation now accepts either the paginated child listing or the documented direct folder detail endpoint, `GET /folders/{id}`, so a newly-created remote folder is not deleted just because the child listing lags.

@@ -34,8 +34,8 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run all unit tests (currently 211 across 27 suites:
-# 163 ImageRelayKitTests + 48 FileProviderExtensionTests)
+# Run all unit tests (currently 230 across 27 suites:
+# 174 ImageRelayKitTests + 56 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -68,6 +68,12 @@ xcodebuild build \
 **`AppConfiguration.save` must create the parent directory**: On first launch the app group container directory does not exist. Call `FileManager.default.createDirectory(at:withIntermediateDirectories:)` before writing `config.json`, or the write throws "file not found".
 
 **Folder filtering semantics**: `AppConfiguration.selectedFolderIDs` empty = all folders sync. Filtering applied client-side at the root enumerator only. Children of selected folders always enumerate normally.
+
+**Keychain Prompt-Storm Protection Guidelines**:
+1. **Testing Bypass**: The `KeychainStore` automatically detects test mode (e.g., `XCTest` loading) and diverts secure storage to a thread-safe, in-memory `testStore` dictionary. Never hit the real macOS Keychain APIs during unit testing to avoid password prompt storms.
+2. **Access Control List (ACL) Retention**: When updating a Keychain credential (e.g., OAuth tokens), always perform in-place updates using `SecItemUpdate` instead of deleting and recreating. Recreating items wipes out the user-approved "Always Allow" application signature, triggering a brand-new popup storm.
+3. **Selective Credential Reading**: Only query the Keychain for the active `authMethod` credentials (API Key or OAuth tokens), rather than querying both blindly.
+4. **Bypass for Idle Operations**: When performing unauthenticated background sync operations (e.g., polling intervals), use `AppConfiguration.loadWithoutSecrets` to read the configuration from disk without hitting the Keychain at all.
 
 ## File Provider Patterns
 
