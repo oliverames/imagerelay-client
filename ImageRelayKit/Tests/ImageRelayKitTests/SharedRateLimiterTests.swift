@@ -36,17 +36,25 @@ struct SharedRateLimiterTests {
         #expect(elapsed >= 0.4)
     }
 
-    @Test("recordRateLimit pushes ramp to 4 and clears process probe")
-    func recordRateLimitSnapsToFour() async throws {
+    @Test("recordRateLimit tightens gradually and clears process probe")
+    func recordRateLimitTightensGradually() async throws {
         let url = Self.makeURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let limiter = SharedRateLimiter(url: url, processIdentifier: "test-process")
+
         await limiter.recordRateLimit()
-        let state = await limiter.readState()
-        #expect(state.rampPhase == 4)
+        var state = await limiter.readState()
+        #expect(state.rampPhase == 1)
         #expect(state.consecutiveSuccesses == 0)
         // No in-flight probe was held, so recording the 429 should not create a lock.
         #expect(state.probeToken == nil)
+
+        await limiter.recordRateLimit()
+        await limiter.recordRateLimit()
+        await limiter.recordRateLimit()
+        state = await limiter.readState()
+        #expect(state.rampPhase == 4)
+        #expect(state.consecutiveRateLimits == 4)
     }
 
     @Test("recordSuccess steps down only after hysteresis")

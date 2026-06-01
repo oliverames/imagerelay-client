@@ -209,10 +209,10 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     public func recordRateLimit() async {
         var state = readState()
         let now = Date().timeIntervalSince1970
-        // Snap straight to the deepest ramp on any observed 429 — we have empirical
-        // evidence (2026-05-13 storm) that Image Relay does not signal Retry-After
-        // and the account-level penalty lasts much longer than per-request backoff.
-        state.rampPhase = 4
+        // Tighten gradually so one incidental 429 does not collapse the whole
+        // client into single-probe mode. Repeated 429s still converge quickly
+        // to phase 4, where only one cross-process recovery probe is allowed.
+        state.rampPhase = min(4, max(state.rampPhase, state.consecutiveRateLimits + 1))
         state.consecutiveSuccesses = 0
         state.consecutiveRateLimits = min(state.consecutiveRateLimits + 1, 20)
         state.nextProbeAfter = now + Self.rateLimitCooldown(
