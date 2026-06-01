@@ -8,18 +8,19 @@ Eliminated the disruptive inter-process Keychain password prompt storms occurrin
 - **In-Place ACL Retention**: Changed `KeychainStore.save` to perform an in-place update using `SecItemUpdate` instead of deleting and recreating. This preserves the macOS Access Control List (ACL) permanently, so that clicking "Always Allow" once is retained across credential refreshes.
 - **Selective Authentication Gating**: Optimized `AppConfiguration.load` to only read credentials matching the active `authMethod` (API Key or OAuth), saving up to 66% of Keychain read calls on startup.
 - **Keychain Bypass for Idle Operations (`loadWithoutSecrets`)**: Created `AppConfiguration.loadWithoutSecrets` to read the config from disk without hitting the Keychain. Refactored the File Provider extension's `init(domain:)` and `RemoteChangePoller`'s `currentConfig()` to use this, dropping idle background Keychain queries to absolute zero.
-- **Premium Light-Mode Marketing Site**: Overhauled `docs/index.html` to a beautiful, clean light-slate style matching Image Relay/Canto branding, featuring Outfit/Plus Jakarta Sans typography, thin-bordered micro-shadow feature cards, and elegant radial gradients.
+- **Premium Light-Mode Marketing Site Overhaul**: Re-designed `docs/index.html` to align exactly with Canto's real corporate identity (using signature Navy `#0c2340` and Canto Teal `#00b2a9` / `#00c5b4` brand colors) and embedded the official Image Relay mark (vertical stem + diamond dot lowercase "i" logo). Created an immersive, CSS-rendered pixel-perfect macOS Finder window mockup inside the Hero section that visualizes favorites, sidebar folders, and virtual cloud-placeholder status badges (`☁️`/`✓`) next to the Image Relay mount point.
 - **Documentation**: Updated `README.md`, `CLAUDE.md`, and `AGENTS.md` to synchronize accurate test counts (230 tests total: 174 `ImageRelayKit` package tests + 56 `FileProviderExtension` tests).
 
 **Decisions made**: 
 - Chose an in-memory `testStore` dictionary for the test runner because Xcode test binaries are unsigned, sandboxed executables that do not have access to provisioning-profile Keychain entitlements. Running tests against the live macOS Keychain is inherently prone to prompt storms and test flaky timeouts; shifting to memory-only state is completely secure, thread-safe, and incredibly fast.
 - Opted for `SecItemUpdate` instead of `SecItemDelete` during refreshes. In-place updates preserve the OS Access Control List (ACL) signature of authorized applications (host app, File Provider extension, etc.), meaning the user only has to approve Keychain access once per system cycle.
 - Designed `loadWithoutSecrets` specifically for non-authenticated metadata checks (e.g. tracking polling intervals or folder inclusion lists). Since background change polling runs continuously in the background, it should never trigger visual Keychain authentication blocks or prompt storms.
+- Replaced the template mesh gradient backgrounds and capital letter "P" placeholders with professional corporate design grids and native Finder interface representations. This shifts the landing page from looking like a generic template to looking like an official, polished product page built by the Canto design team.
 
 **Left off at**: 
 - All 230 unit tests (174 ImageRelayKit + 56 FileProviderExtension) are passing cleanly and rapidly with zero Keychain prompts.
-- The premium light-mode marketing page is successfully deployed under `/docs/index.html`.
-- Branch `main` is clean and ready to commit/push the documentation and worklog updates.
+- The premium light-mode marketing page is successfully deployed under `/docs/index.html` with real brand assets and is fully live on GitHub Pages.
+- Branch `main` is completely clean and pushed to `origin/main`.
 
 **Open questions**: 
 - The App Store Connect API key rotation note remains a long-term chore to complete when convenient.
