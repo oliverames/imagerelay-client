@@ -9,22 +9,24 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.7);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --accent-color: #f5a542;
+            --bg-color: #fbfbfc;
+            --card-bg: #ffffff;
+            --border-color: rgba(0, 0, 0, 0.06);
+            --text-primary: #1e293b; /* Sleek slate-dark */
+            --text-secondary: #576071; /* Medium professional slate */
+            --accent-color: #f5a542; /* Image Relay Orange */
             --accent-hover: #e09230;
             --accent-gradient: linear-gradient(135deg, #f5a542 0%, #ff7849 100%);
-            --glow-color: rgba(245, 165, 66, 0.15);
+            --glow-color: rgba(245, 165, 66, 0.08);
             --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             --font-display: 'Outfit', sans-serif;
             --font-mono: 'Fira Code', monospace;
+            --card-shadow: 0 10px 30px rgba(15, 23, 42, 0.03), 0 1px 3px rgba(15, 23, 42, 0.01);
+            --hover-shadow: 0 20px 40px rgba(245, 165, 66, 0.06), 0 1px 3px rgba(245, 165, 66, 0.02);
         }
 
         * {
@@ -42,7 +44,7 @@
             position: relative;
         }
 
-        /* Animated Ambient Mesh Gradient Background */
+        /* Animated Ambient Mesh Gradient Background (Light Mode) */
         .ambient-bg {
             position: fixed;
             top: 0;
@@ -58,17 +60,16 @@
             position: absolute;
             border-radius: 50%;
             filter: blur(120px);
-            opacity: 0.4;
-            mix-blend-mode: screen;
+            opacity: 0.12;
             animation: float 20s infinite alternate ease-in-out;
         }
 
         .glow-circle-1 {
-            width: 400px;
-            height: 400px;
+            width: 450px;
+            height: 450px;
             background: radial-gradient(circle, #f5a542 0%, rgba(245, 165, 66, 0) 70%);
-            top: -100px;
-            right: -50px;
+            top: -120px;
+            right: -60px;
         }
 
         .glow-circle-2 {
@@ -81,18 +82,18 @@
         }
 
         .glow-circle-3 {
-            width: 300px;
-            height: 300px;
+            width: 350px;
+            height: 350px;
             background: radial-gradient(circle, #c084fc 0%, rgba(192, 132, 252, 0) 70%);
-            top: 40%;
-            right: 25%;
+            top: 35%;
+            right: 20%;
             animation-delay: -10s;
         }
 
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(40px, 30px) scale(1.1); }
-            100% { transform: translate(-20px, -40px) scale(0.95); }
+            50% { transform: translate(30px, 20px) scale(1.05); }
+            100% { transform: translate(-15px, -30px) scale(0.98); }
         }
 
         /* Container & Grid layout */
@@ -110,7 +111,7 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border-color);
-            background: rgba(11, 15, 25, 0.7);
+            background: rgba(251, 251, 252, 0.8);
         }
 
         .nav-wrapper {
@@ -131,9 +132,9 @@
         .logo-text {
             font-family: var(--font-display);
             font-size: 22px;
-            font-weight: 700;
+            font-weight: 800;
             letter-spacing: -0.5px;
-            background: linear-gradient(to right, #ffffff, #d1d5db);
+            background: linear-gradient(to right, #0f172a, #334155);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -141,11 +142,11 @@
         .badge-pill {
             background: rgba(245, 165, 66, 0.1);
             border: 1px solid rgba(245, 165, 66, 0.2);
-            color: var(--accent-color);
+            color: #d97706; /* Dark Amber for readability */
             padding: 2px 10px;
             border-radius: 100px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -153,24 +154,24 @@
         .header-btn {
             background: var(--accent-gradient);
             border: none;
-            color: #0b0f19;
-            font-weight: 600;
-            padding: 10px 20px;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 10px 22px;
             border-radius: 8px;
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(245, 165, 66, 0.2);
+            box-shadow: 0 4px 14px rgba(245, 165, 66, 0.3);
         }
 
         .header-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(245, 165, 66, 0.35);
+            box-shadow: 0 6px 20px rgba(245, 165, 66, 0.45);
         }
 
         /* Hero Section */
         .hero {
-            padding: 100px 0 80px;
+            padding: 110px 0 90px;
             text-align: center;
             position: relative;
         }
@@ -179,18 +180,23 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-color);
-            padding: 6px 16px;
+            background: rgba(245, 165, 66, 0.06);
+            border: 1px solid rgba(245, 165, 66, 0.15);
+            padding: 6px 18px;
             border-radius: 100px;
             font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
+            font-weight: 600;
+            color: #d97706;
             margin-bottom: 24px;
         }
 
         .hero-platform-tag span {
-            color: var(--accent-color);
+            background: var(--accent-color);
+            color: #ffffff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 800;
         }
 
         .hero-title {
@@ -200,7 +206,7 @@
             line-height: 1.1;
             letter-spacing: -2px;
             margin-bottom: 24px;
-            background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -211,7 +217,7 @@
             color: var(--text-secondary);
             max-width: 780px;
             margin: 0 auto 40px;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         .cta-buttons {
@@ -219,21 +225,21 @@
             justify-content: center;
             align-items: center;
             gap: 16px;
-            margin-bottom: 60px;
+            margin-bottom: 50px;
             flex-wrap: wrap;
         }
 
         .primary-btn {
             background: var(--accent-gradient);
             border: none;
-            color: #0b0f19;
-            font-weight: 600;
+            color: #ffffff;
+            font-weight: 700;
             padding: 16px 36px;
             border-radius: 10px;
             font-size: 16px;
             text-decoration: none;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 20px rgba(245, 165, 66, 0.25);
+            box-shadow: 0 4px 20px rgba(245, 165, 66, 0.3);
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -241,14 +247,14 @@
 
         .primary-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(245, 165, 66, 0.4);
+            box-shadow: 0 8px 30px rgba(245, 165, 66, 0.45);
         }
 
         .secondary-btn {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-color);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             color: var(--text-primary);
-            font-weight: 600;
+            font-weight: 700;
             padding: 16px 32px;
             border-radius: 10px;
             font-size: 16px;
@@ -257,23 +263,25 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
         }
 
         .secondary-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.15);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
         }
 
-        /* Homebrew terminal block */
+        /* Homebrew terminal block (High Contrast Charcoal Slate) */
         .terminal-block {
             max-width: 500px;
             margin: 0 auto;
-            background: #030712;
-            border: 1px solid var(--border-color);
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             padding: 16px 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -282,7 +290,7 @@
         }
 
         .terminal-text {
-            color: #34d399;
+            color: #38bdf8; /* Soft blue */
             text-align: left;
             user-select: all;
             overflow: hidden;
@@ -293,7 +301,7 @@
         .terminal-copy-btn {
             background: transparent;
             border: none;
-            color: var(--text-secondary);
+            color: #94a3b8;
             cursor: pointer;
             padding: 6px;
             border-radius: 6px;
@@ -302,14 +310,14 @@
 
         .terminal-copy-btn:hover {
             background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
+            color: #ffffff;
         }
 
         /* Features Section */
         .features {
             padding: 100px 0;
             border-top: 1px solid var(--border-color);
-            background: rgba(3, 7, 18, 0.2);
+            background: #f8fafc; /* Sleek light-slate */
         }
 
         .section-header {
@@ -321,7 +329,7 @@
             color: var(--accent-color);
             font-family: var(--font-mono);
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 2px;
             margin-bottom: 12px;
@@ -331,8 +339,9 @@
         .section-title {
             font-family: var(--font-display);
             font-size: 40px;
-            font-weight: 700;
+            font-weight: 800;
             letter-spacing: -1px;
+            color: #0f172a;
         }
 
         .features-grid {
@@ -352,6 +361,7 @@
             display: flex;
             flex-direction: column;
             align-items: flex-start;
+            box-shadow: var(--card-shadow);
         }
 
         .feature-card::before {
@@ -369,8 +379,8 @@
 
         .feature-card:hover {
             transform: translateY(-4px);
-            border-color: rgba(245, 165, 66, 0.3);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 165, 66, 0.05);
+            border-color: rgba(245, 165, 66, 0.4);
+            box-shadow: var(--hover-shadow);
         }
 
         .feature-card:hover::before {
@@ -378,8 +388,8 @@
         }
 
         .feature-icon-wrapper {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-color);
+            background: rgba(245, 165, 66, 0.08);
+            border: 1px solid rgba(245, 165, 66, 0.12);
             width: 48px;
             height: 48px;
             border-radius: 10px;
@@ -391,15 +401,16 @@
         }
 
         .feature-card:hover .feature-icon-wrapper {
-            background: rgba(245, 165, 66, 0.1);
+            background: rgba(245, 165, 66, 0.15);
             border-color: rgba(245, 165, 66, 0.3);
         }
 
         .feature-title {
             font-family: var(--font-display);
             font-size: 20px;
-            font-weight: 600;
+            font-weight: 700;
             margin-bottom: 12px;
+            color: #0f172a;
         }
 
         .feature-desc {
@@ -432,8 +443,8 @@
         }
 
         .arch-number {
-            background: rgba(245, 165, 66, 0.1);
-            border: 1px solid rgba(245, 165, 66, 0.2);
+            background: rgba(245, 165, 66, 0.08);
+            border: 1px solid rgba(245, 165, 66, 0.15);
             color: var(--accent-color);
             width: 36px;
             height: 36px;
@@ -442,15 +453,16 @@
             align-items: center;
             justify-content: center;
             font-family: var(--font-mono);
-            font-weight: 600;
+            font-weight: 700;
             flex-shrink: 0;
             margin-top: 4px;
         }
 
         .arch-step-title {
             font-size: 18px;
-            font-weight: 600;
+            font-weight: 700;
             margin-bottom: 6px;
+            color: #0f172a;
         }
 
         .arch-step-desc {
@@ -460,28 +472,29 @@
 
         .arch-diagram {
             flex: 1.1;
-            background: #030712;
+            background: #ffffff;
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 40px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            box-shadow: var(--card-shadow);
             position: relative;
         }
 
         .arch-node {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: #f8fafc;
+            border: 1px solid rgba(0, 0, 0, 0.05);
             padding: 16px;
             border-radius: 10px;
             text-align: center;
-            font-weight: 600;
+            font-weight: 700;
             position: relative;
+            color: #0f172a;
         }
 
         .arch-node span {
             display: block;
             font-size: 11px;
-            font-weight: 400;
+            font-weight: 500;
             color: var(--text-secondary);
             margin-top: 4px;
         }
@@ -491,13 +504,14 @@
             padding: 10px;
             color: var(--accent-color);
             font-size: 16px;
+            font-weight: 700;
         }
 
         /* Footer */
         footer {
             border-top: 1px solid var(--border-color);
             padding: 60px 0;
-            background: #030712;
+            background: #f8fafc;
             text-align: center;
         }
 
@@ -520,6 +534,7 @@
             text-decoration: none;
             font-size: 14px;
             transition: color 0.2s ease;
+            font-weight: 500;
         }
 
         .footer-link:hover {
@@ -528,12 +543,13 @@
 
         .footer-credits {
             font-size: 12px;
-            color: #4b5563;
+            color: #94a3b8;
         }
 
         .footer-credits a {
             color: var(--text-secondary);
             text-decoration: none;
+            font-weight: 600;
         }
 
         .footer-credits a:hover {
@@ -568,7 +584,7 @@
 </head>
 <body>
 
-    <!-- Floating ambient glow -->
+    <!-- Floating ambient glow (Light Mode) -->
     <div class="ambient-bg">
         <div class="glow-circle glow-circle-1"></div>
         <div class="glow-circle glow-circle-2"></div>
@@ -581,7 +597,7 @@
             <a href="#" class="logo-wrapper">
                 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect width="32" height="32" rx="8" fill="url(#brand-gradient)"/>
-                    <path d="M10 10H16C18.2091 10 20 11.7909 20 14C20 16.2091 18.2091 18 16 18H14V22H10V10ZM14 14V14.01V14ZM14 14H16C16.5523 14 17 13.5523 17 13C17 12.4477 16.5523 12 16 12H14V14Z" fill="#0b0f19" stroke="#0b0f19" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M10 10H16C18.2091 10 20 11.7909 20 14C20 16.2091 18.2091 18 16 18H14V22H10V10ZM14 14V14.01V14ZM14 14H16C16.5523 14 17 13.5523 17 13C17 12.4477 16.5523 12 16 12H14V14Z" fill="#ffffff" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
                     <defs>
                         <linearGradient id="brand-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
                             <stop stop-color="#f5a542"/>
@@ -590,7 +606,7 @@
                     </defs>
                 </svg>
                 <span class="logo-text">Image Relay</span>
-                <span class="badge-pill">v1.2</span>
+                <span class="badge-pill">v1.3</span>
             </a>
             <a href="https://github.com/oliverames/imagerelay-client/releases/latest" class="header-btn">Get App</a>
         </div>
@@ -601,7 +617,7 @@
         <!-- Hero Section -->
         <section class="container hero">
             <div class="hero-platform-tag">
-                <span>NEW</span> Process-Safe Coordinated OAuth Refresh Enabled
+                <span>NEW</span> Zero-Popup Coordinated Keychain Cache Enabled
             </div>
             <h1 class="hero-title">Mount your Image Relay DAM<br>Directly in Finder</h1>
             <p class="hero-subtitle">
@@ -640,7 +656,7 @@
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
                         </div>
                         <h3 class="feature-title">Finder-Native Integration</h3>
-                        <p class="feature-desc">Mounts as a real location alongside iCloud. Use quick search, drag campagne assets to Figma, or edit files in Premiere Pro natively.</p>
+                        <p class="feature-desc">Mounts as a real location alongside iCloud. Use quick search, drag campaign assets to Figma, or edit files in Premiere Pro natively.</p>
                     </div>
 
                     <!-- Feature 2 -->
@@ -657,8 +673,8 @@
                         <div class="feature-icon-wrapper">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         </div>
-                        <h3 class="feature-title">Multi-Process Dynamic OAuth</h3>
-                        <p class="feature-desc">Equipped with automatic token refresh, coordinated securely across processes via lock-files. Zero Keychain prompt spam.</p>
+                        <h3 class="feature-title">Coordinated Keychain Security</h3>
+                        <p class="feature-desc">In-place credential updates (`SecItemUpdate`) preserve your ACL approvals. Seamless, silent refreshes with absolutely zero prompt storms.</p>
                     </div>
 
                     <!-- Feature 4 -->
@@ -754,7 +770,7 @@
             <div class="footer-logo">
                 <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect width="32" height="32" rx="8" fill="url(#footer-gradient)"/>
-                    <path d="M10 10H16C18.2091 10 20 11.7909 20 14C20 16.2091 18.2091 18 16 18H14V22H10V10ZM14 14V14.01V14ZM14 14H16C16.5523 14 17 13.5523 17 13C17 12.4477 16.5523 12 16 12H14V14Z" fill="#030712" stroke="#030712" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M10 10H16C18.2091 10 20 11.7909 20 14C20 16.2091 18.2091 18 16 18H14V22H10V10ZM14 14V14.01V14ZM14 14H16C16.5523 14 17 13.5523 17 13C17 12.4477 16.5523 12 16 12H14V14Z" fill="#ffffff" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
                     <defs>
                         <linearGradient id="footer-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
                             <stop stop-color="#f5a542"/>
@@ -783,7 +799,7 @@
             const cmdText = document.getElementById("brew-cmd").innerText;
             navigator.clipboard.writeText(cmdText).then(() => {
                 const icon = document.getElementById("copy-icon");
-                icon.innerHTML = '<path d="M20 6L9 17l-5-5" stroke="#34d399" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+                icon.innerHTML = '<path d="M20 6L9 17l-5-5" stroke="#10b981" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
                 setTimeout(() => {
                     icon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
                 }, 2000);
