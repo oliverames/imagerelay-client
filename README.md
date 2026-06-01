@@ -28,6 +28,11 @@
 
 ---
 
+### 🌐 Live Marketing Page
+Explore the features, visual workflow, and architecture of the client on our premium, Apple/Linear-style dark-mode marketing site: **[oliverames.github.io/imagerelay-client](https://oliverames.github.io/imagerelay-client/)** (hosted via GitHub Pages).
+
+---
+
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
 > **1.2 release**: Image Relay Client deepens the Finder integration on macOS 26 (Tahoe). Finder shows native upload/download state, child counts, and needs-attention decorations; right-click adds Refresh from Image Relay, Copy Public Link, and Open Folder in Image Relay Web. The menu bar surfaces ETA, throughput, rate-limit state, and failed-upload counts; you can retry failed uploads, OAuth-authenticate developer apps, or Stop Sync Completely without a Terminal. All 1.1 capabilities (metadata editing, upload links, Collections, Products, Webhooks, Library Admin) carry forward unchanged.
@@ -73,7 +78,7 @@ brew install --cask image-relay
 - **Stop / reconnect** — Stop Sync Completely disconnects the File Provider domain from the menu bar; Reconnect Sync brings it back
 - **Live status with ETA** — menu bar shows sync state, batch progress, time remaining, throughput, recent activity, and rate-limit waits
 - **Bulk retry** — Retry N Failed Uploads in the menu bar re-queues every failed item in one click
-- **OAuth or API key** — connect via classic API key or an Image Relay Developer-app OAuth flow
+- **OAuth Security** — connect via classic API key or an Image Relay Developer-app OAuth flow featuring process-safe coordinated refresh and anti-prompt Keychain caching
 - **Update checks** — Sparkle-backed Check for Updates action from the menu bar
 - **Diagnostics export** - export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
 - **Domain reset** - Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
@@ -96,6 +101,10 @@ brew install --cask image-relay
 **Remote changes** -- A background poller wakes on a configurable interval and signals the OS to re-enumerate. The enumerator fetches the current selected subtree, diffs it against the local database, and surfaces additions, changes, and deletions to Finder. The host app also signals enumerators every 5 minutes as a quiet watchdog after system sleep or extension restarts.
 
 **Conflict detection** -- On every modify, the extension compares the content version the OS provides against the version in the local database. If they differ, the local edit is uploaded as a conflict copy and the remote version is fetched.
+
+**Coordinated OAuth Refresh** -- Sandboxed File Provider extensions and the host app share the same credentials container. To prevent token invalidation races (which occur if multiple processes refresh an expired token concurrently), the library implements an atomic lock-file protocol (`config.json.lock`) inside the shared App Group. Only one process performs the API refresh exchange, while other processes await completion and read the new token.
+
+**Keychain Prompt-Storm Protection** -- Sandboxed extensions query the secure Keychain under strict OS sandbox restrictions. Frequent secure queries during rapid parallel sync operations can flood the user with macOS password prompt storms. The client utilizes a thread-safe `CredentialCache` that monitors the modification date of `config.json` on disk; if the file timestamp has not changed and the in-memory token is valid, it skips redundant Keychain queries entirely.
 
 ## Configuration
 
@@ -124,30 +133,43 @@ open -a "Image Relay" --args --export-diagnostics
 
 `--export-diagnostics` writes `manifest.json`, `system.json`, `config.json` (API key redacted), `activity.json`, `sync-progress.json`, `domain-status.json`, `crash-reports.txt`, and `logs.txt` to the app sandbox temporary directory, then exits. The Settings UI still lets you choose a destination folder through the standard security-scoped folder picker.
 
-## Architecture
+## Architecture & Cross-Platform Design
 
-Three targets share state through an App Group container (`group.com.oliverames.imagerelay-client`):
+The codebase supports both macOS (full bidirectional sync) and iOS (read-only stateless on-demand file browsing).
+
+### App Group & Sandbox Sharing
+
+Targets share configuration and state via a secure App Group container (`group.com.oliverames.imagerelay-client`):
 
 ```
-ImageRelayKit/          Swift Package — shared library
+ImageRelayKit/          Swift Package — shared library (macOS 15+ / iOS 18+)
   APIClient             Async HTTP client (rate limiting, chunked upload, quick links)
   SyncDatabase          GRDB-backed SQLite (tracked items, progress, activity log, pause state)
-  AppConfiguration      JSON config in the App Group container
+  AppConfiguration      JSON config in the App Group container with process-safe locking
+  CredentialCache       Thread-safe, date-monitored in-memory token cache to prevent Keychain prompt storms
   Models                RemoteFolder, RemoteFile, TrackedItem, SyncProgressState, etc.
 
-ImageRelayClient/       Menu bar app (SwiftUI, LSUIElement)
+ImageRelayClient/       macOS Menu Bar Host App (SwiftUI, LSUIElement)
   DomainManager         Registers/removes the File Provider domain; remote sync signaling
   MenuBarView           Live status, recent activity, pause controls, Open in Finder
-  Settings/             General, Folders, Activity, Advanced
+  Settings/             General, Folders, Activity, Advanced tabs (macOS 26 native Tab structure)
 
-FileProviderExtension/  NSFileProviderReplicatedExtension
-  Extension             All CRUD operations delegated by the OS
+FileProviderExtension/  macOS File Provider Extension (NSFileProviderReplicatedExtension)
+  Extension             All CRUD operations delegated by macOS
   Enumerator            Concurrent folder discovery; drives initial and incremental sync
   RemoteChangePoller    Background actor; signals enumerators on a configurable interval
   FileProviderItem      Adapts TrackedItem to NSFileProviderItem
+
+ImageRelayClientiOS/    iOS Host App (TabView: Files, Library, Settings)
+  FilesView             Browse mounted folders directly
+  LibraryAdminView      Manage collections, products, and webhooks on-the-go
+
+FileProviderExtensioniOS/ iOS File Provider Extension (Stateless & Read-Only)
+  Extension             On-demand stateless browser extension surfacing folders inside the Files App
+                        Mints temporary quick links, downloads to temp files, and deletes quick-links
 ```
 
-The OS manages the extension lifecycle. There is no custom daemon.
+The OS manages extension lifecycles dynamically. There are no custom background daemons.
 
 ## Building from Source
 

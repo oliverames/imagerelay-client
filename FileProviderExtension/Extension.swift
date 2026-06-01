@@ -65,9 +65,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         let startupDelay = Self.initialThrottleDelay(from: throttleStore.load(), now: Date())
         self.startupThrottleGate = StartupThrottleGate(delay: startupDelay)
 
+        let cache = CredentialCache(url: configURL, keychainAccessGroup: KeychainStore.sharedAccessGroup)
         self.api = APIClient(
             baseURL: loadedConfig.baseURL,
-            credential: loadedConfig.credential,
+            credentialProvider: { [cache] in
+                cache.getCredential()
+            },
             userAgent: loadedConfig.userAgent,
             // #16 fix: the App Group shared limiter pools 5 RPS across the host
             // app + this extension, with a single-probe ramp protocol that

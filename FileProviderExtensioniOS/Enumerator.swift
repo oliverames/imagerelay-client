@@ -33,6 +33,10 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         let logger = self.logger
 
         Task {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
+                let configURL = AppConfiguration.fileURL(in: container)
+                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+            }
             do {
                 guard services.isConfigured else {
                     observer.finishEnumeratingWithError(NSFileProviderError(.notAuthenticated))

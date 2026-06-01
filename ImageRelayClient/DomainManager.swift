@@ -66,6 +66,11 @@ final class DomainManager {
     func bootstrap() async {
         refreshStatus()
 
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) {
+            let configURL = AppConfiguration.fileURL(in: container)
+            _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+        }
+
         let config = loadConfiguration()
         guard config.isConfigured else { return }
 
@@ -306,6 +311,11 @@ final class DomainManager {
 
     private func remotePollLoop() async {
         while !Task.isCancelled {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) {
+                let configURL = AppConfiguration.fileURL(in: container)
+                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+            }
+
             do {
                 try await Task.sleep(for: .seconds(Self.hostWatchdogIntervalSeconds))
             } catch {

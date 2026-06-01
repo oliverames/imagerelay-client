@@ -177,6 +177,27 @@ private struct CollectionDetailView: View {
         .task(id: collection.id) {
             await state.loadItems(for: collection.id)
         }
+        .alert(
+            "Public Collection Warning",
+            isPresented: $state.showRemovalAlert,
+            presenting: state.pendingRemoveCollection
+        ) { col in
+            Button("Remove and Recreate", role: .destructive) {
+                if let fileID = state.pendingRemoveFileID {
+                    Task {
+                        await state.removeItem(fileID: fileID, from: col)
+                        state.pendingRemoveFileID = nil
+                        state.pendingRemoveCollection = nil
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                state.pendingRemoveFileID = nil
+                state.pendingRemoveCollection = nil
+            }
+        } message: { col in
+            Text("This is a public collection. The Image Relay API has no direct removal endpoint, so removing this file will recreate the collection. All existing public shared links and cover images will be permanently broken, and the new collection will be private by default.")
+        }
     }
 
     private var header: some View {
@@ -263,9 +284,22 @@ private struct CollectionDetailView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            // Removal isn't exposed: the Image Relay v2 API
-                            // has no delta DELETE for collection membership.
-                            // Users can drop items via the web app.
+                            Button {
+                                if collection.isPublic {
+                                    state.pendingRemoveFileID = item.fileID
+                                    state.pendingRemoveCollection = collection
+                                    state.showRemovalAlert = true
+                                } else {
+                                    Task {
+                                        await state.removeItem(fileID: item.fileID, from: collection)
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove from collection")
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)

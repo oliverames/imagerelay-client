@@ -383,4 +383,109 @@ struct ConfigurationTests {
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.filenamePresentationStyle == .serverCanonical)
     }
+
+    @Test("loadAndRefresh does not refresh still-valid OAuth tokens")
+    func loadAndRefreshOAuthTokenStillValid() async throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        var config = AppConfiguration.default
+        config.authMethod = .oauth
+        config.oauthTenant = "test-tenant"
+        config.oauthClientID = "cid"
+        config.oauthClientSecret = "csec"
+        config.oauthTokens = OAuthTokens(
+            accessToken: "valid-access",
+            refreshToken: "valid-refresh",
+            expiresAt: Date().addingTimeInterval(3600),
+            tenant: "test-tenant"
+        )
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        MockURLProtocol.requestHandler = { _ in
+            throw NSError(domain: "test", code: -1)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let result = try await AppConfiguration.loadAndRefresh(
+            from: url,
+            keychainAccount: account,
+            keychainAccessGroup: nil
+        )
+
+        #expect(result.oauthTokens?.accessToken == "valid-access")
+    }
+
+    @Test("loadAndRefresh refreshes expiring OAuth tokens")
+    func loadAndRefreshOAuthTokenExpiring() async throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        var config = AppConfiguration.default
+        config.authMethod = .oauth
+        config.oauthTenant = "test-tenant"
+        config.oauthClientID = "cid"
+        config.oauthClientSecret = "csec"
+        config.oauthTokens = OAuthTokens(
+            accessToken: "old-access",
+            refreshToken: "old-refresh",
+            expiresAt: Date().addingTimeInterval(-300),
+            tenant: "test-tenant"
+        )
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let mockResponseData = """
+        {
+            "access_token": "new-access-token",
+            "refresh_token": "new-refresh-token",
+            "expires_in": 3600,
+            "token_type": "Bearer"
+        }
+        """.data(using: .utf8)!
+
+        var requestBodyQueryItems: [URLQueryItem]?
+        MockURLProtocol.requestHandler = { request in
+            if let url = request.url,
+               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                requestBodyQueryItems = components.queryItems
+            }
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, mockResponseData)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let testConfig = URLSessionConfiguration.ephemeral
+        testConfig.protocolClasses = [MockURLProtocol.self]
+
+        let result = try await AppConfiguration.loadAndRefresh(
+            from: url,
+            keychainAccount: account,
+            keychainAccessGroup: nil,
+            sessionConfiguration: testConfig
+        )
+
+        #expect(result.oauthTokens?.accessToken == "new-access-token")
+        #expect(result.oauthTokens?.refreshToken == "new-refresh-token")
+        #expect(result.oauthTokens?.expiresAt != nil)
+
+        #expect(requestBodyQueryItems?.contains(where: { $0.name == "grant_type" && $0.value == "refresh_token" }) == true)
+        #expect(requestBodyQueryItems?.contains(where: { $0.name == "refresh_token" && $0.value == "old-refresh" }) == true)
+        #expect(requestBodyQueryItems?.contains(where: { $0.name == "client_id" && $0.value == "cid" }) == true)
+        #expect(requestBodyQueryItems?.contains(where: { $0.name == "client_secret" && $0.value == "csec" }) == true)
+    }
 }

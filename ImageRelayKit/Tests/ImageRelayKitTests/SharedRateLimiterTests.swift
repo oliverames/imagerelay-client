@@ -137,16 +137,16 @@ struct SharedRateLimiterTests {
             url: url,
             maxRequests: 1,
             period: 0.1,
-            rateLimitCooldownBase: 0.25,
-            maxRateLimitCooldown: 0.25,
+            rateLimitCooldownBase: 0.4,
+            maxRateLimitCooldown: 0.4,
             processIdentifier: "process-A"
         )
         let second = SharedRateLimiter(
             url: url,
             maxRequests: 1,
             period: 0.1,
-            rateLimitCooldownBase: 0.25,
-            maxRateLimitCooldown: 0.25,
+            rateLimitCooldownBase: 0.4,
+            maxRateLimitCooldown: 0.4,
             processIdentifier: "process-B"
         )
         await first.writeState(SharedRateLimiterState(rampPhase: 4))
@@ -161,10 +161,10 @@ struct SharedRateLimiterTests {
         }
         defer { queuedProbe.cancel() }
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await Task.sleep(for: .milliseconds(150))
         #expect(await flag.isCompleted == false)
 
-        try await Task.sleep(for: .milliseconds(250))
+        try await Task.sleep(for: .milliseconds(350))
         #expect(await flag.isCompleted == true)
         await second.recordSuccess()
     }

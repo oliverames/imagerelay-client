@@ -5,7 +5,14 @@ public actor APIClient {
     static let missingRetryAfterFallbackDelay: TimeInterval = 15
 
     private let baseURL: URL
-    private let credential: AuthCredential
+    private let _credential: AuthCredential
+    private let credentialProvider: (@Sendable () -> AuthCredential)?
+    private var credential: AuthCredential {
+        if let provider = credentialProvider {
+            return provider()
+        }
+        return _credential
+    }
     private let userAgent: String
     private let session: URLSession
     private let rateLimiter: any AsyncRateLimiting
@@ -51,10 +58,38 @@ public actor APIClient {
         maxRetryDelay: TimeInterval = 30
     ) {
         self.baseURL = baseURL
-        self.credential = credential
+        self._credential = credential
+        self.credentialProvider = nil
         self.userAgent = userAgent
         // 30 s per request, 10 min total resource timeout (large uploads excluded — they
         // use URLSession.upload which has its own deadline per chunk).
+        sessionConfiguration.timeoutIntervalForRequest = 30
+        sessionConfiguration.timeoutIntervalForResource = 600
+        sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        sessionConfiguration.urlCache = nil
+        self.session = URLSession(configuration: sessionConfiguration)
+        self.rateLimiter = rateLimiter
+        self.throttleStateStore = throttleStateStore
+        self.telemetry = telemetry
+        self.maxRetries = maxRetries
+        self.maxRetryDelay = maxRetryDelay
+    }
+
+    public init(
+        baseURL: URL,
+        credentialProvider: @escaping @Sendable () -> AuthCredential,
+        userAgent: String = AppConfiguration.currentServiceUserAgent,
+        sessionConfiguration: URLSessionConfiguration = .default,
+        rateLimiter: any AsyncRateLimiting = RateLimiter(),
+        throttleStateStore: ThrottleStateStore? = nil,
+        telemetry: SyncDatabase? = nil,
+        maxRetries: Int = 3,
+        maxRetryDelay: TimeInterval = 30
+    ) {
+        self.baseURL = baseURL
+        self._credential = .apiKey("")
+        self.credentialProvider = credentialProvider
+        self.userAgent = userAgent
         sessionConfiguration.timeoutIntervalForRequest = 30
         sessionConfiguration.timeoutIntervalForResource = 600
         sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -80,11 +115,22 @@ public actor APIClient {
         let perPage = currentQuery["per_page"].flatMap(Int.init) ?? 100
         currentQuery["per_page"] = "\(perPage)"
         var page = 1
+        var previousPageData: Data? = nil
 
         while true {
+            if page > 100 {
+                logger.error("getAllPages: Max page limit reached (100) for path \(path, privacy: .public). Breaking to prevent infinite loop.")
+                break
+            }
             currentQuery["page"] = "\(page)"
             let request = try buildRequest(method: "GET", path: path, query: currentQuery)
             let (data, response) = try await executeRaw(request)
+
+            if let prev = previousPageData, prev == data {
+                logger.warning("getAllPages: Detected identical response data on page \(page) for path \(path, privacy: .public). Breaking to prevent infinite loop.")
+                break
+            }
+            previousPageData = data
 
             let pageResult = try decodePage([T].self, from: data, response: response, perPage: perPage)
             let items = pageResult.items

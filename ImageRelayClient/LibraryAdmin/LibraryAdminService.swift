@@ -72,10 +72,9 @@ final class LibraryAdminService {
         // Endpoint is `/permissions.json` on the live v2 API, NOT
         // `/permission_groups.json` (the latter returns 404). Response is a
         // bare array; the decoder also accepts a `{"permission_groups": [...]}`
-        // wrapper in case other deployments use that shape.
-        let api = try makeClient()
-        let response: PermissionGroupListResponse = try await api.get("/permissions.json")
-        return response.values
+        // wrapper in case other deployments use that shape. (getAllPages handles
+        // both envelopes automatically).
+        try await makeClient().getAllPages("/permissions.json")
     }
 
     func invitedUsers() async throws -> [InvitedUser] {

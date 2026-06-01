@@ -296,6 +296,94 @@ public struct AppConfiguration: Codable, Sendable {
         )
     }
 
+    /// Loads the configuration and atomic-refreshes the OAuth tokens if they are close to expiration.
+    /// Uses a lock file in the same directory as the config to ensure only one process performs the
+    /// refresh at a time, preventing token invalidation/revocation race conditions.
+    public static func loadAndRefresh(
+        from url: URL,
+        sessionConfiguration: URLSessionConfiguration = .default
+    ) async throws -> AppConfiguration {
+        try await loadAndRefresh(
+            from: url,
+            keychainAccount: keychainAccount,
+            keychainAccessGroup: KeychainStore.sharedAccessGroup,
+            sessionConfiguration: sessionConfiguration
+        )
+    }
+
+    static func loadAndRefresh(
+        from url: URL,
+        keychainAccount: String,
+        keychainAccessGroup: String?,
+        sessionConfiguration: URLSessionConfiguration = .default
+    ) async throws -> AppConfiguration {
+        var config = try load(from: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
+        
+        guard config.authMethod == .oauth,
+              let tokens = config.oauthTokens,
+              let refreshToken = tokens.refreshToken else {
+            return config
+        }
+        
+        if let expiresAt = tokens.expiresAt, expiresAt.timeIntervalSinceNow > 600 {
+            return config
+        }
+        
+        // Needs refresh. Let's acquire lock file.
+        let lockURL = url.deletingPathExtension().appendingPathExtension("lock")
+        let maxWaitTime: TimeInterval = 10.0
+        let startTime = Date()
+        
+        while true {
+            do {
+                try Data().write(to: lockURL, options: .withoutOverwriting)
+                break
+            } catch {
+                if let attribs = try? FileManager.default.attributesOfItem(atPath: lockURL.path),
+                   let modDate = attribs[.modificationDate] as? Date,
+                   Date().timeIntervalSince(modDate) > 30 {
+                    try? FileManager.default.removeItem(at: lockURL)
+                }
+                
+                if Date().timeIntervalSince(startTime) > maxWaitTime {
+                    break
+                }
+                
+                try await Task.sleep(for: .milliseconds(200))
+            }
+        }
+        
+        defer {
+            try? FileManager.default.removeItem(at: lockURL)
+        }
+        
+        // Re-read config after acquiring lock to see if another process refreshed it
+        config = try load(from: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
+        guard config.authMethod == .oauth,
+              let currentTokens = config.oauthTokens,
+              let currentRefreshToken = currentTokens.refreshToken else {
+            return config
+        }
+        
+        if let expiresAt = currentTokens.expiresAt, expiresAt.timeIntervalSinceNow > 600 {
+            return config
+        }
+        
+        // Perform the refresh request
+        let client = OAuthClient(tenant: config.oauthTenant, sessionConfiguration: sessionConfiguration)
+        let newTokens = try await client.refresh(
+            refreshToken: currentRefreshToken,
+            clientID: config.oauthClientID,
+            clientSecret: config.oauthClientSecret,
+            redirectURI: config.oauthRedirectURI
+        )
+        
+        config.oauthTokens = newTokens
+        try config.save(to: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
+        
+        return config
+    }
+
     static func load(from url: URL, keychainAccount: String, keychainAccessGroup: String?) throws -> AppConfiguration {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return .default
@@ -406,4 +494,61 @@ public struct AppConfiguration: Codable, Sendable {
     public static let keychainAccount = "api-key"
     public static let oauthTokensKeychainAccount = "oauth-tokens"
     public static let oauthClientSecretKeychainAccount = "oauth-client-secret"
+}
+
+/// Thread-safe in-memory cache for credentials to avoid redundant Keychain queries
+/// that trigger popups/locks during rapid concurrent requests. Coordinated by checking
+/// the modification date of the config.json file on disk before querying Keychain.
+public final class CredentialCache: @unchecked Sendable {
+    private let url: URL
+    private let keychainAccount: String
+    private let keychainAccessGroup: String?
+    private let lock = NSLock()
+    private var cachedCredential: AuthCredential?
+    private var lastFileModDate: Date?
+
+    public init(
+        url: URL,
+        keychainAccount: String = AppConfiguration.keychainAccount,
+        keychainAccessGroup: String?
+    ) {
+        self.url = url
+        self.keychainAccount = keychainAccount
+        self.keychainAccessGroup = keychainAccessGroup
+    }
+
+    public func getCredential() -> AuthCredential {
+        lock.withLock {
+            let currentModDate = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? Date.distantPast
+            
+            if let cached = cachedCredential, let lastMod = lastFileModDate, currentModDate == lastMod {
+                switch cached {
+                case .apiKey:
+                    return cached
+                case .oauth(let tokens):
+                    if let exp = tokens.expiresAt, exp.timeIntervalSinceNow > 600 {
+                        return cached
+                    }
+                }
+            }
+
+            let config = (try? AppConfiguration.load(
+                from: url,
+                keychainAccount: keychainAccount,
+                keychainAccessGroup: keychainAccessGroup
+            )) ?? .default
+            
+            let cred = config.credential
+            cachedCredential = cred
+            lastFileModDate = currentModDate
+            return cred
+        }
+    }
+
+    public func invalidate() {
+        lock.withLock {
+            cachedCredential = nil
+            lastFileModDate = nil
+        }
+    }
 }

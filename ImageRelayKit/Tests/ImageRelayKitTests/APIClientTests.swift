@@ -602,4 +602,29 @@ struct APIClientTests {
             Issue.record("Unexpected error type: \(error)")
         }
     }
+
+    @Test("getAllPages breaks infinite loops when response is identical across pages")
+    func getAllPagesInfiniteLoopProtection() async throws {
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            // Provide 100 entries (matching per_page) repeatedly.
+            let entries = (1...100).map {
+                "{\"id\":\($0),\"name\":\"F\($0)\",\"parent_id\":null,\"path\":\"/F\($0)\",\"updated_on\":null,\"child_count\":0}"
+            }.joined(separator: ",")
+            let foldersJSON = "{\"folders\": [\(entries)]}"
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, foldersJSON.data(using: .utf8)!)
+        }
+
+        let client = makeClient()
+        // If there was no loop protection, this would loop infinitely.
+        // With loop protection, it breaks on the second request because the response is identical to the first.
+        let folders: [RemoteFolder] = try await client.getAllPages("/folders")
+        #expect(folders.count == 100)
+        #expect(requestCount == 2)
+    }
 }

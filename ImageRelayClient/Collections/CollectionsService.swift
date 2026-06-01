@@ -72,12 +72,42 @@ final class CollectionsService {
     /// Removing an individual file from a collection has no working endpoint on
     /// the v2 API. We probed every plausible path (DELETE/PATCH/POST under
     /// `/collections/{id}/...`) — they all return 404, and `PUT` is delta-add
-    /// (omitted IDs are not removed). Until Image Relay exposes a delete path,
-    /// the only way to drop items is to delete the collection and recreate it
-    /// without the unwanted asset.
-    func removeItem(fileID: Int, from collection: Collection) async throws {
-        _ = (fileID, collection)
-        throw ServiceError.removeNotSupported
+    /// (omitted IDs are not removed).
+    ///
+    /// Workaround: Fetch current items, filter out the target fileID, delete the
+    /// collection, recreate it with the same name, and re-add the remaining items.
+    ///
+    /// Safety Guarantee (Data Loss Prevention): The operations run in a non-destructive
+    /// sequence. The new collection is created and populated first. Only if both
+    /// operations succeed is the original collection deleted. If a network error,
+    /// timeout, or rate limit occurs during population, the original collection remains
+    /// completely untouched.
+    @discardableResult
+    func removeItem(fileID: Int, from collection: Collection) async throws -> Collection? {
+        let currentItems = try await items(in: collection)
+        let remainingIDs = currentItems.map(\.fileID).filter { $0 != fileID }
+
+        // 1. Recreate the collection first
+        let recreated = try await create(name: collection.name)
+
+        // 2. Add remaining files to the recreated collection
+        if !remainingIDs.isEmpty {
+            try await addItems(remainingIDs, to: recreated)
+        }
+
+        // 3. Only delete the original collection if creation and additions succeeded
+        try await delete(collection)
+
+        return Collection(
+            id: recreated.id,
+            name: recreated.name,
+            description: collection.description, // Preserve description
+            itemCount: remainingIDs.count,
+            createdOn: recreated.createdOn,
+            updatedOn: recreated.updatedOn,
+            coverImageURL: recreated.coverImageURL,
+            isPublic: recreated.isPublic
+        )
     }
 
     private func makeClient() throws -> APIClient {
@@ -154,6 +184,11 @@ final class CollectionsState {
     var pendingAddFileIDs: [Int] = []
     var pendingAddFileNames: [String] = []
 
+    /// Properties for handling the alert dialog during public collection item removal.
+    var pendingRemoveFileID: Int? = nil
+    var pendingRemoveCollection: Collection? = nil
+    var showRemovalAlert: Bool = false
+
     var selectedCollection: Collection? {
         guard let selectedID else { return nil }
         return collections.first { $0.id == selectedID }
@@ -192,8 +227,31 @@ final class CollectionsState {
 
     func removeItem(fileID: Int, from collection: Collection) async {
         do {
-            try await service.removeItem(fileID: fileID, from: collection)
-            itemsByCollectionID[collection.id]?.removeAll { $0.fileID == fileID }
+            if let updatedCollection = try await service.removeItem(fileID: fileID, from: collection) {
+                // Update in-memory collections array
+                if let index = collections.firstIndex(where: { $0.id == collection.id }) {
+                    collections[index] = updatedCollection
+                }
+                
+                // Swap the items dictionary cache
+                let remainingItems = itemsByCollectionID[collection.id]?.filter { $0.fileID != fileID } ?? []
+                itemsByCollectionID[updatedCollection.id] = remainingItems
+                if updatedCollection.id != collection.id {
+                    itemsByCollectionID.removeValue(forKey: collection.id)
+                    itemsErrorByCollectionID.removeValue(forKey: collection.id)
+                }
+
+                if selectedID == collection.id {
+                    selectedID = updatedCollection.id
+                }
+            } else {
+                collections.removeAll { $0.id == collection.id }
+                itemsByCollectionID.removeValue(forKey: collection.id)
+                itemsErrorByCollectionID.removeValue(forKey: collection.id)
+                if selectedID == collection.id {
+                    selectedID = collections.first?.id
+                }
+            }
         } catch {
             logger.warning("Remove item from collection failed: \(error.localizedDescription)")
             itemsErrorByCollectionID[collection.id] = error.localizedDescription

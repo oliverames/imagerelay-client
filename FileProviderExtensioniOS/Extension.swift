@@ -38,6 +38,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         let services = self.services
 
         Task {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
+                let configURL = AppConfiguration.fileURL(in: container)
+                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+            }
             do {
                 if identifier == .rootContainer {
                     completionHandler(
@@ -200,6 +204,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         let logger = self.logger
 
         Task {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
+                let configURL = AppConfiguration.fileURL(in: container)
+                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+            }
             do {
                 guard services.isConfigured else {
                     completionHandler(nil, nil, NSFileProviderError(.notAuthenticated))
@@ -272,9 +280,15 @@ struct ExtensionServices: Sendable {
 
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         let userAgent = AppConfiguration.normalizedIOSUserAgent(config.userAgent)
+        let cache = CredentialCache(
+            url: AppConfiguration.fileURL(in: container),
+            keychainAccessGroup: KeychainStore.sharedAccessGroup
+        )
         let api = APIClient(
             baseURL: config.baseURL,
-            credential: config.credential,
+            credentialProvider: { [cache] in
+                cache.getCredential()
+            },
             userAgent: userAgent,
             // Coordinate API calls with the macOS host counterpart via the App Group
             // shared limiter (#16). iOS-only on this device, but the limiter file is
