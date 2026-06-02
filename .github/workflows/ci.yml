@@ -10,7 +10,10 @@ on:
 jobs:
   test-kit:
     name: ImageRelayKit unit tests
-    runs-on: macos-latest
+    # Keep package tests on the same SDK family as the app targets. macos-latest
+    # can lag on an older Swift/macOS image and fail package tests even when the
+    # macOS 26 Xcode scheme is green.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
