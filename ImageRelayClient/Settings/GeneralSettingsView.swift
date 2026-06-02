@@ -184,7 +184,7 @@ struct GeneralSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
-                    Text("OAuth support is included for beta testing with a registered Image Relay Developer app. Image Relay currently documents a client-secret token exchange, so do not ship a public client secret.")
+                    Text("OAuth support requires a registered Image Relay Developer app. Image Relay currently documents a client-secret token exchange, so do not ship a public client secret.")
                     Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
                     Text("Default File Type ID is required for uploading new files.")
                     if uploadNeedsDefaultFileType {

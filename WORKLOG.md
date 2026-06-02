@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-06-02 - 1.4.0 stable public release
+
+**What changed**:
+Promoted the 1.4 line from `1.4.0-beta.1` to stable `1.4.0` / build `43`. The stable cut keeps the beta's sync durability and native retry UX work, then removes the beta channel caveat: Homebrew is updated again, the generated Sparkle appcast points at `v1.4.0`, and beta User-Agent defaults are included in the legacy migration list so existing beta installs roll forward without resetting customized configuration.
+
+Also fixed the GitHub Actions release readiness gap by moving the Xcode project job from `macos-latest` to the explicit `macos-26` runner image. The prior `main` and tag runs were failing because `macos-latest` was still on macOS 15 / Xcode 16 while this app targets macOS 26 APIs.
+
+**Validation**:
+- `scripts/run-release-candidate-checks.sh 1.4.0` passed, including patch whitespace, 187 ImageRelayKit package tests, the 248-test Xcode scheme, unsigned macOS build, and unsigned iOS simulator build.
+- `scripts/build-developer-id-release.sh --version 1.4.0 --smoke-install` produced a Developer ID signed, notarized, stapled DMG with SHA-256 `681b47794b84d699de550cee23a7c5d56ed9c8a81da827500c4840c08d427d0f`.
+- App ZIP notarization submission `fa75e7d9-464b-4c3d-9dec-ce38db916956` and DMG notarization submission `3764a67e-8385-406f-99e8-c689ef883765` were both Accepted.
+- The smoke install replaced `/Applications/Image Relay.app`, passed codesign, Gatekeeper, and stapler validation, and registered `com.oliverames.imagerelay-client.fileprovider(1.4.0)` with UUID `16C46A56-ADA6-4AA1-A823-0C4C918AD194`.
+- The full live sync matrix passed inside `Oliver's Stuff` (`2907644`): create, modify, delete, rename, zero-byte create/delete, 6 MB upload/delete, file move between generated folders, and folder create/rename/move/delete all verified against the remote API with cleanup.
+
+**Left off at**:
+- Local artifacts are in `build/releases/1.4.0/`.
+- `Casks/image-relay.rb` is advanced to `1.4.0` with the notarized DMG SHA-256.
+- No 1.4.0 release blocker remains. The App Store Connect API key rotation note still carries forward because an earlier repo-local copy was treated as exposed.
+
+---
+
 ## 2026-06-02 - 1.4.0-beta.1 signed release and resilience closeout
 
 **What changed**:

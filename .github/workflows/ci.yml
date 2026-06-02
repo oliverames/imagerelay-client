@@ -23,7 +23,10 @@ jobs:
 
   build:
     name: Build (host app + extension)
-    runs-on: macos-latest
+    # The app and File Provider extension target macOS 26 APIs. macos-latest can
+    # lag behind the newest SDK, so run the Xcode project job on the explicit
+    # macOS 26 image.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 

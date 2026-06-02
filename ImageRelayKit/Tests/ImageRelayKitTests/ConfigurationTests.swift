@@ -197,7 +197,9 @@ struct ConfigurationTests {
             "ImageRelayClient/1.3.1",
             "ImageRelayClient/1.3.1 (macOS)",
             "ImageRelayClient/1.3.2",
-            "ImageRelayClient/1.3.2 (macOS)"
+            "ImageRelayClient/1.3.2 (macOS)",
+            "ImageRelayClient/1.4.0-beta.1",
+            "ImageRelayClient/1.4.0-beta.1 (macOS)"
         ]
 
         for userAgent in previousBuiltInDefaults {
@@ -233,6 +235,7 @@ struct ConfigurationTests {
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.4.0-beta.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
     }
 

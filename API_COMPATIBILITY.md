@@ -54,10 +54,11 @@ currently uses or intentionally leaves out.
   The client does not create additional remote synced-file memberships through the dedicated
   synced-file API.
 - Remote change detection
-  Implemented through polling the folder and file listing endpoints. The client records the
-  last successful pull and next scheduled pull, but it does not yet integrate webhooks.
+  Implemented through polling the folder and file listing endpoints, with optional webhook
+  relay polling in the host app for faster Finder refresh. The relay remains optional because
+  a desktop app cannot reliably receive direct public webhook POSTs behind NAT.
 
-## Implemented in 1.1
+## Additional Implemented Surfaces
 
 - File metadata editing
   `GET /files/{id}.json` returns description, keyword list, and any custom file-type fields;
@@ -101,16 +102,17 @@ currently uses or intentionally leaves out.
   `GET /users/search.json?q={query}`. The live v2 API filters with `?q=` only; the
   documented `?first_name=`, `?last_name=`, and `?email=` parameters are silently ignored
   and return the full user list.
+- OAuth-based auth flows
+  Settings supports an Image Relay Developer-app OAuth flow with tenant, client ID, client
+  secret, redirect URI, browser authorization, callback handling, token exchange, coordinated
+  refresh, and Keychain-backed token storage. API keys remain the simpler default path.
+- Webhook relay consumption
+  Settings > Advanced accepts an HTTPS relay URL. The host app polls that relay for Image
+  Relay webhook cursors, records the cursor in the shared database, and signals File Provider
+  enumerators when events arrive. The File Provider extension keeps a slower safety poll.
 
 ## Not Yet Implemented
 
-- Webhook consumption
-  The desktop client doesn't subscribe to webhook deliveries yet — that requires a public
-  relay (NAT'd desktop can't host a webhook URL directly). Planned: a Cloudflare Worker
-  receives Image Relay webhook POSTs, validates an HMAC signature, and pushes events to
-  subscribed desktop clients via Server-Sent Events. Tracked as Phase 7 of 1.1.
-- OAuth-based auth flows
-  The client currently assumes API-key style access through configured credentials.
 - Collection item removal
   The Image Relay v2 API has no working endpoint for removing an individual file from a
   collection. Probed paths (`DELETE /collections/{id}/files/{file_id}.json`,

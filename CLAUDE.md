@@ -34,8 +34,8 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run all unit tests (currently 233 across 27 suites:
-# 176 ImageRelayKitTests + 57 FileProviderExtensionTests)
+# Run all unit tests (currently 248:
+# 187 ImageRelayKitTests + 61 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \

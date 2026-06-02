@@ -1,7 +1,7 @@
 import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
-    private static let fallbackAppVersion = "1.4.0-beta.1"
+    private static let fallbackAppVersion = "1.4.0"
     private static let versionedBundleIdentifiers: Set<String> = [
         "com.oliverames.imagerelay-client",
         "com.oliverames.imagerelay-client.fileprovider",
@@ -57,7 +57,9 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.3.1",
         "ImageRelayClient/1.3.1 (macOS)",
         "ImageRelayClient/1.3.2",
-        "ImageRelayClient/1.3.2 (macOS)"
+        "ImageRelayClient/1.3.2 (macOS)",
+        "ImageRelayClient/1.4.0-beta.1",
+        "ImageRelayClient/1.4.0-beta.1 (macOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
@@ -80,7 +82,8 @@ public struct AppConfiguration: Codable, Sendable {
             userAgent == "ImageRelayClient/1.3.0-beta.3 (iOS)" ||
             userAgent == "ImageRelayClient/1.3.0 (iOS)" ||
             userAgent == "ImageRelayClient/1.3.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.2 (iOS)" {
+            userAgent == "ImageRelayClient/1.3.2 (iOS)" ||
+            userAgent == "ImageRelayClient/1.4.0-beta.1 (iOS)" {
             return currentIOSUserAgent
         }
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
