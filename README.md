@@ -35,7 +35,7 @@ Explore the features, visual workflow, and architecture of the client on our pre
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.4 beta**: Image Relay Client now focuses on smoother setup, clearer sync issue recovery, Keychain prompt-storm prevention, and better release automation. The latest stable release remains 1.3.2 until the 1.4 beta is packaged and published.
+> **1.4 beta**: `1.4.0-beta.1` is packaged, notarized, and published through the in-app Sparkle feed and the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest). This beta focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, and better release automation. Homebrew remains stable-only at `1.3.2` until the 1.4 line is promoted to stable.
 
 ## Why This Exists
 

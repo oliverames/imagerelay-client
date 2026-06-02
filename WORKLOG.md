@@ -1,5 +1,29 @@
 # Worklog
 
+## 2026-06-02 - 1.4.0-beta.1 signed release and resilience closeout
+
+**What changed**:
+Published `1.4.0-beta.1` / build `42` as a Developer ID signed, notarized, stapled DMG with Sparkle appcast metadata. The released build carries the sync durability and native retry UX work from `f78a0a5`: durable sync operation journaling, two-pass remote deletion confirmation, streaming file fingerprinting for upload correctness, centralized File Provider signaling, Keychain-backed OAuth transient state, sanitized diagnostics, database integrity checks, relay URL validation, clearer File Provider error messaging, and interrupted-upload retry behavior that leaves retryable work queued instead of treating it as lost.
+
+**Decisions made**:
+- Published the GitHub release as `latest` and not as a prerelease even though the marketing version contains `beta`, because installed clients read `https://github.com/oliverames/imagerelay-client/releases/latest/download/appcast.xml`. Keeping the beta release behind GitHub's prerelease/latest split would strand existing Sparkle clients on the older feed.
+- Kept Homebrew stable-only. `scripts/build-developer-id-release.sh` correctly skipped the Cask update for the beta version; beta users get this build through Sparkle or manual DMG install.
+- Kept live signed-build smoke testing scoped to the configured `Oliver's Stuff` folder (`2907644`), matching the project's current release-test constraint.
+
+**Left off at**:
+- Branch `main` is pushed with signed commit `f78a0a5` tagged as signed tag `v1.4.0-beta.1`.
+- GitHub release: https://github.com/oliverames/imagerelay-client/releases/tag/v1.4.0-beta.1
+- Local artifacts: `build/releases/1.4.0-beta.1/`
+- Smoke install moved the prior `/Applications/Image Relay.app` aside to `/Users/oliverames/Applications/Codex Backups/Image Relay.app.1.4.0-beta.1.smoke-20260602-065131`, installed the notarized app, passed Gatekeeper validation, and registered the File Provider extension.
+- Verification passed before shipping: `swift test --package-path ImageRelayKit` (187 tests), `xcodebuild test -project ImageRelayClient.xcodeproj -scheme ImageRelayClient -destination 'platform=macOS'` (248 tests), unsigned macOS build, unsigned iOS simulator build, app ZIP notarization, DMG notarization, DMG stapling, smoke install, remote appcast XML validation, and remote appcast/local artifact match.
+
+**Open questions**:
+- Resolved this session: signing and GitHub publishing are unblocked; installed clients should now see the beta through the existing Sparkle feed.
+- Still open: rotate the App Store Connect API key when convenient because an earlier repo-local copy was treated as exposed.
+- NEW: Decide before the next beta whether the Sparkle feed should keep using GitHub `latest` or move to an explicit beta/stable channel split.
+
+---
+
 ## 2026-06-01 - 1.4.0-beta.1 (Keychain Prompt Storm Elimination & Premium Marketing Site)
 
 **What changed**: 
