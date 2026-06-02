@@ -416,7 +416,10 @@ echo "Stapling DMG..."
 xcrun stapler staple "$DMG_PATH" | tee "$ARTIFACT_DIR/stapler-dmg.log"
 xcrun stapler validate "$DMG_PATH" | tee "$ARTIFACT_DIR/stapler-dmg-validate.log"
 spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH" 2>&1 | tee "$ARTIFACT_DIR/spctl-dmg.log"
-shasum -a 256 "$DMG_PATH" | tee "$CHECKSUM_PATH"
+(
+  cd "$ARTIFACT_DIR"
+  shasum -a 256 "$(basename "$DMG_PATH")"
+) | tee "$CHECKSUM_PATH"
 
 echo "Generating Sparkle appcast..."
 write_appcast "$DMG_PATH" "$APPCAST_PATH"
