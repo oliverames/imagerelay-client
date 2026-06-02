@@ -116,6 +116,44 @@ struct ResilienceTests {
         #expect(outage.code == NSFileProviderError.Code.serverUnreachable.rawValue)
     }
 
+    @Test("Interrupted local upload failures are marked for automatic retry")
+    func interruptedUploadFailureIsAutomaticRetry() {
+        let message = Extension.failureMessageForLocalMutation(APIError.networkError(underlying: URLError(.networkConnectionLost)))
+        let entry = ActivityEntry(
+            action: .uploadFailed,
+            itemName: "Annual Report.pdf",
+            itemType: .file,
+            errorMessage: message
+        )
+
+        #expect(entry.isAutomaticRetryFailure)
+        #expect(message.localizedCaseInsensitiveContains("client will retry automatically"))
+    }
+
+    @Test("Validation upload failures still require user attention")
+    func validationUploadFailureRequiresAttention() {
+        let message = Extension.failureMessageForLocalMutation(APIError.serverError(statusCode: 422, message: nil))
+        let entry = ActivityEntry(
+            action: .uploadFailed,
+            itemName: "Annual Report.pdf",
+            itemType: .file,
+            errorMessage: message
+        )
+
+        #expect(!entry.isAutomaticRetryFailure)
+    }
+
+    @Test("Cancelled and URL-interrupted File Provider errors are retryable")
+    func cancellationAndURLErrorMapToServerUnreachable() {
+        let cancelled = CancellationError().asFileProviderError as NSError
+        let lostNetwork = URLError(.networkConnectionLost).asFileProviderError as NSError
+
+        #expect(cancelled.domain == NSFileProviderErrorDomain)
+        #expect(cancelled.code == NSFileProviderError.Code.serverUnreachable.rawValue)
+        #expect(lostNetwork.domain == NSFileProviderErrorDomain)
+        #expect(lostNetwork.code == NSFileProviderError.Code.serverUnreachable.rawValue)
+    }
+
     @Test("Recent 429 state delays first File Provider batch")
     func recent429DelaysFirstBatch() {
         let state = PersistedThrottleState(

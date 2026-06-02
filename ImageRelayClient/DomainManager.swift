@@ -23,7 +23,11 @@ final class DomainManager {
     var showAdvancedInformation = false
     var syncDisconnected = false
     var failedUploadCount = 0
+    var openOperationCount = 0
+    var pendingRemoteDeletionCount = 0
     var lastRetryMessage: String?
+    var oauthStatusMessage: String?
+    var oauthIsCompleting = false
     var recentActivity: [ActivityEntry] = []
     private var db: SyncDatabase?
     private var remotePollingTask: Task<Void, Never>?
@@ -54,8 +58,22 @@ final class DomainManager {
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier
         ) else { return nil }
-        db = try? SyncDatabase(url: SyncDatabase.databaseURL(in: container))
-        return db
+        do {
+            let opened = try SyncDatabase(url: SyncDatabase.databaseURL(in: container))
+            do {
+                try opened.requireIntegrity()
+                try? opened.markDatabaseIntegritySucceeded()
+            } catch {
+                try? opened.markDatabaseIntegrityFailed(error.localizedDescription)
+                throw error
+            }
+            db = opened
+            return opened
+        } catch {
+            lastError = error.localizedDescription
+            logger.error("Sync database unavailable or failed integrity check: \(error.localizedDescription, privacy: .private)")
+            return nil
+        }
     }
 
     private func loadConfiguration() -> AppConfiguration {
@@ -103,6 +121,8 @@ final class DomainManager {
         syncProgress = (try? db.getProgress()) ?? .idle
         pauseState = (try? db.getPauseState()) ?? .default
         failedUploadCount = (try? db.unresolvedFailureCount()) ?? 0
+        openOperationCount = (try? db.openSyncOperationCount()) ?? 0
+        pendingRemoteDeletionCount = (try? db.pendingRemoteDeletions(limit: 1_000).count) ?? 0
         recentActivity = (try? db.recentActivity(limit: 5)) ?? []
     }
 
@@ -253,22 +273,13 @@ final class DomainManager {
     }
 
     private func signalEnumerators(config: AppConfiguration) async throws {
-        guard let manager = NSFileProviderManager(for: domain) else { return }
-        try await manager.signalEnumerator(for: .workingSet)
-        try await manager.signalEnumerator(for: .rootContainer)
         let folderIDs = folderIDsToSignal(config: config)
-        var folderSignalFailures = 0
-        for folderID in folderIDs {
-            do {
-                try await manager.signalEnumerator(
-                    for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
-                )
-            } catch {
-                folderSignalFailures += 1
-                logger.debug("Folder enumerator signal failed: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-        logger.info("Signaled remote poll enumerators (folders: \(folderIDs.count, privacy: .public), folder failures: \(folderSignalFailures, privacy: .public))")
+        let coordinator = FileProviderSignalCoordinator(domain: domain, logger: logger)
+        _ = try await coordinator.signalEnumerators(
+            targets: FileProviderSignalCoordinator.remotePollTargets(folderIDs: folderIDs),
+            reason: "remote poll",
+            db: ensureDatabase()
+        )
     }
 
     private func folderIDsToSignal(config: AppConfiguration) -> [Int] {
@@ -518,8 +529,12 @@ final class DomainManager {
             for error in retryableErrors {
                 try await manager.signalErrorResolved(error)
             }
-            try await manager.signalEnumerator(for: .workingSet)
-            try await manager.signalEnumerator(for: .rootContainer)
+            let coordinator = FileProviderSignalCoordinator(domain: domain, logger: logger)
+            _ = try await coordinator.signalEnumerators(
+                targets: FileProviderSignalCoordinator.remotePollTargets(folderIDs: []),
+                reason: "retry failed uploads",
+                db: ensureDatabase()
+            )
             await signalSync()
             lastRetryMessage = "Retry requested for \(failedUploadCount) failed item\(failedUploadCount == 1 ? "" : "s")."
             refreshStatus()
@@ -542,11 +557,17 @@ final class DomainManager {
         Pause: \(pauseState.isActive ? pauseState.description : "not paused")
         Progress: \(progress.phase) \(progress.completedSteps)/\(progress.totalSteps)
         Failed items needing attention: \(failedUploadCount)
+        Open operations: \(openOperationCount)
+        Pending remote deletion confirmations: \(pendingRemoteDeletionCount)
         Throughput: \(progress.smoothedBytesPerSecond) bytes/sec
         ETA seconds: \(progress.etaSeconds.map(String.init) ?? "unknown")
         Rate limited until: \(progress.rateLimitedUntil?.description ?? "not rate-limited")
         Rate-limit waits in flight: \(progress.rateLimitInFlight)
         429s recorded: \(progress.recentRateLimitCount)
+        Last File Provider signal: \(progress.lastFileProviderSignalAt?.description ?? "never")
+        File Provider signal failures: \(progress.lastFileProviderSignalFailureCount)
+        File Provider signal error: \(progress.lastFileProviderSignalError ?? "none")
+        Database integrity error: \(progress.lastDatabaseIntegrityError ?? "none")
         Persisted throttle failures: \(throttleState?.consecutiveFailures ?? 0)
         Last successful API: \(progress.lastSuccessfulAPIAt?.description ?? "unknown")
         Last remote poll: \(progress.lastRemotePollAt?.description ?? "never")
@@ -556,33 +577,52 @@ final class DomainManager {
     }
 
     func completeOAuthCallback(_ url: URL) async {
+        oauthIsCompleting = true
+        oauthStatusMessage = "Finishing Image Relay sign-in..."
+        defer { oauthIsCompleting = false }
+
         let callback = OAuthFlow.parseCallback(url)
         if let error = callback.error {
-            lastError = "OAuth failed: \(error)"
+            let message = "Image Relay sign-in was canceled or rejected: \(error)"
+            lastError = message
+            oauthStatusMessage = message
+            clearPendingOAuthLogin()
             return
         }
 
         guard let code = callback.code else {
-            lastError = "OAuth callback did not include an authorization code."
+            let message = "Image Relay did not send an authorization code. Start OAuth again."
+            lastError = message
+            oauthStatusMessage = message
+            clearPendingOAuthLogin()
             return
         }
 
         guard let container = AppConfiguration.containerURL() else {
-            lastError = "App Group container is unavailable."
+            let message = "App Group container is unavailable."
+            lastError = message
+            oauthStatusMessage = message
             return
         }
 
         let configURL = AppConfiguration.fileURL(in: container)
         var config = (try? AppConfiguration.load(from: configURL)) ?? .default
         guard callback.state == config.oauthState else {
-            lastError = "OAuth callback state did not match the pending login."
+            config.oauthCodeVerifier = nil
+            config.oauthState = nil
+            try? config.save(to: configURL)
+            let message = "Image Relay sign-in expired or did not match this app. Start OAuth again."
+            lastError = message
+            oauthStatusMessage = message
             return
         }
         guard !config.oauthTenant.isEmpty,
               !config.oauthClientID.isEmpty,
               !config.oauthClientSecret.isEmpty,
               let verifier = config.oauthCodeVerifier else {
-            lastError = "OAuth settings are incomplete."
+            let message = "OAuth settings are incomplete. Check Settings and start OAuth again."
+            lastError = message
+            oauthStatusMessage = message
             return
         }
 
@@ -601,11 +641,79 @@ final class DomainManager {
             config.oauthState = nil
             try config.save(to: configURL)
             lastError = nil
+            oauthStatusMessage = "Connected to Image Relay with OAuth."
             await bootstrap()
         } catch {
-            lastError = error.localizedDescription
+            let message = "Could not finish Image Relay sign-in: \(error.localizedDescription)"
+            lastError = message
+            oauthStatusMessage = message
             logger.error("OAuth token exchange failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    func startOAuthLogin(
+        tenant: String,
+        clientID: String,
+        clientSecret: String,
+        redirectURI: String
+    ) {
+        let trimmedTenant = tenant.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedClientID = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedRedirectURI = redirectURI.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedTenant.isEmpty,
+              !trimmedClientID.isEmpty,
+              !clientSecret.isEmpty,
+              !trimmedRedirectURI.isEmpty else {
+            oauthStatusMessage = "Enter the OAuth tenant, client ID, client secret, and redirect URI."
+            return
+        }
+
+        guard let container = AppConfiguration.containerURL() else {
+            oauthStatusMessage = "App Group container is unavailable."
+            return
+        }
+
+        let configURL = AppConfiguration.fileURL(in: container)
+        var config = (try? AppConfiguration.load(from: configURL)) ?? .default
+        config.authMethod = .oauth
+        config.oauthTenant = trimmedTenant
+        config.oauthClientID = trimmedClientID
+        config.oauthClientSecret = clientSecret
+        config.oauthRedirectURI = trimmedRedirectURI
+        config.oauthCodeVerifier = OAuthFlow.makeCodeVerifier()
+        config.oauthState = UUID().uuidString
+
+        guard let verifier = config.oauthCodeVerifier,
+              let state = config.oauthState,
+              let url = OAuthFlow.authorizationURL(
+                tenant: config.oauthTenant,
+                clientID: config.oauthClientID,
+                redirectURI: config.oauthRedirectURI,
+                state: state,
+                codeChallenge: OAuthFlow.codeChallenge(for: verifier)
+              ) else {
+            oauthStatusMessage = "Could not create the Image Relay authorization URL. Check the tenant and redirect URI."
+            return
+        }
+
+        do {
+            try config.save(to: configURL)
+            oauthIsCompleting = false
+            oauthStatusMessage = "Waiting for Image Relay sign-in to finish in your browser..."
+            NSWorkspace.shared.open(url)
+        } catch {
+            oauthStatusMessage = "Could not save OAuth login state: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearPendingOAuthLogin() {
+        guard let container = AppConfiguration.containerURL() else { return }
+        let configURL = AppConfiguration.fileURL(in: container)
+        var config = (try? AppConfiguration.load(from: configURL)) ?? .default
+        config.oauthCodeVerifier = nil
+        config.oauthState = nil
+        try? config.save(to: configURL)
     }
 
     private func updateConfiguration(_ mutate: (inout AppConfiguration) -> Void) {

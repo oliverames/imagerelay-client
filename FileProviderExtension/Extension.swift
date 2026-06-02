@@ -52,10 +52,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         let dbURL = SyncDatabase.databaseURL(in: container)
         let database: SyncDatabase
         do {
-            database = try SyncDatabase(url: dbURL)
+            let opened = try SyncDatabase(url: dbURL)
+            do {
+                try opened.requireIntegrity()
+                try? opened.markDatabaseIntegritySucceeded()
+            } catch {
+                try? opened.markDatabaseIntegrityFailed(error.localizedDescription)
+                throw error
+            }
+            database = opened
         } catch {
             Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Extension")
-                .fault("SyncDatabase init failed (\(error.localizedDescription)) — extension degraded")
+                .fault("SyncDatabase init or integrity check failed (\(error.localizedDescription)) — extension degraded")
             database = SyncDatabase.makeInMemory()
         }
         self.db = database
@@ -385,6 +393,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             await self.waitForFileOperationSlot()
             defer { self.releaseFileOperationSlot() }
 
+            var operationID: String?
             do {
                 // Filter out .DS_Store and temp files
                 let ignoredNames: Set<String> = [".DS_Store"]
@@ -411,6 +420,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 let parentFolderID = try await self.resolveParentFolderID(itemTemplate.parentItemIdentifier)
 
                 if itemTemplate.contentType == .folder {
+                    operationID = try db.beginSyncOperation(
+                        kind: .create,
+                        itemName: itemTemplate.filename,
+                        itemType: .folder,
+                        parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
+                        phase: "Creating remote folder"
+                    )
                     self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename)
                     defer { self.incrementProgress() }
 
@@ -418,6 +434,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         named: itemTemplate.filename,
                         parentFolderID: parentFolderID
                     )
+                    try? db.markSyncOperation(operationID!, phase: "Confirming remote folder", remoteID: folder.id)
                     let confirmed = try await self.waitForRemoteFolder(
                         remoteID: folder.id,
                         parentFolderID: parentFolderID,
@@ -442,6 +459,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         itemName: confirmed.name,
                         itemType: .folder
                     )
+                    try? db.completeSyncOperation(operationID!, remoteID: confirmed.id)
 
                     let item = FileProviderItem(trackedItem: tracked, filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(item, [], false, nil)
@@ -450,36 +468,57 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         reason: "created folder"
                     )
                 } else if let contentURL = url {
-                    let fileData = try Data(contentsOf: contentURL)
+                    let fingerprint = try FileFingerprinting.fingerprint(of: contentURL)
                     guard let fileTypeID = config.defaultFileTypeID else {
                         throw ExtensionError.missingDefaultFileTypeID
                     }
 
-                    self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename, expectedBytes: Int64(fileData.count))
+                    self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename, expectedBytes: fingerprint.size)
                     defer { self.incrementProgress() }
 
                     let fileID: Int
                     let contentVersion: String
                     let finalName: String
                     if let existingRemote = try await self.remoteFile(named: itemTemplate.filename, parentFolderID: parentFolderID) {
+                        operationID = try db.beginSyncOperation(
+                            kind: .modify,
+                            itemIdentifier: ItemIdentifier.file(existingRemote.id).rawValue,
+                            itemName: itemTemplate.filename,
+                            itemType: .file,
+                            parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
+                            remoteID: existingRemote.id,
+                            localContentSize: fingerprint.size,
+                            localContentSHA256: fingerprint.sha256,
+                            phase: "Uploading version"
+                        )
                         // File Provider can send a second create-style request when a
                         // freshly-created file is edited before enumeration settles on
                         // the remote identifier. Treat that as a version update.
                         fileID = existingRemote.id
-                        try await self.replaceFileContents(remoteID: existingRemote.id, name: itemTemplate.filename, data: fileData)
+                        try await self.replaceFileContents(remoteID: existingRemote.id, name: itemTemplate.filename, fileURL: contentURL)
                         self.updateProgress(state: .syncing, phase: "Confirming upload", currentItem: itemTemplate.filename)
                         let confirmed = try await self.waitForRemoteFileSize(
                             remoteID: existingRemote.id,
                             parentFolderID: parentFolderID,
-                            expectedSize: fileData.count,
+                            expectedSize: try Self.checkedIntSize(fingerprint.size),
                             acceptExistingAsset: true
                         )
                         finalName = confirmed.name
                         contentVersion = UUID().uuidString
                     } else {
+                        operationID = try db.beginSyncOperation(
+                            kind: .create,
+                            itemName: itemTemplate.filename,
+                            itemType: .file,
+                            parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
+                            localContentSize: fingerprint.size,
+                            localContentSHA256: fingerprint.sha256,
+                            phase: "Creating upload job"
+                        )
                         let uploaded = try await self.uploadNewFile(
                             name: itemTemplate.filename,
-                            data: fileData,
+                            fileURL: contentURL,
+                            fingerprint: fingerprint,
                             parentFolderID: parentFolderID,
                             fileTypeID: fileTypeID
                         )
@@ -492,7 +531,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         identifier: ItemIdentifier.file(fileID).rawValue,
                         parentIdentifier: itemTemplate.parentItemIdentifier.rawValue,
                         remoteID: fileID, itemType: .file, name: finalName,
-                        size: Int64(fileData.count), contentVersion: contentVersion,
+                        size: fingerprint.size, contentVersion: contentVersion,
                         metadataVersion: TrackedItem.fileMetadataVersion(
                             updatedOn: contentVersion,
                             parentIdentifier: itemTemplate.parentItemIdentifier.rawValue
@@ -501,6 +540,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     )
                     try db.upsertItem(tracked)
                     try? db.logActivity(action: .uploaded, itemName: finalName, itemType: .file)
+                    try? db.completeSyncOperation(operationID!, remoteID: fileID, remoteContentSize: fingerprint.size)
 
                     let item = FileProviderItem(trackedItem: tracked, filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(item, [], false, nil)
@@ -513,14 +553,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
             } catch {
                 logger.error("Create failed: \(error.localizedDescription)")
+                let failureMessage = Self.failureMessageForLocalMutation(error)
+                if let operationID {
+                    try? db.failSyncOperation(operationID, errorMessage: failureMessage)
+                }
                 let failureItemType: TrackedItemType = itemTemplate.contentType == .folder ? .folder : .file
                 try? db.logActivity(
                     action: .uploadFailed,
                     itemName: itemTemplate.filename,
                     itemType: failureItemType,
-                    errorMessage: error.localizedDescription
+                    errorMessage: failureMessage
                 )
-                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: failureMessage)
                 handler.value(nil, [], false, error.asFileProviderError)
             }
         }
@@ -549,6 +593,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
             var failureItemName = item.filename
             var failureItemType: TrackedItemType = item.contentType == .folder ? .folder : .file
+            var operationID: String?
             do {
                 let mutatesRemote = changedFields.contains(.contents)
                     || changedFields.contains(.filename)
@@ -575,24 +620,34 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 failureItemName = item.filename
                 failureItemType = tracked.itemType
 
-                let expectedModifyBytes: Int64
+                let contentFingerprint: FileFingerprint?
                 if changedFields.contains(.contents), let newContents {
-                    let attributes = try? FileManager.default.attributesOfItem(atPath: newContents.path)
-                    expectedModifyBytes = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+                    contentFingerprint = try FileFingerprinting.fingerprint(of: newContents)
                 } else {
-                    expectedModifyBytes = 0
+                    contentFingerprint = nil
                 }
+                let expectedModifyBytes = contentFingerprint?.size ?? 0
                 self.beginOperation(phase: "Modifying", currentItem: tracked.name, expectedBytes: expectedModifyBytes)
                 defer { self.incrementProgress() }
                 var updated = tracked
 
                 if changedFields.contains(.parentItemIdentifier),
                    item.parentItemIdentifier == .trashContainer {
+                    operationID = try db.beginSyncOperation(
+                        kind: .delete,
+                        itemIdentifier: tracked.identifier,
+                        itemName: tracked.name,
+                        itemType: tracked.itemType,
+                        parentIdentifier: tracked.parentIdentifier,
+                        remoteID: remoteID,
+                        phase: "Deleting remote item"
+                    )
                     try await self.deleteTrackedItem(
                         itemID: itemID,
                         remoteID: remoteID,
                         tracked: tracked
                     )
+                    try? db.completeSyncOperation(operationID!, remoteID: remoteID)
                     handler.value(nil, [], false, nil)
                     self.signalLocalMutation(
                         affectedContainerIdentifiers: [NSFileProviderItemIdentifier(tracked.parentIdentifier)],
@@ -617,14 +672,27 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                             throw ExtensionError.missingDefaultFileTypeID
                         }
                         let parentFolderID = try await self.resolveParentFolderID(item.parentItemIdentifier)
-                        let fileData = try Data(contentsOf: contentURL)
+                        let fingerprint = try Self.requireContentFingerprint(contentFingerprint)
+                        operationID = try db.beginSyncOperation(
+                            kind: .conflictCopy,
+                            itemIdentifier: tracked.identifier,
+                            itemName: conflictName,
+                            itemType: .file,
+                            parentIdentifier: item.parentItemIdentifier.rawValue,
+                            remoteID: remoteID,
+                            localContentSize: fingerprint.size,
+                            localContentSHA256: fingerprint.sha256,
+                            phase: "Uploading conflict copy"
+                        )
                         self.updateProgress(state: .syncing, phase: "Uploading conflict copy", currentItem: conflictName)
-                        _ = try await self.uploadNewFile(
+                        let uploaded = try await self.uploadNewFile(
                             name: conflictName,
-                            data: fileData,
+                            fileURL: contentURL,
+                            fingerprint: fingerprint,
                             parentFolderID: parentFolderID,
                             fileTypeID: fileTypeID
                         )
+                        try? db.completeSyncOperation(operationID!, remoteID: uploaded.id, remoteContentSize: fingerprint.size)
 
                         // Tell the OS to re-fetch the remote canonical version.
                         let resultItem = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
@@ -638,20 +706,33 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
 
                 if changedFields.contains(.contents), let contentURL = newContents, itemID.isFile {
-                    let fileData = try Data(contentsOf: contentURL)
+                    let fingerprint = try Self.requireContentFingerprint(contentFingerprint)
+                    if operationID == nil {
+                        operationID = try db.beginSyncOperation(
+                            kind: .modify,
+                            itemIdentifier: tracked.identifier,
+                            itemName: item.filename,
+                            itemType: .file,
+                            parentIdentifier: tracked.parentIdentifier,
+                            remoteID: remoteID,
+                            localContentSize: fingerprint.size,
+                            localContentSHA256: fingerprint.sha256,
+                            phase: "Uploading version"
+                        )
+                    }
                     self.updateProgress(state: .syncing, phase: "Uploading version", currentItem: tracked.name)
                     let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
 
-                    try await self.replaceFileContents(remoteID: remoteID, name: item.filename, data: fileData)
+                    try await self.replaceFileContents(remoteID: remoteID, name: item.filename, fileURL: contentURL)
                     self.updateProgress(state: .syncing, phase: "Confirming upload", currentItem: tracked.name)
                     let confirmed = try await self.waitForRemoteFileSize(
                         remoteID: remoteID,
                         parentFolderID: parentFolderID,
-                        expectedSize: fileData.count,
+                        expectedSize: try Self.checkedIntSize(fingerprint.size),
                         acceptExistingAsset: true
                     )
 
-                    updated.size = Int64(fileData.count)
+                    updated.size = fingerprint.size
                     updated.name = confirmed.name
                     updated.contentVersion = UUID().uuidString
                     updated.metadataVersion = TrackedItem.fileMetadataVersion(
@@ -665,6 +746,15 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 if itemID.isFile, changedFields.contains(.filename) {
                     let parentFolderID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
                     if !changedFields.contains(.contents) {
+                        operationID = try db.beginSyncOperation(
+                            kind: .rename,
+                            itemIdentifier: tracked.identifier,
+                            itemName: item.filename,
+                            itemType: .file,
+                            parentIdentifier: tracked.parentIdentifier,
+                            remoteID: remoteID,
+                            phase: "Renaming file by version"
+                        )
                         self.updateProgress(state: .syncing, phase: "Renaming file", currentItem: tracked.name)
                         try await self.renameFileByVersion(
                             remoteID: remoteID,
@@ -694,6 +784,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     let newParentID: Int = changedFields.contains(.parentItemIdentifier)
                         ? try await self.resolveParentFolderID(item.parentItemIdentifier)
                         : oldParentID
+                    if operationID == nil {
+                        operationID = try db.beginSyncOperation(
+                            kind: changedFields.contains(.parentItemIdentifier) ? .move : .rename,
+                            itemIdentifier: tracked.identifier,
+                            itemName: item.filename,
+                            itemType: .folder,
+                            parentIdentifier: tracked.parentIdentifier,
+                            remoteID: remoteID,
+                            phase: "Updating folder"
+                        )
+                    }
                     let expectedParentID = newParentID
                     let remoteName = Self.remoteFolderName(forLocalName: item.filename)
                     self.updateProgress(state: .syncing, phase: "Updating folder", currentItem: tracked.name)
@@ -728,6 +829,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 if changedFields.contains(.parentItemIdentifier), itemID.isFile {
                     let oldParentID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
                     let newParentID = try await self.resolveParentFolderID(item.parentItemIdentifier)
+                    if operationID == nil {
+                        operationID = try db.beginSyncOperation(
+                            kind: .move,
+                            itemIdentifier: tracked.identifier,
+                            itemName: tracked.name,
+                            itemType: .file,
+                            parentIdentifier: tracked.parentIdentifier,
+                            remoteID: remoteID,
+                            phase: "Moving file"
+                        )
+                    }
                     try await api.post(
                         "/files/\(remoteID)/move.json",
                         body: MoveRequest(folder_ids: [String(newParentID)])
@@ -750,6 +862,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
 
                 try db.upsertItem(updated)
+                if let operationID {
+                    try? db.completeSyncOperation(operationID, remoteID: remoteID, remoteContentSize: updated.size)
+                }
                 let resultItem = FileProviderItem(trackedItem: updated, syncState: self.syncState(for: updated), filenameStyle: self.config.filenamePresentationStyle)
                 handler.value(resultItem, [], false, nil)
                 if mutatesRemote {
@@ -763,13 +878,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
             } catch {
                 logger.error("Modify failed: \(error.localizedDescription)")
+                let failureMessage = Self.failureMessageForLocalMutation(error)
+                if let operationID {
+                    try? db.failSyncOperation(operationID, errorMessage: failureMessage)
+                }
                 try? db.logActivity(
                     action: .modifyFailed,
                     itemName: failureItemName,
                     itemType: failureItemType,
-                    errorMessage: error.localizedDescription
+                    errorMessage: failureMessage
                 )
-                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: error.localizedDescription)
+                self.updateProgress(state: .error, phase: "Error", currentItem: nil, lastError: failureMessage)
                 handler.value(nil, [], false, error.asFileProviderError)
             }
         }
@@ -796,6 +915,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
             var failureItemName = identifier.rawValue
             var failureItemType: TrackedItemType = .file
+            var operationID: String?
             do {
                 guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                       let remoteID = itemID.numericID else {
@@ -823,7 +943,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 self.beginOperation(phase: "Deleting", currentItem: tracked?.name)
                 defer { self.incrementProgress() }
 
+                operationID = try db.beginSyncOperation(
+                    kind: .delete,
+                    itemIdentifier: itemID.rawValue,
+                    itemName: tracked?.name ?? itemID.rawValue,
+                    itemType: failureItemType,
+                    parentIdentifier: tracked?.parentIdentifier,
+                    remoteID: remoteID,
+                    phase: "Deleting remote item"
+                )
                 try await self.deleteTrackedItem(itemID: itemID, remoteID: remoteID, tracked: tracked)
+                try? db.completeSyncOperation(operationID!, remoteID: remoteID)
 
                 handler.value(nil)
                 self.signalLocalMutation(
@@ -834,6 +964,9 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 )
             } catch {
                 logger.error("Delete failed: \(error.localizedDescription)")
+                if let operationID {
+                    try? db.failSyncOperation(operationID, errorMessage: error.localizedDescription)
+                }
                 try? db.logActivity(
                     action: .deleteFailed,
                     itemName: failureItemName,
@@ -913,29 +1046,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         itemIdentifiers: [NSFileProviderItemIdentifier],
         handler: UncheckedBox<((any Error)?) -> Void>
     ) async {
-        let logger = self.logger
-        let targets = localMutationSignalTargets(itemIdentifiers)
-
-        guard let manager = NSFileProviderManager(for: domain) else {
-            handler.value(fileProviderCannotSynchronize("Image Relay could not reach the File Provider manager."))
-            return
-        }
-
-        var failures = 0
-        for target in targets {
-            do {
-                try await manager.signalEnumerator(for: target)
-            } catch {
-                failures += 1
-                logger.debug("Finder refresh action signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
-        }
-
-        if failures == targets.count {
-            handler.value(fileProviderCannotSynchronize("Image Relay could not refresh this item in Finder."))
-        } else {
-            logger.info("Finder refresh action signaled \(targets.count, privacy: .public) targets with \(failures, privacy: .public) failures")
+        let targets = FileProviderSignalCoordinator.localMutationTargets(itemIdentifiers)
+        let coordinator = FileProviderSignalCoordinator(domain: domain, logger: logger)
+        do {
+            _ = try await coordinator.signalEnumerators(
+                targets: targets,
+                reason: "manual refresh action",
+                db: db
+            )
             handler.value(nil)
+        } catch {
+            handler.value(fileProviderCannotSynchronize("Image Relay could not refresh this item in Finder."))
         }
     }
 
@@ -1697,15 +1818,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
     private func uploadNewFile(
         name: String,
-        data fileData: Data,
+        fileURL: URL,
+        fingerprint: FileFingerprint,
         parentFolderID: Int,
         fileTypeID: Int
     ) async throws -> RemoteFile {
-        let uploadData = fileData.isEmpty ? Data([0]) : fileData
+        let originalSize = try Self.checkedIntSize(fingerprint.size)
+        let uploadSize = fingerprint.size == 0 ? 1 : originalSize
         let jobRequest = UploadJobRequest(
             folder_id: parentFolderID,
             file_type_id: fileTypeID,
-            files: [.init(name: name, size: uploadData.count)]
+            files: [.init(name: name, size: uploadSize)]
         )
 
         let job: UploadJob = try await api.post("/upload_jobs.json", body: jobRequest)
@@ -1713,12 +1836,22 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             throw ExtensionError.uploadJobMissingFileID
         }
 
-        let uploadResult = try await api.uploadChunked(
-            fileData: uploadData,
-            pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
-            chunkSize: 5 * 1024 * 1024,
-            responseType: UploadJob.self
-        )
+        let uploadResult: (chunkCount: Int, lastResponse: UploadJob?)
+        if fingerprint.size == 0 {
+            uploadResult = try await api.uploadChunked(
+                fileData: Data([0]),
+                pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
+                chunkSize: 5 * 1024 * 1024,
+                responseType: UploadJob.self
+            )
+        } else {
+            uploadResult = try await api.uploadChunked(
+                fileURL: fileURL,
+                pathBuilder: { chunkNumber in "/upload_jobs/\(job.id)/files/\(uploadFileID)/chunks/\(chunkNumber)" },
+                chunkSize: 5 * 1024 * 1024,
+                responseType: UploadJob.self
+            )
+        }
         updateProgress(state: .syncing, phase: "Finalizing upload", currentItem: name)
 
         var completedJob = uploadResult.lastResponse ?? job
@@ -1734,14 +1867,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         updateProgress(state: .syncing, phase: "Confirming upload", currentItem: name)
 
         let confirmed: RemoteFile
-        if fileData.isEmpty {
+        if fingerprint.size == 0 {
             do {
-                try await replaceFileContents(remoteID: assetID, name: name, data: fileData)
+                try await replaceFileContents(remoteID: assetID, name: name, fileURL: fileURL)
                 updateProgress(state: .syncing, phase: "Confirming upload", currentItem: name)
                 confirmed = try await waitForRemoteFileSize(
                     remoteID: assetID,
                     parentFolderID: parentFolderID,
-                    expectedSize: fileData.count,
+                    expectedSize: originalSize,
                     acceptExistingAsset: true
                 )
             } catch {
@@ -1753,12 +1886,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 confirmed = try await waitForRemoteFileSize(
                     remoteID: assetID,
                     parentFolderID: parentFolderID,
-                    expectedSize: fileData.count,
+                    expectedSize: originalSize,
                     acceptExistingAsset: true
                 )
             } catch {
                 if let direct = try? await remoteFile(remoteID: assetID),
-                   remoteFileMatches(direct, parentFolderID: parentFolderID, expectedSize: fileData.count) {
+                   remoteFileMatches(direct, parentFolderID: parentFolderID, expectedSize: originalSize) {
                     logger.warning("Uploaded file \(assetID, privacy: .public) was confirmed by direct file lookup after folder-listing confirmation lagged")
                     return remoteFile(from: direct)
                 }
@@ -2029,6 +2162,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     }
 
     private func replaceFileContents(remoteID: Int, name: String, data fileData: Data) async throws {
+        let tempFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "-" + name)
+        try fileData.write(to: tempFile, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: tempFile) }
+        try await replaceFileContents(remoteID: remoteID, name: name, fileURL: tempFile)
+    }
+
+    private func replaceFileContents(remoteID: Int, name: String, fileURL: URL) async throws {
         let versionResponse: [String: String] = try await api.post(
             "/files/\(remoteID)/versions.json",
             body: EmptyBody()
@@ -2039,7 +2180,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         }
 
         let chunkCount = try await api.uploadChunked(
-            fileData: fileData,
+            fileURL: fileURL,
             pathBuilder: { n in "/files/\(remoteID)/versions/\(uuid)/chunk/\(n)" },
             chunkSize: 5 * 1024 * 1024
         )
@@ -2057,17 +2198,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         newName: String,
         parentFolderID: Int
     ) async throws {
-        let data = try await downloadRemoteFileData(remoteID: remoteID, name: oldName)
-        try await replaceFileContents(remoteID: remoteID, name: newName, data: data)
+        let downloaded = try await downloadRemoteFileToTemporaryFile(remoteID: remoteID, name: oldName)
+        defer { try? FileManager.default.removeItem(at: downloaded.url) }
+        try await replaceFileContents(remoteID: remoteID, name: newName, fileURL: downloaded.url)
         _ = try await waitForRemoteFileSize(
             remoteID: remoteID,
             parentFolderID: parentFolderID,
-            expectedSize: data.count,
+            expectedSize: try Self.checkedIntSize(downloaded.fingerprint.size),
             acceptExistingAsset: true
         )
     }
 
-    private func downloadRemoteFileData(remoteID: Int, name: String) async throws -> Data {
+    private func downloadRemoteFileToTemporaryFile(remoteID: Int, name: String) async throws -> (url: URL, fingerprint: FileFingerprint) {
         let quickLinkRequest = QuickLinkRequest(asset_id: remoteID, purpose: "download", disposition: "attachment")
         let quickLink: QuickLink = try await api.post(
             "/quick_links.json",
@@ -2075,15 +2217,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         )
         let tempFile = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + "-" + name)
-        defer {
-            try? FileManager.default.removeItem(at: tempFile)
-            Task {
-                try? await api.delete("/quick_links/\(quickLink.id).json")
-            }
-        }
 
-        try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
-        return try Data(contentsOf: tempFile)
+        do {
+            try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
+            let fingerprint = try FileFingerprinting.fingerprint(of: tempFile)
+            try? await api.delete("/quick_links/\(quickLink.id).json")
+            return (tempFile, fingerprint)
+        } catch {
+            try? FileManager.default.removeItem(at: tempFile)
+            try? await api.delete("/quick_links/\(quickLink.id).json")
+            throw error
+        }
     }
 
     /// Downloads `url` to `destination`, retrying up to `maxAttempts` times on network errors.
@@ -2097,6 +2241,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         var lastError: Error?
         for attempt in 1...maxAttempts {
             do {
+                try? FileManager.default.removeItem(at: destination)
                 try await api.download(url, to: destination, countsAgainstRateLimit: false)
                 return
             } catch {
@@ -2139,37 +2284,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     ) {
         let domain = self.domain
         let logger = self.logger
-        let targets = localMutationSignalTargets(affectedContainerIdentifiers)
+        let db = self.db
+        let targets = FileProviderSignalCoordinator.localMutationTargets(affectedContainerIdentifiers)
 
         Task {
-            guard let manager = NSFileProviderManager(for: domain) else {
-                logger.warning("Unable to signal immediate local sync after \(reason, privacy: .public): missing File Provider manager")
-                return
+            let coordinator = FileProviderSignalCoordinator(domain: domain, logger: logger)
+            do {
+                _ = try await coordinator.signalEnumerators(
+                    targets: targets,
+                    reason: reason,
+                    db: db
+                )
+            } catch {
+                logger.warning("Unable to signal immediate local sync after \(reason, privacy: .public): \(error.localizedDescription, privacy: .private)")
             }
-
-            var failures = 0
-            for target in targets {
-                do {
-                    try await manager.signalEnumerator(for: target)
-                } catch {
-                    failures += 1
-                    logger.debug("Immediate local sync signal failed for \(target.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                }
-            }
-
-            logger.info("Signaled immediate local sync after \(reason, privacy: .public) (targets: \(targets.count, privacy: .public), failures: \(failures, privacy: .public))")
-        }
-    }
-
-    private func localMutationSignalTargets(
-        _ affectedContainerIdentifiers: [NSFileProviderItemIdentifier]
-    ) -> [NSFileProviderItemIdentifier] {
-        var seen = Set<String>()
-        var targets: [NSFileProviderItemIdentifier] = [.workingSet, .rootContainer]
-        targets.append(contentsOf: affectedContainerIdentifiers)
-
-        return targets.filter { identifier in
-            seen.insert(identifier.rawValue).inserted
         }
     }
 
@@ -2206,6 +2334,57 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
     private func incrementProgress() {
         try? db.completeProgressOperation()
+    }
+
+    private static func checkedIntSize(_ size: Int64) throws -> Int {
+        guard size <= Int64(Int.max) else {
+            throw ExtensionError.fileTooLarge
+        }
+        return Int(size)
+    }
+
+    private static func requireContentFingerprint(_ fingerprint: FileFingerprint?) throws -> FileFingerprint {
+        guard let fingerprint else {
+            throw ExtensionError.missingContentFingerprint
+        }
+        return fingerprint
+    }
+
+    static func failureMessageForLocalMutation(_ error: any Error) -> String {
+        let message = error.localizedDescription
+        guard shouldTreatLocalMutationAsAutomaticallyRetryable(error) else {
+            return message
+        }
+        if message.localizedCaseInsensitiveContains("client will retry automatically") {
+            return message
+        }
+        return "\(message) The client will retry automatically."
+    }
+
+    static func shouldTreatLocalMutationAsAutomaticallyRetryable(_ error: any Error) -> Bool {
+        if let apiError = error as? APIError {
+            return apiError.isRetryable
+        }
+        if error is CancellationError {
+            return true
+        }
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+        switch nsError.code {
+        case NSURLErrorTimedOut,
+             NSURLErrorCannotFindHost,
+             NSURLErrorCannotConnectToHost,
+             NSURLErrorNetworkConnectionLost,
+             NSURLErrorDNSLookupFailed,
+             NSURLErrorNotConnectedToInternet,
+             NSURLErrorInternationalRoamingOff,
+             NSURLErrorCallIsActive,
+             NSURLErrorDataNotAllowed,
+             NSURLErrorRequestBodyStreamExhausted:
+            return true
+        default:
+            return false
+        }
     }
 
 }
@@ -2268,6 +2447,8 @@ private enum ExtensionError: LocalizedError {
     case missingDefaultFileTypeID
     case missingRootFolderID
     case invalidParentIdentifier(String)
+    case fileTooLarge
+    case missingContentFingerprint
     case uploadJobMissingFileID
     case uploadJobMissingAssetID
     case versionMissingUUID
@@ -2284,6 +2465,10 @@ private enum ExtensionError: LocalizedError {
             return "Set a Root Folder ID in Settings before changing files."
         case .invalidParentIdentifier(let identifier):
             return "Could not resolve the Image Relay folder for parent identifier \(identifier)."
+        case .fileTooLarge:
+            return "The file is too large for the current Image Relay upload request."
+        case .missingContentFingerprint:
+            return "File contents changed but Image Relay could not read the local file safely."
         case .uploadJobMissingFileID:
             return "Image Relay did not return an upload file ID for the new file."
         case .uploadJobMissingAssetID:

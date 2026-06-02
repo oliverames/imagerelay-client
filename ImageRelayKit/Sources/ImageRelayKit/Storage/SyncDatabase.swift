@@ -2,6 +2,14 @@ import Foundation
 import Darwin
 import GRDB
 
+public struct SyncDatabaseIntegrityError: LocalizedError, Sendable {
+    public let result: String
+
+    public var errorDescription: String? {
+        "Sync database integrity check failed: \(result)"
+    }
+}
+
 public final class SyncDatabase: Sendable {
     private let writer: any DatabaseWriter
 
@@ -113,7 +121,54 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v8") { db in
+            try db.create(table: "sync_operation_journal") { t in
+                t.primaryKey("id", .text).notNull()
+                t.column("kind", .text).notNull().indexed()
+                t.column("itemIdentifier", .text)
+                t.column("itemName", .text).notNull()
+                t.column("itemType", .text).notNull()
+                t.column("parentIdentifier", .text)
+                t.column("remoteID", .integer)
+                t.column("localContentSize", .integer)
+                t.column("localContentSHA256", .text)
+                t.column("remoteContentSize", .integer)
+                t.column("phase", .text).notNull()
+                t.column("status", .text).notNull().indexed()
+                t.column("errorMessage", .text)
+                t.column("createdAt", .datetime).notNull().indexed()
+                t.column("updatedAt", .datetime).notNull()
+            }
+        }
+
+        migrator.registerMigration("v9") { db in
+            try db.create(table: "pending_remote_deletions") { t in
+                t.primaryKey("identifier", .text).notNull()
+                t.column("itemName", .text).notNull()
+                t.column("itemType", .text).notNull()
+                t.column("parentIdentifier", .text).notNull().indexed()
+                t.column("firstSeenAt", .datetime).notNull()
+                t.column("lastSeenAt", .datetime).notNull()
+                t.column("missCount", .integer).notNull()
+            }
+        }
+
         try migrator.migrate(writer)
+    }
+
+    // MARK: - Integrity
+
+    public func quickCheck() throws -> String {
+        try writer.read { db in
+            try String.fetchOne(db, sql: "PRAGMA quick_check") ?? "unknown"
+        }
+    }
+
+    public func requireIntegrity() throws {
+        let result = try quickCheck()
+        guard result == "ok" else {
+            throw SyncDatabaseIntegrityError(result: result)
+        }
     }
 
     // MARK: - Tracked Items
@@ -121,6 +176,7 @@ public final class SyncDatabase: Sendable {
     public func upsertItem(_ item: TrackedItem) throws {
         try writer.write { db in
             try item.insert(db, onConflict: .replace)
+            _ = try PendingRemoteDeletion.deleteOne(db, key: item.identifier)
         }
     }
 
@@ -167,6 +223,7 @@ public final class SyncDatabase: Sendable {
     public func deleteItem(_ identifier: String) throws {
         try writer.write { db in
             _ = try TrackedItem.deleteOne(db, key: identifier)
+            _ = try PendingRemoteDeletion.deleteOne(db, key: identifier)
         }
     }
 
@@ -182,6 +239,20 @@ public final class SyncDatabase: Sendable {
                     JOIN subtree ON tracked_items.parentIdentifier = subtree.identifier
                 )
                 DELETE FROM tracked_items
+                WHERE identifier IN (SELECT identifier FROM subtree)
+                """,
+                arguments: [identifier]
+            )
+            try db.execute(
+                sql: """
+                WITH RECURSIVE subtree(identifier) AS (
+                    VALUES (?)
+                    UNION ALL
+                    SELECT tracked_items.identifier
+                    FROM tracked_items
+                    JOIN subtree ON tracked_items.parentIdentifier = subtree.identifier
+                )
+                DELETE FROM pending_remote_deletions
                 WHERE identifier IN (SELECT identifier FROM subtree)
                 """,
                 arguments: [identifier]
@@ -220,6 +291,7 @@ public final class SyncDatabase: Sendable {
         try writer.write { db in
             try db.execute(sql: "DELETE FROM sync_anchors")
             try db.execute(sql: "DELETE FROM tracked_items")
+            try db.execute(sql: "DELETE FROM pending_remote_deletions")
         }
     }
 
@@ -336,6 +408,174 @@ public final class SyncDatabase: Sendable {
 
     private static let activityLogRetentionCount = 500
 
+    // MARK: - Operation Journal
+
+    @discardableResult
+    public func beginSyncOperation(
+        kind: SyncOperationKind,
+        itemIdentifier: String? = nil,
+        itemName: String,
+        itemType: TrackedItemType,
+        parentIdentifier: String? = nil,
+        remoteID: Int? = nil,
+        localContentSize: Int64? = nil,
+        localContentSHA256: String? = nil,
+        phase: String = "Queued"
+    ) throws -> String {
+        let now = Date()
+        let entry = SyncOperationJournalEntry(
+            kind: kind,
+            itemIdentifier: itemIdentifier,
+            itemName: itemName,
+            itemType: itemType,
+            parentIdentifier: parentIdentifier,
+            remoteID: remoteID,
+            localContentSize: localContentSize,
+            localContentSHA256: localContentSHA256,
+            phase: phase,
+            status: .pending,
+            createdAt: now,
+            updatedAt: now
+        )
+        try writer.write { db in
+            try entry.insert(db)
+        }
+        return entry.id
+    }
+
+    public func markSyncOperation(
+        _ id: String,
+        phase: String,
+        status: SyncOperationStatus = .inProgress,
+        remoteID: Int? = nil,
+        remoteContentSize: Int64? = nil,
+        errorMessage: String? = nil
+    ) throws {
+        try writer.write { db in
+            var entry = try SyncOperationJournalEntry.fetchOne(db, key: id)
+            guard entry != nil else { return }
+            entry?.phase = phase
+            entry?.status = status
+            entry?.updatedAt = Date()
+            if let remoteID {
+                entry?.remoteID = remoteID
+            }
+            if let remoteContentSize {
+                entry?.remoteContentSize = remoteContentSize
+            }
+            entry?.errorMessage = errorMessage
+            try entry?.update(db)
+        }
+    }
+
+    public func completeSyncOperation(
+        _ id: String,
+        phase: String = "Completed",
+        remoteID: Int? = nil,
+        remoteContentSize: Int64? = nil
+    ) throws {
+        try markSyncOperation(
+            id,
+            phase: phase,
+            status: .completed,
+            remoteID: remoteID,
+            remoteContentSize: remoteContentSize,
+            errorMessage: nil
+        )
+    }
+
+    public func failSyncOperation(_ id: String, phase: String = "Failed", errorMessage: String) throws {
+        try markSyncOperation(
+            id,
+            phase: phase,
+            status: .failed,
+            errorMessage: errorMessage
+        )
+    }
+
+    public func recentSyncOperations(limit: Int = 100) throws -> [SyncOperationJournalEntry] {
+        try writer.read { db in
+            try SyncOperationJournalEntry
+                .order(Column("updatedAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+
+    public func openSyncOperations(limit: Int = 100) throws -> [SyncOperationJournalEntry] {
+        try writer.read { db in
+            try SyncOperationJournalEntry
+                .filter(sql: "status IN (?, ?)", arguments: [
+                    SyncOperationStatus.pending.rawValue,
+                    SyncOperationStatus.inProgress.rawValue
+                ])
+                .order(Column("updatedAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+
+    public func openSyncOperationCount() throws -> Int {
+        try writer.read { db in
+            try SyncOperationJournalEntry
+                .filter(sql: "status IN (?, ?)", arguments: [
+                    SyncOperationStatus.pending.rawValue,
+                    SyncOperationStatus.inProgress.rawValue
+                ])
+                .fetchCount(db)
+        }
+    }
+
+    // MARK: - Pending Remote Deletions
+
+    @discardableResult
+    public func notePendingRemoteDeletion(
+        identifier: String,
+        itemName: String,
+        itemType: TrackedItemType,
+        parentIdentifier: String,
+        now: Date = Date()
+    ) throws -> PendingRemoteDeletion {
+        try writer.write { db in
+            if var existing = try PendingRemoteDeletion.fetchOne(db, key: identifier) {
+                existing.itemName = itemName
+                existing.itemType = itemType
+                existing.parentIdentifier = parentIdentifier
+                existing.lastSeenAt = now
+                existing.missCount += 1
+                try existing.update(db)
+                return existing
+            }
+
+            let pending = PendingRemoteDeletion(
+                identifier: identifier,
+                itemName: itemName,
+                itemType: itemType,
+                parentIdentifier: parentIdentifier,
+                firstSeenAt: now,
+                lastSeenAt: now,
+                missCount: 1
+            )
+            try pending.insert(db)
+            return pending
+        }
+    }
+
+    public func clearPendingRemoteDeletion(identifier: String) throws {
+        try writer.write { db in
+            _ = try PendingRemoteDeletion.deleteOne(db, key: identifier)
+        }
+    }
+
+    public func pendingRemoteDeletions(limit: Int = 100) throws -> [PendingRemoteDeletion] {
+        try writer.read { db in
+            try PendingRemoteDeletion
+                .order(Column("lastSeenAt").desc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+
     // MARK: - Settings / Pause State
 
     public func getPauseState() throws -> SyncPauseState {
@@ -408,6 +648,38 @@ public final class SyncDatabase: Sendable {
     public func setProgress(_ state: SyncProgressState) throws {
         try writer.write { db in
             try Self.saveProgress(state, in: db)
+        }
+    }
+
+    public func markFileProviderSignalSucceeded(now: Date = Date()) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.markFileProviderSignalSucceeded(now: now)
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func markFileProviderSignalFailed(_ message: String, failureCount: Int, now: Date = Date()) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.markFileProviderSignalFailed(message, failureCount: failureCount, now: now)
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func markDatabaseIntegritySucceeded() throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.markDatabaseIntegritySucceeded()
+            try Self.saveProgress(progress, in: db)
+        }
+    }
+
+    public func markDatabaseIntegrityFailed(_ message: String) throws {
+        try writer.write { db in
+            var progress = try Self.progress(in: db)
+            progress.markDatabaseIntegrityFailed(message)
+            try Self.saveProgress(progress, in: db)
         }
     }
 

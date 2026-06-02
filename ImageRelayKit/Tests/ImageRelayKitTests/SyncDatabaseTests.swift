@@ -597,6 +597,87 @@ struct SyncDatabaseTests {
         #expect(try db.webhookRelayCursor() == nil)
     }
 
+    @Test("Operation journal tracks pending completed and failed operations")
+    func operationJournalTracksStatuses() throws {
+        let db = try makeDB()
+        let operationID = try db.beginSyncOperation(
+            kind: .modify,
+            itemIdentifier: ItemIdentifier.file(42).rawValue,
+            itemName: "brand.jpg",
+            itemType: .file,
+            parentIdentifier: ItemIdentifier.folder(10).rawValue,
+            remoteID: 42,
+            localContentSize: 128,
+            localContentSHA256: "abc123",
+            phase: "Uploading version"
+        )
+
+        #expect(try db.openSyncOperationCount() == 1)
+        try db.markSyncOperation(operationID, phase: "Confirming upload", remoteContentSize: 128)
+        let inProgress = try #require(try db.openSyncOperations().first)
+        #expect(inProgress.status == .inProgress)
+        #expect(inProgress.phase == "Confirming upload")
+
+        try db.completeSyncOperation(operationID, remoteContentSize: 128)
+        #expect(try db.openSyncOperationCount() == 0)
+        let completed = try #require(try db.recentSyncOperations().first)
+        #expect(completed.status == .completed)
+        #expect(completed.remoteContentSize == 128)
+
+        let failedID = try db.beginSyncOperation(
+            kind: .delete,
+            itemName: "Old Folder",
+            itemType: .folder,
+            phase: "Deleting"
+        )
+        try db.failSyncOperation(failedID, errorMessage: "Network failed")
+        #expect(try db.openSyncOperationCount() == 0)
+        #expect(try db.recentSyncOperations().contains { $0.status == .failed && $0.errorMessage == "Network failed" })
+    }
+
+    @Test("Pending remote deletion increments and clears on item upsert")
+    func pendingRemoteDeletionLifecycle() throws {
+        let db = try makeDB()
+        let identifier = ItemIdentifier.file(99).rawValue
+
+        let first = try db.notePendingRemoteDeletion(
+            identifier: identifier,
+            itemName: "missing.pdf",
+            itemType: .file,
+            parentIdentifier: ItemIdentifier.folder(10).rawValue
+        )
+        #expect(first.missCount == 1)
+
+        let second = try db.notePendingRemoteDeletion(
+            identifier: identifier,
+            itemName: "missing.pdf",
+            itemType: .file,
+            parentIdentifier: ItemIdentifier.folder(10).rawValue
+        )
+        #expect(second.missCount == 2)
+        #expect(try db.pendingRemoteDeletions().count == 1)
+
+        try db.upsertItem(TrackedItem(
+            identifier: identifier,
+            parentIdentifier: ItemIdentifier.folder(10).rawValue,
+            remoteID: 99,
+            itemType: .file,
+            name: "missing.pdf",
+            size: 12,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+        #expect(try db.pendingRemoteDeletions().isEmpty)
+    }
+
+    @Test("Quick check reports healthy in-memory database")
+    func quickCheckReportsHealthyDatabase() throws {
+        let db = try makeDB()
+
+        #expect(try db.quickCheck() == "ok")
+        try db.requireIntegrity()
+    }
+
     @Test("Cache snapshots decode legacy payloads with defaults")
     func cacheSnapshotsDecodeLegacyPayloadsWithDefaults() throws {
         let rootData = Data(#"{"folders":[{"id":12,"name":"Root"}]}"#.utf8)

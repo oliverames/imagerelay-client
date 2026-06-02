@@ -146,10 +146,10 @@ struct AdvancedSettingsView: View {
         let relayURL = webhookRelayURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if relayURL.isEmpty {
             config.webhookRelayURL = nil
-        } else if let url = URL(string: relayURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+        } else if let url = URL(string: relayURL), AppConfiguration.isAllowedWebhookRelayURL(url) {
             config.webhookRelayURL = url
         } else {
-            saveError = "Webhook Relay URL must be a valid HTTP or HTTPS URL."
+            saveError = "Webhook Relay URL must use HTTPS, or HTTP on localhost for development."
             return
         }
         config.webhookRelayIntervalSeconds = Int(webhookRelayInterval)

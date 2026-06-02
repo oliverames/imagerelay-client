@@ -202,13 +202,26 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 continue
             }
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
-            for identifier in localSubtree {
-                deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
-            }
             if isFilteredRoot || remoteIdentifiers.contains(tracked.identifier) {
                 logger.info("Item hidden by selection filter: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                for identifier in localSubtree {
+                    deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
+                }
             } else {
-                logger.info("Remote deletion detected: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                let pending = try db.notePendingRemoteDeletion(
+                    identifier: tracked.identifier,
+                    itemName: tracked.name,
+                    itemType: tracked.itemType,
+                    parentIdentifier: tracked.parentIdentifier
+                )
+                guard pending.missCount >= Self.requiredDeletionConfirmationMisses else {
+                    logger.warning("Remote deletion pending confirmation (\(pending.missCount, privacy: .public)/\(Self.requiredDeletionConfirmationMisses, privacy: .public)): \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                    continue
+                }
+                logger.info("Remote deletion confirmed after \(pending.missCount, privacy: .public) misses: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                for identifier in localSubtree {
+                    deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
+                }
             }
         }
 
@@ -256,11 +269,21 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 logger.info("Working-set skipping deletion of unverified selected folder subtree: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
                 continue
             }
+            let pending = try db.notePendingRemoteDeletion(
+                identifier: tracked.identifier,
+                itemName: tracked.name,
+                itemType: tracked.itemType,
+                parentIdentifier: tracked.parentIdentifier
+            )
+            guard pending.missCount >= Self.requiredDeletionConfirmationMisses else {
+                logger.warning("Working-set remote deletion pending confirmation (\(pending.missCount, privacy: .public)/\(Self.requiredDeletionConfirmationMisses, privacy: .public)): \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                continue
+            }
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree where queuedDeletions.insert(identifier).inserted {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
             }
-            logger.info("Working-set remote deletion detected: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+            logger.info("Working-set remote deletion confirmed after \(pending.missCount, privacy: .public) misses: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
         }
 
         return (items, deletedIdentifiers)
@@ -515,6 +538,10 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         )
     }
 
+}
+
+private extension Enumerator {
+    static let requiredDeletionConfirmationMisses = 2
 }
 
 private struct ItemSyncSnapshot {

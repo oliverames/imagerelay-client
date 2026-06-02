@@ -18,6 +18,13 @@ struct ConfigurationTests {
         KeychainStore.delete(account: account, accessGroup: nil)
     }
 
+    func cleanOAuthKeychain() {
+        KeychainStore.delete(account: AppConfiguration.oauthTokensKeychainAccount, accessGroup: nil)
+        KeychainStore.delete(account: AppConfiguration.oauthClientSecretKeychainAccount, accessGroup: nil)
+        KeychainStore.delete(account: AppConfiguration.oauthCodeVerifierKeychainAccount, accessGroup: nil)
+        KeychainStore.delete(account: AppConfiguration.oauthStateKeychainAccount, accessGroup: nil)
+    }
+
     @Test("Save and load configuration")
     func saveAndLoad() throws {
         let account = testKeychainAccount()
@@ -278,6 +285,14 @@ struct ConfigurationTests {
         #expect(legacy.webhookRelayIntervalSeconds == 15)
     }
 
+    @Test("Webhook relay URL validation allows HTTPS and local HTTP only")
+    func webhookRelayURLValidation() {
+        #expect(AppConfiguration.isAllowedWebhookRelayURL(URL(string: "https://relay.example.com/imagerelay")!))
+        #expect(AppConfiguration.isAllowedWebhookRelayURL(URL(string: "http://localhost:8787/imagerelay")!))
+        #expect(!AppConfiguration.isAllowedWebhookRelayURL(URL(string: "http://relay.example.com/imagerelay")!))
+        #expect(!AppConfiguration.isAllowedWebhookRelayURL(URL(string: "file:///tmp/relay.json")!))
+    }
+
     @Test("Legacy config without max_concurrent_files defaults to 10")
     func legacyMaxConcurrentFilesDefaultsToTen() throws {
         let account = testKeychainAccount()
@@ -303,14 +318,12 @@ struct ConfigurationTests {
     func oauthSecretsRoundTrip() throws {
         let account = testKeychainAccount()
         cleanKeychain(account: account)
-        KeychainStore.delete(account: AppConfiguration.oauthTokensKeychainAccount, accessGroup: nil)
-        KeychainStore.delete(account: AppConfiguration.oauthClientSecretKeychainAccount, accessGroup: nil)
+        cleanOAuthKeychain()
         let url = tempURL()
         defer {
             try? FileManager.default.removeItem(at: url)
             cleanKeychain(account: account)
-            KeychainStore.delete(account: AppConfiguration.oauthTokensKeychainAccount, accessGroup: nil)
-            KeychainStore.delete(account: AppConfiguration.oauthClientSecretKeychainAccount, accessGroup: nil)
+            cleanOAuthKeychain()
         }
 
         var config = AppConfiguration.default
@@ -332,6 +345,66 @@ struct ConfigurationTests {
         #expect(loaded.oauthClientSecret == "client-secret")
         #expect(loaded.oauthTokens?.accessToken == "access-token")
         #expect(loaded.credential == .oauth(OAuthTokens(accessToken: "access-token", refreshToken: "refresh-token", tenant: "bluecrossvt")))
+    }
+
+    @Test("OAuth transient verifier and state round trip through Keychain only")
+    func oauthTransientsRoundTripThroughKeychainOnly() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        cleanOAuthKeychain()
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+            cleanOAuthKeychain()
+        }
+
+        var config = AppConfiguration.default
+        config.authMethod = .oauth
+        config.oauthCodeVerifier = "verifier-secret"
+        config.oauthState = "state-secret"
+
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        #expect(!raw.contains("verifier-secret"))
+        #expect(!raw.contains("state-secret"))
+        let json = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
+        #expect(json?["oauth_code_verifier"] == nil)
+        #expect(json?["oauth_state"] == nil)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.oauthCodeVerifier == "verifier-secret")
+        #expect(loaded.oauthState == "state-secret")
+    }
+
+    @Test("Legacy OAuth transient fields migrate to Keychain and are scrubbed")
+    func legacyOAuthTransientsMigrateToKeychain() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        cleanOAuthKeychain()
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+            cleanOAuthKeychain()
+        }
+
+        let legacyJSON = """
+        {"auth_method":"oauth","oauth_code_verifier":"legacy-verifier","oauth_state":"legacy-state","poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"ImageRelayClient/Oliver-Test","selected_folder_ids":[]}
+        """
+        try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.oauthCodeVerifier == "legacy-verifier")
+        #expect(loaded.oauthState == "legacy-state")
+
+        let rewritten = try String(contentsOf: url, encoding: .utf8)
+        #expect(!rewritten.contains("legacy-verifier"))
+        #expect(!rewritten.contains("legacy-state"))
+        let json = try JSONSerialization.jsonObject(with: Data(rewritten.utf8)) as? [String: Any]
+        #expect(json?["oauth_code_verifier"] == nil)
+        #expect(json?["oauth_state"] == nil)
     }
 
     @Test("isConfigured requires API key")

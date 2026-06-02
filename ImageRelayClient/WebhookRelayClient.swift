@@ -47,6 +47,10 @@ struct WebhookRelayClient: Sendable {
     }
 
     func poll(url: URL, cursor: String?, timeoutSeconds: Int) async throws -> PollResult {
+        guard AppConfiguration.isAllowedWebhookRelayURL(url) else {
+            throw URLError(.appTransportSecurityRequiresSecureConnection)
+        }
+
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         var queryItems = components?.queryItems ?? []
         if let cursor, !cursor.isEmpty {

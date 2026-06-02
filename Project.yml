@@ -53,6 +53,7 @@ targets:
     sources:
       - path: ImageRelayClient
       - path: FileProviderExtension/ActionFormatting.swift
+      - path: FileProviderExtension/FileProviderSignalCoordinator.swift
     dependencies:
       - package: ImageRelayKit
       - package: Sparkle

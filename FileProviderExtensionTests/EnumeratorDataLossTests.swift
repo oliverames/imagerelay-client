@@ -278,14 +278,84 @@ struct EnumeratorDataLossTests {
         await observer.runEnumerateChanges(on: fx.enumerator, from: initialAnchor)
 
         let reportedIdentifiers = Set(observer.deletedIdentifiers.map(\.rawValue))
-        // Stale folder is NOT under an unverified selected folder — it should be
-        // detected as a real remote deletion. This confirms the protection
-        // doesn't bleed into the success path.
+        // Stale folder is NOT under an unverified selected folder, but it is
+        // hidden by the selected-folder filter. That is a local configuration
+        // deletion, not a remote-miss quarantine case.
         #expect(reportedIdentifiers.contains(staleIdentifier),
-                "Stale folder with no remote counterpart should be reported deleted")
+                "Stale folder hidden by the selected-folder filter should be reported deleted")
         // Selected folder and its descendants still pass through normal logic.
         #expect(!reportedIdentifiers.contains(fx.selectedIdentifier),
                 "Successfully-fetched selected folder must not be reported deleted")
+    }
+
+    @Test("Clean remote miss requires a second confirmation before deletion")
+    func cleanRemoteMissRequiresSecondConfirmation() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let rootFolderID = 1000
+        let staleFolderID = 55555
+        let staleIdentifier = ItemIdentifier.folder(staleFolderID).rawValue
+        try db.upsertItem(TrackedItem(
+            identifier: staleIdentifier,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            remoteID: staleFolderID,
+            itemType: .folder,
+            name: "Stale",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+
+        let config = AppConfiguration(
+            apiKey: "test-key",
+            remoteRootFolderID: rootFolderID,
+            defaultFileTypeID: 1,
+            pollIntervalSeconds: 60,
+            syncUpload: true,
+            syncDownload: true,
+            userAgent: "TestAgent/1.0",
+            selectedFolderIDs: []
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: sessionConfig,
+            rateLimiter: RateLimiter(maxRequests: 1000, period: 1.0),
+            maxRetries: 0,
+            maxRetryDelay: 0
+        )
+        let enumerator = Enumerator(
+            containerIdentifier: .rootContainer,
+            api: api,
+            db: db,
+            config: config
+        )
+
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("[]".utf8))
+        }
+
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        let firstObserver = FakeChangeObserver()
+        await firstObserver.runEnumerateChanges(on: enumerator, from: initialAnchor)
+        let firstReportedIdentifiers = Set(firstObserver.deletedIdentifiers.map(\.rawValue))
+        #expect(!firstReportedIdentifiers.contains(staleIdentifier),
+                "First clean remote miss should be quarantined")
+        #expect(try db.pendingRemoteDeletions().first?.identifier == staleIdentifier)
+        #expect(try db.item(for: staleIdentifier) != nil)
+
+        let secondObserver = FakeChangeObserver()
+        await secondObserver.runEnumerateChanges(on: enumerator, from: initialAnchor)
+        let secondReportedIdentifiers = Set(secondObserver.deletedIdentifiers.map(\.rawValue))
+        #expect(secondReportedIdentifiers.contains(staleIdentifier),
+                "Second clean remote miss should report deletion")
+        #expect(try db.item(for: staleIdentifier) == nil)
     }
 
     @Test("Full enumeration preserves deletion evidence for the change pass")

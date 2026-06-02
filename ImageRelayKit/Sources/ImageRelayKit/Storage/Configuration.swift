@@ -86,7 +86,8 @@ public struct AppConfiguration: Codable, Sendable {
         return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
     }
 
-    // apiKey, OAuth tokens, and OAuth client secret are NOT serialized to config.json.
+    // apiKey, OAuth tokens, OAuth client secret, and transient OAuth
+    // verifier/state are NOT serialized to config.json.
     // See load(from:) for the backward-compat migration from legacy plaintext JSON.
     public var apiKey: String
     public var authMethod: AuthMethod
@@ -132,8 +133,6 @@ public struct AppConfiguration: Codable, Sendable {
         case oauthTenant = "oauth_tenant"
         case oauthClientID = "oauth_client_id"
         case oauthRedirectURI = "oauth_redirect_uri"
-        case oauthCodeVerifier = "oauth_code_verifier"
-        case oauthState = "oauth_state"
         case remoteRootFolderID = "remote_root_folder_id"
         case defaultFileTypeID = "default_file_type_id"
         case pollIntervalSeconds = "poll_interval_seconds"
@@ -209,8 +208,8 @@ public struct AppConfiguration: Codable, Sendable {
         oauthClientID = try c.decodeIfPresent(String.self, forKey: .oauthClientID) ?? ""
         oauthClientSecret = ""
         oauthRedirectURI = try c.decodeIfPresent(String.self, forKey: .oauthRedirectURI) ?? "imagerelay-client://oauth/callback"
-        oauthCodeVerifier = try c.decodeIfPresent(String.self, forKey: .oauthCodeVerifier)
-        oauthState = try c.decodeIfPresent(String.self, forKey: .oauthState)
+        oauthCodeVerifier = nil
+        oauthState = nil
         oauthTokens = nil
         remoteRootFolderID = try c.decodeIfPresent(Int.self, forKey: .remoteRootFolderID)
         defaultFileTypeID = try c.decodeIfPresent(Int.self, forKey: .defaultFileTypeID)
@@ -230,7 +229,8 @@ public struct AppConfiguration: Codable, Sendable {
             webBaseURL = nil
         }
         if let raw = try c.decodeIfPresent(String.self, forKey: .webhookRelayURL),
-           let url = URL(string: raw) {
+           let url = URL(string: raw),
+           Self.isAllowedWebhookRelayURL(url) {
             webhookRelayURL = url
         } else {
             webhookRelayURL = nil
@@ -296,17 +296,47 @@ public struct AppConfiguration: Codable, Sendable {
     }
 
     func save(to url: URL, keychainAccount: String, keychainAccessGroup: String?) throws {
-        KeychainStore.save(apiKey, account: keychainAccount, accessGroup: keychainAccessGroup)
+        if apiKey.isEmpty {
+            try KeychainStore.deleteRequired(account: keychainAccount, accessGroup: keychainAccessGroup)
+        } else {
+            try KeychainStore.saveRequired(apiKey, account: keychainAccount, accessGroup: keychainAccessGroup)
+        }
         if let oauthTokens {
             let data = try JSONEncoder.imageRelay.encode(oauthTokens)
-            KeychainStore.save(String(decoding: data, as: UTF8.self), account: Self.oauthTokensKeychainAccount, accessGroup: keychainAccessGroup)
+            try KeychainStore.saveRequired(
+                String(decoding: data, as: UTF8.self),
+                account: Self.oauthTokensKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
         } else {
-            KeychainStore.delete(account: Self.oauthTokensKeychainAccount, accessGroup: keychainAccessGroup)
+            try KeychainStore.deleteRequired(account: Self.oauthTokensKeychainAccount, accessGroup: keychainAccessGroup)
         }
         if oauthClientSecret.isEmpty {
-            KeychainStore.delete(account: Self.oauthClientSecretKeychainAccount, accessGroup: keychainAccessGroup)
+            try KeychainStore.deleteRequired(account: Self.oauthClientSecretKeychainAccount, accessGroup: keychainAccessGroup)
         } else {
-            KeychainStore.save(oauthClientSecret, account: Self.oauthClientSecretKeychainAccount, accessGroup: keychainAccessGroup)
+            try KeychainStore.saveRequired(
+                oauthClientSecret,
+                account: Self.oauthClientSecretKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
+        }
+        if let oauthCodeVerifier, !oauthCodeVerifier.isEmpty {
+            try KeychainStore.saveRequired(
+                oauthCodeVerifier,
+                account: Self.oauthCodeVerifierKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
+        } else {
+            try KeychainStore.deleteRequired(account: Self.oauthCodeVerifierKeychainAccount, accessGroup: keychainAccessGroup)
+        }
+        if let oauthState, !oauthState.isEmpty {
+            try KeychainStore.saveRequired(
+                oauthState,
+                account: Self.oauthStateKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
+        } else {
+            try KeychainStore.deleteRequired(account: Self.oauthStateKeychainAccount, accessGroup: keychainAccessGroup)
         }
         let directory = url.deletingLastPathComponent()
         if !FileManager.default.fileExists(atPath: directory.path) {
@@ -364,7 +394,7 @@ public struct AppConfiguration: Codable, Sendable {
         
         guard config.authMethod == .oauth,
               let tokens = config.oauthTokens,
-              let refreshToken = tokens.refreshToken else {
+              tokens.refreshToken != nil else {
             return config
         }
         
@@ -436,6 +466,10 @@ public struct AppConfiguration: Codable, Sendable {
         let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         let containsLegacyAPIKey = raw?.keys.contains("api_key") ?? false
         let legacyKey = raw?["api_key"] as? String
+        let containsLegacyOAuthCodeVerifier = raw?.keys.contains("oauth_code_verifier") ?? false
+        let containsLegacyOAuthState = raw?.keys.contains("oauth_state") ?? false
+        let legacyOAuthCodeVerifier = raw?["oauth_code_verifier"] as? String
+        let legacyOAuthState = raw?["oauth_state"] as? String
         let storedUserAgent = raw?["user_agent"] as? String
         let userAgentNeedsRewrite = storedUserAgent != nil && storedUserAgent != config.userAgent
 
@@ -448,11 +482,31 @@ public struct AppConfiguration: Codable, Sendable {
                 config.apiKey = stored
             } else if let legacyKey, !legacyKey.isEmpty {
                 config.apiKey = legacyKey
-                KeychainStore.save(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
+                try KeychainStore.saveRequired(legacyKey, account: keychainAccount, accessGroup: keychainAccessGroup)
             }
         }
 
-        if containsLegacyAPIKey || userAgentNeedsRewrite {
+        if let legacyOAuthCodeVerifier,
+           !legacyOAuthCodeVerifier.isEmpty,
+           KeychainStore.load(account: Self.oauthCodeVerifierKeychainAccount, accessGroup: keychainAccessGroup) == nil {
+            try KeychainStore.saveRequired(
+                legacyOAuthCodeVerifier,
+                account: Self.oauthCodeVerifierKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
+        }
+        if let legacyOAuthState,
+           !legacyOAuthState.isEmpty,
+           KeychainStore.load(account: Self.oauthStateKeychainAccount, accessGroup: keychainAccessGroup) == nil {
+            try KeychainStore.saveRequired(
+                legacyOAuthState,
+                account: Self.oauthStateKeychainAccount,
+                accessGroup: keychainAccessGroup
+            )
+        }
+        config.loadOAuthTransientSecrets(accessGroup: keychainAccessGroup)
+
+        if containsLegacyAPIKey || containsLegacyOAuthCodeVerifier || containsLegacyOAuthState || userAgentNeedsRewrite {
             try? rewriteJSONWithoutAPIKey(config, to: url)
         }
 
@@ -473,6 +527,36 @@ public struct AppConfiguration: Codable, Sendable {
             return
         }
         oauthTokens = try? JSONDecoder.imageRelay.decode(OAuthTokens.self, from: Data(tokenJSON.utf8))
+    }
+
+    private mutating func loadOAuthTransientSecrets(accessGroup: String?) {
+        oauthCodeVerifier = KeychainStore.load(
+            account: Self.oauthCodeVerifierKeychainAccount,
+            accessGroup: accessGroup
+        )
+        oauthState = KeychainStore.load(
+            account: Self.oauthStateKeychainAccount,
+            accessGroup: accessGroup
+        )
+    }
+
+    public static func isAllowedWebhookRelayURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(),
+              let host = url.host(percentEncoded: false)?.lowercased(),
+              !host.isEmpty else {
+            return false
+        }
+        if scheme == "https" {
+            return true
+        }
+        if scheme == "http" {
+            return Self.isLocalhost(host)
+        }
+        return false
+    }
+
+    private static func isLocalhost(_ host: String) -> Bool {
+        host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
     private static func normalizedTenant(_ value: String) -> String {
@@ -533,6 +617,8 @@ public struct AppConfiguration: Codable, Sendable {
     public static let keychainAccount = "api-key"
     public static let oauthTokensKeychainAccount = "oauth-tokens"
     public static let oauthClientSecretKeychainAccount = "oauth-client-secret"
+    public static let oauthCodeVerifierKeychainAccount = "oauth-code-verifier"
+    public static let oauthStateKeychainAccount = "oauth-state"
 }
 
 /// Thread-safe in-memory cache for credentials to avoid redundant Keychain queries

@@ -70,22 +70,13 @@ actor RemoteChangePoller {
             }
 
             do {
-                guard let manager = NSFileProviderManager(for: domain) else { continue }
-                try await manager.signalEnumerator(for: .workingSet)
-                try await manager.signalEnumerator(for: .rootContainer)
                 let folderIDs = folderIDsToSignal(config: currentConfig)
-                var folderSignalFailures = 0
-                for folderID in folderIDs {
-                    do {
-                        try await manager.signalEnumerator(
-                            for: NSFileProviderItemIdentifier(ItemIdentifier.folder(folderID).rawValue)
-                        )
-                    } catch {
-                        folderSignalFailures += 1
-                        logger.debug("Folder enumerator signal failed: \(error.localizedDescription, privacy: .public)")
-                    }
-                }
-                logger.info("Remote poll signaled enumerators (folders: \(folderIDs.count, privacy: .public), folder failures: \(folderSignalFailures, privacy: .public))")
+                let coordinator = FileProviderSignalCoordinator(domain: domain, logger: logger)
+                _ = try await coordinator.signalEnumerators(
+                    targets: FileProviderSignalCoordinator.remotePollTargets(folderIDs: folderIDs),
+                    reason: "extension safety poll",
+                    db: db
+                )
 
                 consecutiveFailures = 0
                 throttleStateStore?.recordSuccess()

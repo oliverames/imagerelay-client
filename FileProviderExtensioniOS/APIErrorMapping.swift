@@ -4,8 +4,19 @@ import ImageRelayKit
 
 extension Error {
     var asFileProviderError: Error {
+        if self is CancellationError {
+            return NSFileProviderError(.serverUnreachable)
+        }
+        let nsError = self as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return NSFileProviderError(.serverUnreachable)
+        }
+
         guard let apiError = self as? APIError else {
-            return fileProviderCannotSynchronize(localizedDescription)
+            return fileProviderCannotSynchronize(
+                localizedDescription,
+                recoverySuggestion: "Try again after checking Image Relay settings."
+            )
         }
 
         switch apiError {
@@ -16,15 +27,22 @@ extension Error {
         case .rateLimited, .serverError, .networkError:
             return NSFileProviderError(.serverUnreachable)
         case .forbidden, .decodingError, .invalidResponse, .invalidURL:
-            return fileProviderCannotSynchronize(apiError.userMessage)
+            return fileProviderCannotSynchronize(
+                apiError.userMessage,
+                recoverySuggestion: "Check Image Relay permissions and app settings, then try again."
+            )
         }
     }
 }
 
-func fileProviderCannotSynchronize(_ message: String) -> Error {
-    NSError(
+func fileProviderCannotSynchronize(_ message: String, recoverySuggestion: String? = nil) -> Error {
+    var userInfo: [String: Any] = [NSLocalizedDescriptionKey: message]
+    if let recoverySuggestion, !recoverySuggestion.isEmpty {
+        userInfo[NSLocalizedRecoverySuggestionErrorKey] = recoverySuggestion
+    }
+    return NSError(
         domain: NSFileProviderErrorDomain,
         code: NSFileProviderError.Code.cannotSynchronize.rawValue,
-        userInfo: [NSLocalizedDescriptionKey: message]
+        userInfo: userInfo
     )
 }

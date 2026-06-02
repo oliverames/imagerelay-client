@@ -28,6 +28,14 @@ public enum TrackedItemType: String, Codable, Sendable, DatabaseValueConvertible
     case file, folder
 }
 
+public enum SyncOperationKind: String, Codable, Sendable, DatabaseValueConvertible {
+    case create, modify, rename, move, delete, conflictCopy
+}
+
+public enum SyncOperationStatus: String, Codable, Sendable, DatabaseValueConvertible {
+    case pending, inProgress, completed, failed
+}
+
 public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "tracked_items"
 
@@ -113,6 +121,91 @@ public struct TrackedItem: Codable, Sendable, FetchableRecord, PersistableRecord
 
     public static func fileMetadataVersion(updatedOn: String?, parentIdentifier: String) -> String {
         "\(updatedOn ?? "0")|parent:\(parentIdentifier)"
+    }
+}
+
+public struct SyncOperationJournalEntry: Codable, Sendable, FetchableRecord, PersistableRecord, Identifiable {
+    public static let databaseTableName = "sync_operation_journal"
+
+    public var id: String
+    public var kind: SyncOperationKind
+    public var itemIdentifier: String?
+    public var itemName: String
+    public var itemType: TrackedItemType
+    public var parentIdentifier: String?
+    public var remoteID: Int?
+    public var localContentSize: Int64?
+    public var localContentSHA256: String?
+    public var remoteContentSize: Int64?
+    public var phase: String
+    public var status: SyncOperationStatus
+    public var errorMessage: String?
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: String = UUID().uuidString,
+        kind: SyncOperationKind,
+        itemIdentifier: String? = nil,
+        itemName: String,
+        itemType: TrackedItemType,
+        parentIdentifier: String? = nil,
+        remoteID: Int? = nil,
+        localContentSize: Int64? = nil,
+        localContentSHA256: String? = nil,
+        remoteContentSize: Int64? = nil,
+        phase: String = "Queued",
+        status: SyncOperationStatus = .pending,
+        errorMessage: String? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.kind = kind
+        self.itemIdentifier = itemIdentifier
+        self.itemName = itemName
+        self.itemType = itemType
+        self.parentIdentifier = parentIdentifier
+        self.remoteID = remoteID
+        self.localContentSize = localContentSize
+        self.localContentSHA256 = localContentSHA256
+        self.remoteContentSize = remoteContentSize
+        self.phase = phase
+        self.status = status
+        self.errorMessage = errorMessage
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct PendingRemoteDeletion: Codable, Sendable, FetchableRecord, PersistableRecord, Identifiable {
+    public static let databaseTableName = "pending_remote_deletions"
+
+    public var id: String { identifier }
+    public var identifier: String
+    public var itemName: String
+    public var itemType: TrackedItemType
+    public var parentIdentifier: String
+    public var firstSeenAt: Date
+    public var lastSeenAt: Date
+    public var missCount: Int
+
+    public init(
+        identifier: String,
+        itemName: String,
+        itemType: TrackedItemType,
+        parentIdentifier: String,
+        firstSeenAt: Date = Date(),
+        lastSeenAt: Date = Date(),
+        missCount: Int = 1
+    ) {
+        self.identifier = identifier
+        self.itemName = itemName
+        self.itemType = itemType
+        self.parentIdentifier = parentIdentifier
+        self.firstSeenAt = firstSeenAt
+        self.lastSeenAt = lastSeenAt
+        self.missCount = max(1, missCount)
     }
 }
 

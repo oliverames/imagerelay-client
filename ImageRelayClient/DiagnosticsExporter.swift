@@ -37,9 +37,9 @@ enum DiagnosticsExporter {
             appGroupIdentifier: DomainManager.appGroupIdentifier,
             domainIdentifier: DomainManager.domainIdentifier.rawValue,
             domainDisplayName: DomainManager.domainDisplayName,
-            appContainerPath: container?.path,
+            appContainerPath: redactPath(container?.path),
             isDomainActive: domainManager.isDomainActive,
-            lastError: domainManager.lastError,
+            lastError: redactSensitiveText(domainManager.lastError),
             appVersion: bundleString("CFBundleShortVersionString"),
             buildVersion: bundleString("CFBundleVersion"),
             updateFeedURL: bundleString("SUFeedURL"),
@@ -52,9 +52,9 @@ enum DiagnosticsExporter {
         let info = SystemInfo(
             operatingSystemVersion: ProcessInfo.processInfo.operatingSystemVersionString,
             appBundleIdentifier: Bundle.main.bundleIdentifier,
-            appBundlePath: Bundle.main.bundlePath,
-            appExecutablePath: Bundle.main.executablePath,
-            homeDirectory: FileManager.default.homeDirectoryForCurrentUser.path,
+            appBundlePath: redactPath(Bundle.main.bundlePath) ?? Bundle.main.bundlePath,
+            appExecutablePath: redactPath(Bundle.main.executablePath),
+            homeDirectory: "~",
             installedAppExists: FileManager.default.fileExists(atPath: "/Applications/Image Relay.app")
         )
         try writeJSON(info, to: directory.appendingPathComponent("system.json"))
@@ -88,6 +88,8 @@ enum DiagnosticsExporter {
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("activity.json"))
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("sync-progress.json"))
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("unresolved-failures.json"))
+            try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("sync-operations.json"))
+            try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("pending-remote-deletions.json"))
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("root-folders-cache.json"))
             try writeText("App group container is unavailable.\n", to: directory.appendingPathComponent("upload-links-cache.json"))
             return
@@ -95,19 +97,34 @@ enum DiagnosticsExporter {
 
         let dbURL = SyncDatabase.databaseURL(in: container)
         guard let db = try? SyncDatabase(url: dbURL) else {
-            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("activity.json"))
-            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("sync-progress.json"))
-            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("unresolved-failures.json"))
-            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("root-folders-cache.json"))
-            try writeText("Sync database is unavailable at \(dbURL.path).\n", to: directory.appendingPathComponent("upload-links-cache.json"))
+            let message = "Sync database is unavailable at \(redactPath(dbURL.path) ?? "[redacted-path]").\n"
+            try writeText(message, to: directory.appendingPathComponent("activity.json"))
+            try writeText(message, to: directory.appendingPathComponent("sync-progress.json"))
+            try writeText(message, to: directory.appendingPathComponent("unresolved-failures.json"))
+            try writeText(message, to: directory.appendingPathComponent("sync-operations.json"))
+            try writeText(message, to: directory.appendingPathComponent("pending-remote-deletions.json"))
+            try writeText(message, to: directory.appendingPathComponent("root-folders-cache.json"))
+            try writeText(message, to: directory.appendingPathComponent("upload-links-cache.json"))
             return
         }
 
-        try writeJSON(try db.recentActivity(limit: 100), to: directory.appendingPathComponent("activity.json"))
-        try writeJSON(try db.getProgress(), to: directory.appendingPathComponent("sync-progress.json"))
-        try writeJSON(try db.recentUnresolvedFailures(limit: 100), to: directory.appendingPathComponent("unresolved-failures.json"))
-        try writeJSON(try db.cachedRootFolders(), to: directory.appendingPathComponent("root-folders-cache.json"))
-        try writeJSON(try db.cachedUploadLinks(), to: directory.appendingPathComponent("upload-links-cache.json"))
+        let activity = try db.recentActivity(limit: 100).map(SanitizedActivityEntry.init)
+        let failures = try db.recentUnresolvedFailures(limit: 100).map(SanitizedActivityEntry.init)
+        let operations = try db.recentSyncOperations(limit: 100).map(SanitizedSyncOperationEntry.init)
+        let pendingDeletions = try db.pendingRemoteDeletions(limit: 100).map(SanitizedPendingRemoteDeletion.init)
+        try writeJSON(activity, to: directory.appendingPathComponent("activity.json"))
+        try writeJSON(SanitizedSyncProgressState(try db.getProgress()), to: directory.appendingPathComponent("sync-progress.json"))
+        try writeJSON(failures, to: directory.appendingPathComponent("unresolved-failures.json"))
+        try writeJSON(operations, to: directory.appendingPathComponent("sync-operations.json"))
+        try writeJSON(pendingDeletions, to: directory.appendingPathComponent("pending-remote-deletions.json"))
+        try writeJSON(
+            RootFoldersCacheDiagnostics(snapshot: try db.cachedRootFolders()),
+            to: directory.appendingPathComponent("root-folders-cache.json")
+        )
+        try writeJSON(
+            UploadLinksCacheDiagnostics(snapshot: try db.cachedUploadLinks()),
+            to: directory.appendingPathComponent("upload-links-cache.json")
+        )
         try writeJSON(
             WebhookRelayDiagnostics(cursorPresent: (try db.webhookRelayCursor())?.isEmpty == false),
             to: directory.appendingPathComponent("webhook-relay.json")
@@ -122,7 +139,7 @@ enum DiagnosticsExporter {
         )
         let status = DomainStatus(
             isDomainActive: domainManager.isDomainActive,
-            lastError: domainManager.lastError,
+            lastError: redactSensitiveText(domainManager.lastError),
             managerAvailable: NSFileProviderManager(for: domain) != nil
         )
         try writeJSON(status, to: directory.appendingPathComponent("domain-status.json"))
@@ -209,7 +226,7 @@ enum DiagnosticsExporter {
                 let timestamp = formatter.string(from: log.date)
                 let category = log.category.isEmpty ? "-" : log.category
                 lines.append(
-                    "\(timestamp) \(String(describing: log.level)) \(log.subsystem)/\(category): \(log.composedMessage)"
+                    "\(timestamp) \(String(describing: log.level)) \(log.subsystem)/\(category): \(redactSensitiveText(log.composedMessage))"
                 )
             }
 
@@ -246,6 +263,43 @@ enum DiagnosticsExporter {
 
     private static func bundleString(_ key: String) -> String? {
         Bundle.main.object(forInfoDictionaryKey: key) as? String
+    }
+
+    private static func redactPath(_ path: String?) -> String? {
+        guard var path, !path.isEmpty else { return path }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if !home.isEmpty {
+            path = path.replacingOccurrences(of: home, with: "~")
+        }
+        return path
+    }
+
+    fileprivate static func redactSensitiveText(_ text: String?) -> String? {
+        guard let text else { return nil }
+        return redactSensitiveText(text)
+    }
+
+    fileprivate static func redactSensitiveText(_ text: String) -> String {
+        var redacted = redactPath(text) ?? text
+        let replacements: [(String, String)] = [
+            (#"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|authorization|code[_-]?verifier|oauth[_-]?state)=([^&\s]+)"#, "$1=[redacted]"),
+            (#"(?i)(bearer)\s+[A-Za-z0-9._~+/=-]+"#, "$1 [redacted]"),
+            (#"https?://[^\s]+"#, "[redacted-url]")
+        ]
+        for replacement in replacements {
+            redacted = redacted.replacingOccurrences(
+                of: replacement.0,
+                with: replacement.1,
+                options: .regularExpression
+            )
+        }
+        return redacted
+    }
+
+    fileprivate static func redactedItemName(_ name: String, itemType: TrackedItemType) -> String {
+        guard itemType == .file else { return "[folder name redacted]" }
+        let ext = URL(fileURLWithPath: name).pathExtension
+        return ext.isEmpty ? "[file name redacted]" : "[file .\(ext)]"
     }
 }
 
@@ -294,4 +348,158 @@ private struct DomainStatus: Encodable {
     let isDomainActive: Bool
     let lastError: String?
     let managerAvailable: Bool
+}
+
+private struct SanitizedActivityEntry: Encodable {
+    let id: Int64?
+    let action: SyncAction
+    let itemName: String
+    let itemType: TrackedItemType
+    let timestamp: Date
+    let errorMessage: String?
+
+    init(_ entry: ActivityEntry) {
+        id = entry.id
+        action = entry.action
+        itemName = DiagnosticsExporter.redactedItemName(entry.itemName, itemType: entry.itemType)
+        itemType = entry.itemType
+        timestamp = entry.timestamp
+        errorMessage = DiagnosticsExporter.redactSensitiveText(entry.errorMessage)
+    }
+}
+
+private struct SanitizedSyncOperationEntry: Encodable {
+    let id: String
+    let kind: SyncOperationKind
+    let itemIdentifierPresent: Bool
+    let itemName: String
+    let itemType: TrackedItemType
+    let parentIdentifierPresent: Bool
+    let remoteID: Int?
+    let localContentSize: Int64?
+    let localContentSHA256Present: Bool
+    let remoteContentSize: Int64?
+    let phase: String
+    let status: SyncOperationStatus
+    let errorMessage: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(_ entry: SyncOperationJournalEntry) {
+        id = entry.id
+        kind = entry.kind
+        itemIdentifierPresent = entry.itemIdentifier?.isEmpty == false
+        itemName = DiagnosticsExporter.redactedItemName(entry.itemName, itemType: entry.itemType)
+        itemType = entry.itemType
+        parentIdentifierPresent = entry.parentIdentifier?.isEmpty == false
+        remoteID = entry.remoteID
+        localContentSize = entry.localContentSize
+        localContentSHA256Present = entry.localContentSHA256?.isEmpty == false
+        remoteContentSize = entry.remoteContentSize
+        phase = entry.phase
+        status = entry.status
+        errorMessage = DiagnosticsExporter.redactSensitiveText(entry.errorMessage)
+        createdAt = entry.createdAt
+        updatedAt = entry.updatedAt
+    }
+}
+
+private struct SanitizedPendingRemoteDeletion: Encodable {
+    let identifierPresent: Bool
+    let itemName: String
+    let itemType: TrackedItemType
+    let parentIdentifierPresent: Bool
+    let firstSeenAt: Date
+    let lastSeenAt: Date
+    let missCount: Int
+
+    init(_ deletion: PendingRemoteDeletion) {
+        identifierPresent = !deletion.identifier.isEmpty
+        itemName = DiagnosticsExporter.redactedItemName(deletion.itemName, itemType: deletion.itemType)
+        itemType = deletion.itemType
+        parentIdentifierPresent = !deletion.parentIdentifier.isEmpty
+        firstSeenAt = deletion.firstSeenAt
+        lastSeenAt = deletion.lastSeenAt
+        missCount = deletion.missCount
+    }
+}
+
+private struct SanitizedSyncProgressState: Encodable {
+    let state: SyncProgressState.SyncState
+    let phase: String
+    let completedSteps: Int
+    let totalSteps: Int
+    let etaSeconds: Int?
+    let currentItem: String?
+    let lastError: String?
+    let lastRemotePollAt: Date?
+    let nextRemotePollAt: Date?
+    let lastSuccessfulAPIAt: Date?
+    let rateLimitedUntil: Date?
+    let rateLimitInFlight: Int
+    let recentRateLimitCount: Int
+    let completedBytes: Int64
+    let totalBytes: Int64
+    let instantaneousBytesPerSecond: Int64
+    let smoothedBytesPerSecond: Int64
+    let fileProviderPID: Int32?
+    let fileProviderStartedAt: Date?
+    let lastFileProviderSignalAt: Date?
+    let lastFileProviderSignalError: String?
+    let lastFileProviderSignalFailureCount: Int
+    let lastDatabaseIntegrityError: String?
+    let updatedAt: Date?
+
+    init(_ progress: SyncProgressState) {
+        state = progress.state
+        phase = progress.phase
+        completedSteps = progress.completedSteps
+        totalSteps = progress.totalSteps
+        etaSeconds = progress.etaSeconds
+        currentItem = progress.currentItem.map { _ in "[item name redacted]" }
+        lastError = DiagnosticsExporter.redactSensitiveText(progress.lastError)
+        lastRemotePollAt = progress.lastRemotePollAt
+        nextRemotePollAt = progress.nextRemotePollAt
+        lastSuccessfulAPIAt = progress.lastSuccessfulAPIAt
+        rateLimitedUntil = progress.rateLimitedUntil
+        rateLimitInFlight = progress.rateLimitInFlight
+        recentRateLimitCount = progress.recentRateLimitCount
+        completedBytes = progress.completedBytes
+        totalBytes = progress.totalBytes
+        instantaneousBytesPerSecond = progress.instantaneousBytesPerSecond
+        smoothedBytesPerSecond = progress.smoothedBytesPerSecond
+        fileProviderPID = progress.fileProviderPID
+        fileProviderStartedAt = progress.fileProviderStartedAt
+        lastFileProviderSignalAt = progress.lastFileProviderSignalAt
+        lastFileProviderSignalError = DiagnosticsExporter.redactSensitiveText(progress.lastFileProviderSignalError)
+        lastFileProviderSignalFailureCount = progress.lastFileProviderSignalFailureCount
+        lastDatabaseIntegrityError = DiagnosticsExporter.redactSensitiveText(progress.lastDatabaseIntegrityError)
+        updatedAt = progress.updatedAt
+    }
+}
+
+private struct RootFoldersCacheDiagnostics: Encodable {
+    let present: Bool
+    let fetchedAt: Date?
+    let rootFolderID: Int?
+    let folderCount: Int
+
+    init(snapshot: CachedRootFoldersSnapshot?) {
+        present = snapshot != nil
+        fetchedAt = snapshot?.fetchedAt
+        rootFolderID = snapshot?.rootFolderID
+        folderCount = snapshot?.folders.count ?? 0
+    }
+}
+
+private struct UploadLinksCacheDiagnostics: Encodable {
+    let present: Bool
+    let fetchedAt: Date?
+    let linkCount: Int
+
+    init(snapshot: CachedUploadLinksSnapshot?) {
+        present = snapshot != nil
+        fetchedAt = snapshot?.fetchedAt
+        linkCount = snapshot?.links.count ?? 0
+    }
 }

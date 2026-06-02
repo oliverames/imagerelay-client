@@ -257,6 +257,12 @@ struct MenuBarView: View {
             return lastError
         }
 
+        if domainManager.syncProgress.lastFileProviderSignalFailureCount > 0,
+           let signalError = domainManager.syncProgress.lastFileProviderSignalError,
+           !signalError.isEmpty {
+            return "Finder refresh warning: \(signalError)"
+        }
+
         if domainManager.syncProgress.state == .syncing {
             if domainManager.syncProgress.totalSteps > 0 {
                 var line = "\(domainManager.syncProgress.phase) • \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)"
@@ -335,8 +341,11 @@ struct MenuBarView: View {
     private var diagnosticsRows: some View {
         Text("Throughput: \(throughputLine ?? "Idle")").disabled(true)
         Text("Failed items: \(domainManager.failedUploadCount)").disabled(true)
+        Text("Open operations: \(domainManager.openOperationCount)").disabled(true)
+        Text("Pending delete checks: \(domainManager.pendingRemoteDeletionCount)").disabled(true)
         Text("429s recorded: \(domainManager.syncProgress.recentRateLimitCount)").disabled(true)
         Text("Rate-limit waits: \(domainManager.syncProgress.rateLimitInFlight)").disabled(true)
+        Text("FP signal failures: \(domainManager.syncProgress.lastFileProviderSignalFailureCount)").disabled(true)
         Text("Queue: \(domainManager.syncProgress.completedSteps) of \(domainManager.syncProgress.totalSteps)").disabled(true)
         Text("Next poll: \(nextPollDiagnostics)").disabled(true)
         Text("Last API: \(lastAPIDiagnostics)").disabled(true)

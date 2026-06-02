@@ -24,6 +24,10 @@ public struct SyncProgressState: Codable, Sendable {
     public var smoothedItemsPerSecond: Double?
     public var fileProviderPID: Int32?
     public var fileProviderStartedAt: Date?
+    public var lastFileProviderSignalAt: Date?
+    public var lastFileProviderSignalError: String?
+    public var lastFileProviderSignalFailureCount: Int
+    public var lastDatabaseIntegrityError: String?
     public var updatedAt: Date?
 
     public static let idle = SyncProgressState(
@@ -58,6 +62,10 @@ public struct SyncProgressState: Codable, Sendable {
         smoothedItemsPerSecond: Double? = nil,
         fileProviderPID: Int32? = nil,
         fileProviderStartedAt: Date? = nil,
+        lastFileProviderSignalAt: Date? = nil,
+        lastFileProviderSignalError: String? = nil,
+        lastFileProviderSignalFailureCount: Int = 0,
+        lastDatabaseIntegrityError: String? = nil,
         updatedAt: Date? = nil
     ) {
         self.state = state
@@ -83,6 +91,10 @@ public struct SyncProgressState: Codable, Sendable {
         self.smoothedItemsPerSecond = smoothedItemsPerSecond
         self.fileProviderPID = fileProviderPID
         self.fileProviderStartedAt = fileProviderStartedAt
+        self.lastFileProviderSignalAt = lastFileProviderSignalAt
+        self.lastFileProviderSignalError = lastFileProviderSignalError
+        self.lastFileProviderSignalFailureCount = max(0, lastFileProviderSignalFailureCount)
+        self.lastDatabaseIntegrityError = lastDatabaseIntegrityError
         self.updatedAt = updatedAt
     }
 
@@ -92,7 +104,9 @@ public struct SyncProgressState: Codable, Sendable {
         case rateLimitedUntil, rateLimitInFlight, recentRateLimitCount
         case completedBytes, totalBytes, instantaneousBytesPerSecond, smoothedBytesPerSecond
         case lastByteSampleAt, lastIncrementAt, completionSampleCount, smoothedItemsPerSecond
-        case fileProviderPID, fileProviderStartedAt, updatedAt
+        case fileProviderPID, fileProviderStartedAt
+        case lastFileProviderSignalAt, lastFileProviderSignalError, lastFileProviderSignalFailureCount
+        case lastDatabaseIntegrityError, updatedAt
     }
 
     public init(from decoder: any Decoder) throws {
@@ -120,6 +134,10 @@ public struct SyncProgressState: Codable, Sendable {
         smoothedItemsPerSecond = try c.decodeIfPresent(Double.self, forKey: .smoothedItemsPerSecond)
         fileProviderPID = try c.decodeIfPresent(Int32.self, forKey: .fileProviderPID)
         fileProviderStartedAt = try c.decodeIfPresent(Date.self, forKey: .fileProviderStartedAt)
+        lastFileProviderSignalAt = try c.decodeIfPresent(Date.self, forKey: .lastFileProviderSignalAt)
+        lastFileProviderSignalError = try c.decodeIfPresent(String.self, forKey: .lastFileProviderSignalError)
+        lastFileProviderSignalFailureCount = max(0, try c.decodeIfPresent(Int.self, forKey: .lastFileProviderSignalFailureCount) ?? 0)
+        lastDatabaseIntegrityError = try c.decodeIfPresent(String.self, forKey: .lastDatabaseIntegrityError)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
     }
 
@@ -141,6 +159,8 @@ public struct SyncProgressState: Codable, Sendable {
             smoothedItemsPerSecond = nil
         }
         lastError = nil
+        lastFileProviderSignalError = nil
+        lastFileProviderSignalFailureCount = 0
         rateLimitedUntil = nil
         rateLimitInFlight = 0
         lastRemotePollAt = now
@@ -156,5 +176,29 @@ public struct SyncProgressState: Codable, Sendable {
         phase = "Error"
         currentItem = nil
         lastError = message
+    }
+
+    public mutating func markFileProviderSignalSucceeded(now: Date = Date()) {
+        lastFileProviderSignalAt = now
+        lastFileProviderSignalError = nil
+        lastFileProviderSignalFailureCount = 0
+    }
+
+    public mutating func markFileProviderSignalFailed(_ message: String, failureCount: Int, now: Date = Date()) {
+        lastFileProviderSignalAt = now
+        lastFileProviderSignalError = message
+        lastFileProviderSignalFailureCount = max(1, failureCount)
+    }
+
+    public mutating func markDatabaseIntegrityFailed(_ message: String) {
+        state = .error
+        phase = "Database Error"
+        currentItem = nil
+        lastError = message
+        lastDatabaseIntegrityError = message
+    }
+
+    public mutating func markDatabaseIntegritySucceeded() {
+        lastDatabaseIntegrityError = nil
     }
 }

@@ -11,7 +11,6 @@ struct GeneralSettingsView: View {
     @State private var oauthClientID = ""
     @State private var oauthClientSecret = ""
     @State private var oauthRedirectURI = "imagerelay-client://oauth/callback"
-    @State private var oauthStatus: String?
     @State private var remoteRootFolderID = ""
     @State private var defaultFileTypeID = ""
     @State private var launchAtLogin = false
@@ -97,16 +96,31 @@ struct GeneralSettingsView: View {
                     TextField("Redirect URI", text: $oauthRedirectURI)
 
                     Button {
-                        startOAuth()
+                        domainManager.startOAuthLogin(
+                            tenant: oauthTenant,
+                            clientID: oauthClientID,
+                            clientSecret: oauthClientSecret,
+                            redirectURI: oauthRedirectURI
+                        )
                     } label: {
-                        Label("Connect with OAuth", systemImage: "person.badge.key")
+                        if domainManager.oauthIsCompleting {
+                            Label("Finishing OAuth Sign-in", systemImage: "arrow.triangle.2.circlepath")
+                        } else {
+                            Label("Connect with OAuth", systemImage: "person.badge.key")
+                        }
                     }
-                    .disabled(oauthTenant.isEmpty || oauthClientID.isEmpty || oauthClientSecret.isEmpty || oauthRedirectURI.isEmpty)
+                    .disabled(
+                        domainManager.oauthIsCompleting ||
+                        oauthTenant.isEmpty ||
+                        oauthClientID.isEmpty ||
+                        oauthClientSecret.isEmpty ||
+                        oauthRedirectURI.isEmpty
+                    )
 
-                    if let oauthStatus {
+                    if let oauthStatus = domainManager.oauthStatusMessage {
                         Text(oauthStatus)
                             .font(.caption)
-                            .foregroundStyle(oauthStatus.hasPrefix("Opened") ? Color.secondary : Color.orange)
+                            .foregroundStyle(oauthStatusColor(oauthStatus))
                     }
                 }
 
@@ -322,36 +336,12 @@ struct GeneralSettingsView: View {
         }
     }
 
-    private func startOAuth() {
-        guard let container else { return }
-        var config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-        config.authMethod = .oauth
-        config.oauthTenant = oauthTenant
-        config.oauthClientID = oauthClientID
-        config.oauthClientSecret = oauthClientSecret
-        config.oauthRedirectURI = oauthRedirectURI
-        config.oauthCodeVerifier = OAuthFlow.makeCodeVerifier()
-        config.oauthState = UUID().uuidString
-
-        guard let verifier = config.oauthCodeVerifier,
-              let state = config.oauthState,
-              let url = OAuthFlow.authorizationURL(
-                tenant: config.oauthTenant,
-                clientID: config.oauthClientID,
-                redirectURI: config.oauthRedirectURI,
-                state: state,
-                codeChallenge: OAuthFlow.codeChallenge(for: verifier)
-              ) else {
-            oauthStatus = "Could not create the OAuth authorization URL."
-            return
+    private func oauthStatusColor(_ message: String) -> Color {
+        if message.hasPrefix("Connected") ||
+           message.hasPrefix("Waiting") ||
+           message.hasPrefix("Finishing") {
+            return .secondary
         }
-
-        do {
-            try config.save(to: AppConfiguration.fileURL(in: container))
-            oauthStatus = "Opened Image Relay authorization in your browser."
-            NSWorkspace.shared.open(url)
-        } catch {
-            oauthStatus = error.localizedDescription
-        }
+        return .orange
     }
 }

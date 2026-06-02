@@ -314,6 +314,35 @@ public actor APIClient {
         return max(chunkNumber, 1)
     }
 
+    /// Upload a local file in chunks without loading the whole file into memory.
+    @discardableResult
+    public func uploadChunked(
+        fileURL: URL,
+        pathBuilder: @Sendable (Int) -> String,
+        chunkSize: Int = 5 * 1024 * 1024
+    ) async throws -> Int {
+        let size = try FileFingerprinting.fileSize(at: fileURL)
+        guard size > 0 else {
+            try await upload(data: Data(), to: pathBuilder(1))
+            return 1
+        }
+
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+
+        var chunkNumber = 0
+        while true {
+            try Task.checkCancellation()
+            let chunk = try handle.read(upToCount: chunkSize) ?? Data()
+            guard !chunk.isEmpty else { break }
+            chunkNumber += 1
+            try await upload(data: chunk, to: pathBuilder(chunkNumber))
+            try? telemetry?.recordTransferredBytes(Int64(chunk.count))
+        }
+
+        return max(chunkNumber, 1)
+    }
+
     /// Upload data in chunks and decode the response from the last uploaded chunk.
     @discardableResult
     public func uploadChunked<T: Decodable & Sendable>(
@@ -340,6 +369,39 @@ public actor APIClient {
             }
             try? telemetry?.recordTransferredBytes(Int64(chunk.count))
             offset = end
+        }
+
+        return (max(chunkNumber, 1), lastResponse)
+    }
+
+    /// Upload a local file in chunks and decode the response from the last uploaded chunk.
+    @discardableResult
+    public func uploadChunked<T: Decodable & Sendable>(
+        fileURL: URL,
+        pathBuilder: @Sendable (Int) -> String,
+        chunkSize: Int = 5 * 1024 * 1024,
+        responseType: T.Type
+    ) async throws -> (chunkCount: Int, lastResponse: T?) {
+        let size = try FileFingerprinting.fileSize(at: fileURL)
+        guard size > 0 else {
+            let response: T? = try await uploadIfPresent(data: Data(), to: pathBuilder(1))
+            return (1, response)
+        }
+
+        let handle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? handle.close() }
+
+        var chunkNumber = 0
+        var lastResponse: T?
+        while true {
+            try Task.checkCancellation()
+            let chunk = try handle.read(upToCount: chunkSize) ?? Data()
+            guard !chunk.isEmpty else { break }
+            chunkNumber += 1
+            if let response: T = try await uploadIfPresent(data: chunk, to: pathBuilder(chunkNumber)) {
+                lastResponse = response
+            }
+            try? telemetry?.recordTransferredBytes(Int64(chunk.count))
         }
 
         return (max(chunkNumber, 1), lastResponse)
