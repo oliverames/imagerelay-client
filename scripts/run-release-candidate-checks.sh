@@ -3,7 +3,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_LIVE_SYNC="${RUN_LIVE_SYNC:-0}"
 RUN_PACKAGE="${RUN_PACKAGE:-0}"
 XCODE_CLONED_SOURCE_PACKAGES_DIR="${XCODE_CLONED_SOURCE_PACKAGES_DIR:-}"
 
@@ -71,11 +70,6 @@ run_xcodebuild build \
   -scheme ImageRelayClientiOS \
   -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO
-
-if [[ "$RUN_LIVE_SYNC" == "1" ]]; then
-  echo "Running live sync matrix..."
-  scripts/run-live-sync-matrix.sh
-fi
 
 if [[ "$RUN_PACKAGE" == "1" ]]; then
   echo "Building signed notarized release..."

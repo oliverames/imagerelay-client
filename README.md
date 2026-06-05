@@ -204,9 +204,6 @@ swift test --package-path ImageRelayKit
 # Run the release-candidate validation set for Project.yml's MARKETING_VERSION
 scripts/run-release-candidate-checks.sh
 
-# Optional live account smoke matrix, scoped to Oliver's Stuff by default
-RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh
-
 # Build a Developer ID signed, notarized release DMG
 scripts/build-developer-id-release.sh --version 1.4.0 --smoke-install
 ```

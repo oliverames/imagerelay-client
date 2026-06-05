@@ -89,7 +89,16 @@ Task { completionHandler(...) }
 
 ## Known State
 
-- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). Keep future release testing constrained to that folder unless explicitly asked otherwise.
+- **Never fabricate test files on the server**: Release verification must NOT
+  create synthetic fixtures (throwaway files/folders) on the live Image Relay
+  account. Verify with real assets only, through normal app usage. The old
+  synthetic `run-live-sync-matrix.sh` harness was removed for this reason; it
+  had stranded soft-deleted `Codex-ReleaseLiveMatrix-*` fixtures in a shared
+  folder, which a colleague flagged. Do not reintroduce server-side test
+  fabrication in any form.
+- **Live testing scope**: When exercising live sync with real assets, keep it
+  inside the selected `Oliver's Stuff` folder (`2907644`) unless explicitly
+  asked otherwise.
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version> --smoke-install` for Developer ID signed, notarized DMGs and installed-app smoke verification.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 

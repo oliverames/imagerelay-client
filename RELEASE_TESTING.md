@@ -154,6 +154,9 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 ## Release Automation
 
 - Run `scripts/run-release-candidate-checks.sh` on a macOS 26 machine with Xcode 26. With no argument, it validates Project.yml's `MARKETING_VERSION`.
-- For live account coverage, run `RUN_LIVE_SYNC=1 scripts/run-release-candidate-checks.sh`.
+- Live account coverage is by real-asset usage only. Do NOT fabricate test
+  files/folders on the server; the old synthetic `RUN_LIVE_SYNC` matrix was
+  removed. Verify live sync by uploading or editing a real asset inside
+  `Oliver's Stuff` and confirming it appears, then clean it up manually.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
