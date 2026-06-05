@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-06-05 - Remove synthetic live-sync test harness
+
+**What changed**:
+Deleted `scripts/run-live-sync-matrix.sh` and removed the `RUN_LIVE_SYNC` opt-in from `scripts/run-release-candidate-checks.sh`. Updated `CLAUDE.md`, `README.md`, and `RELEASE_TESTING.md` to record a real-asset-only live verification policy: release verification must never fabricate throwaway files or folders on the live Image Relay account, and live sync is verified with real assets only through normal app usage.
+
+**Decisions made**:
+- No server-side test fabrication in any form. The synthetic create/move/rename/delete matrix that ran against the live account is retired. The concrete trigger: a prior run left empty `Codex-ReleaseLiveMatrix-*` fixtures soft-deleted in a shared folder, visible to other account users.
+
+**Left off at**:
+- Commits `a0a5bcd` (harness removal) and `108270d` (`RUN_LIVE_SYNC` wiring plus docs) pushed to `main`. Repo clean.
+- `run-release-candidate-checks.sh` still runs offline coverage (187 ImageRelayKit package tests, the 248-test Xcode scheme, unsigned macOS and iOS simulator builds) and optional `RUN_PACKAGE=1` signing/notarization.
+
+**Open questions**:
+- None.
+
+---
+
 ## 2026-06-02 - 1.4.0 stable public release
 
 **What changed**:
