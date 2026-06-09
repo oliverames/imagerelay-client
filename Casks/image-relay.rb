@@ -1,6 +1,6 @@
 cask "image-relay" do
-  version "1.4.0"
-  sha256 "681b47794b84d699de550cee23a7c5d56ed9c8a81da827500c4840c08d427d0f"
+  version "1.4.1"
+  sha256 "0ee9fb6ebd5a3c6714a9a65f12b1cf6d151ff7b8b106acd5f99305bdf10592c8"
 
   url "https://github.com/oliverames/imagerelay-client/releases/download/v#{version}/ImageRelayClient-#{version}.dmg",
       verified: "github.com/oliverames/imagerelay-client/"
