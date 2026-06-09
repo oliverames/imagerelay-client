@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_PACKAGE="${RUN_PACKAGE:-0}"
 XCODE_CLONED_SOURCE_PACKAGES_DIR="${XCODE_CLONED_SOURCE_PACKAGES_DIR:-}"
+SWIFTPM_SCRATCH_PATH="${SWIFTPM_SCRATCH_PATH:-/tmp/imagerelay-client-swiftpm-rc}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -46,7 +47,7 @@ echo "Checking patch whitespace..."
 git diff --check
 
 echo "Running ImageRelayKit package tests..."
-swift test --package-path ImageRelayKit
+swift test --package-path ImageRelayKit --scratch-path "$SWIFTPM_SCRATCH_PATH"
 
 echo "Regenerating Xcode project..."
 xcodegen generate
