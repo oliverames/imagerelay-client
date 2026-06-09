@@ -184,6 +184,16 @@ struct APIClientTests {
         #expect(OAuthFlow.codeChallenge(for: verifier) == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
     }
 
+    @Test("PKCE code verifier uses URL-safe random material")
+    func pkceCodeVerifier() {
+        let verifier = OAuthFlow.makeCodeVerifier()
+
+        #expect(verifier.count >= 43)
+        #expect(verifier.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "-" || character == "_"
+        })
+    }
+
     @Test("OAuth authorization URL uses documented Image Relay parameters by default")
     func oauthAuthorizationURLUsesDocumentedParameters() throws {
         let url = try #require(OAuthFlow.authorizationURL(

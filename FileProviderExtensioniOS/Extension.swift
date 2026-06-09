@@ -227,8 +227,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 let quickLink: QuickLink = try await services.api.post("/quick_links.json", body: request)
                 progress.completedUnitCount = 35
 
-                let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent("\(UUID().uuidString)-\(fileMeta.name)")
+                let tempFile = TemporaryFileURL.make(originalName: fileMeta.name)
                 try await services.api.download(quickLink.url, to: tempFile, countsAgainstRateLimit: false)
                 progress.completedUnitCount = 90
 

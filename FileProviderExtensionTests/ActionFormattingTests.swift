@@ -282,4 +282,18 @@ struct ActionFormattingTests {
 
         #expect(url.path == "/tmp/image-relay-link.qr.png")
     }
+
+    @Test("uniqueFileURL sanitizes remote path separators")
+    func uniqueFileURLSanitizesPathSeparators() {
+        let directory = URL(fileURLWithPath: "/tmp", isDirectory: true)
+        let url = ActionFormatting.uniqueFileURL(
+            in: directory,
+            baseName: "../../Secrets/token",
+            extension: "qr.png",
+            fileExists: { _ in false }
+        )
+
+        #expect(url.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL)
+        #expect(url.path == "/tmp/.._.._Secrets_token.qr.png")
+    }
 }

@@ -161,7 +161,9 @@ enum ActionFormatting {
     ) -> URL {
         let fallbackName = "image-relay-link"
         let trimmedBaseName = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let safeBaseName = trimmedBaseName.isEmpty ? fallbackName : trimmedBaseName
+        let safeBaseName = trimmedBaseName.isEmpty
+            ? fallbackName
+            : TemporaryFileURL.safeFilename(from: trimmedBaseName)
 
         var candidate = directory.appendingPathComponent(safeBaseName)
             .appendingPathExtension(fileExtension)

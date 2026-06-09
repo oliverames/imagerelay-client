@@ -4,8 +4,10 @@ import Security
 
 public enum OAuthFlow {
     public static func makeCodeVerifier(byteCount: Int = 32) -> String {
+        precondition(byteCount > 0, "OAuth code verifier byte count must be positive")
         var bytes = [UInt8](repeating: 0, count: byteCount)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        precondition(status == errSecSuccess, "Secure random generation failed for OAuth code verifier")
         return String(base64URLEncoded(Data(bytes)).prefix(128))
     }
 

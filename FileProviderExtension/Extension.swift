@@ -194,8 +194,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
                 progress.completedUnitCount = 30
 
-                let tempDir = FileManager.default.temporaryDirectory
-                let tempFile = tempDir.appendingPathComponent(UUID().uuidString + "-" + tracked.name)
+                let tempFile = TemporaryFileURL.make(originalName: tracked.name)
 
                 // Retry up to 3 times on transient network failures.
                 try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
@@ -267,8 +266,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 guard totalSize > 0 else {
                     // Zero-byte file: serve an empty temp file so the system can
                     // materialize it without a network round trip.
-                    let tempFile = FileManager.default.temporaryDirectory
-                        .appendingPathComponent(UUID().uuidString + "-" + tracked.name)
+                    let tempFile = TemporaryFileURL.make(originalName: tracked.name)
                     FileManager.default.createFile(atPath: tempFile.path, contents: nil)
                     let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
                     handler.value(tempFile, item, NSRange(location: 0, length: 0), [], nil)
@@ -314,8 +312,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     writtenOffset = lowerInclusive
                 }
 
-                let tempFile = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(UUID().uuidString + "-" + tracked.name)
+                let tempFile = TemporaryFileURL.make(originalName: tracked.name)
                 try fetcher.writePartialContent(
                     data: data,
                     offset: writtenOffset,
@@ -2157,8 +2154,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     }
 
     private func replaceFileContents(remoteID: Int, name: String, data fileData: Data) async throws {
-        let tempFile = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + "-" + name)
+        let tempFile = TemporaryFileURL.make(originalName: name)
         try fileData.write(to: tempFile, options: .atomic)
         defer { try? FileManager.default.removeItem(at: tempFile) }
         try await replaceFileContents(remoteID: remoteID, name: name, fileURL: tempFile)
@@ -2210,8 +2206,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             "/quick_links.json",
             body: quickLinkRequest
         )
-        let tempFile = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + "-" + name)
+        let tempFile = TemporaryFileURL.make(originalName: name)
 
         do {
             try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
