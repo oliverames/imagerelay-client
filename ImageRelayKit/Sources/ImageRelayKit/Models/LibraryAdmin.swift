@@ -246,7 +246,18 @@ public struct SSOUserCreate: Codable, Sendable {
         case lastName = "last_name"
         case email
         case company
-        case permissionID = "permission_id"
+        case permissionID = "role_id"
+        case legacyPermissionID = "permission_id"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        firstName = try c.decode(String.self, forKey: .firstName)
+        lastName = try c.decode(String.self, forKey: .lastName)
+        email = try c.decode(String.self, forKey: .email)
+        company = try c.decodeIfPresent(String.self, forKey: .company)
+        permissionID = try c.decodeIfPresent(Int.self, forKey: .permissionID)
+            ?? c.decode(Int.self, forKey: .legacyPermissionID)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -259,7 +270,7 @@ public struct SSOUserCreate: Codable, Sendable {
     }
 }
 
-/// A permission group / role definition returned by `GET /permission_groups.json`.
+/// A permission group / role definition returned by `GET /permissions.json`.
 /// The Image Relay API exposes only the `id` and `name` fields meaningfully —
 /// the permission matrix lives behind the admin UI and isn't part of the
 /// public API surface today.

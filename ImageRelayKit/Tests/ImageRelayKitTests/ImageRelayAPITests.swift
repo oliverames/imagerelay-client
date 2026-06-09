@@ -162,7 +162,8 @@ struct ImageRelayAPITests {
             case "/users/sso_user":
                 let body = try jsonBody(request)
                 #expect(body["first_name"] as? String == "Ava")
-                #expect(body["permission_id"] as? Int == 8)
+                #expect(body["role_id"] as? Int == 8)
+                #expect(body["permission_id"] == nil)
                 return jsonResponse(request, #"{"id":12,"email":"ava@example.com","first_name":"Ava","permission_id":8}"#, statusCode: 201)
             default:
                 Issue.record("Unexpected request path: \(path)")
@@ -228,6 +229,8 @@ struct ImageRelayAPITests {
                 } else if request.httpMethod == "PUT" {
                     let body = try jsonBody(request)
                     #expect(body["name"] as? String == "Updated Bottle")
+                    #expect(body["dimension1_id"] as? Int == 30)
+                    #expect(body["product_custom_attributes"] != nil)
                     return jsonResponse(request, #"{"id":1,"name":"Updated Bottle","sku":"BOT-1"}"#)
                 }
                 return jsonResponse(request, "{}")
@@ -235,6 +238,10 @@ struct ImageRelayAPITests {
                 let body = try jsonBody(request)
                 #expect(body["name"] as? String == "Bottle")
                 #expect(body["product_template_id"] as? Int == 20)
+                #expect(body["product_category_id"] as? Int == 40)
+                #expect(body["dimension1_name"] as? String == "Color")
+                #expect(body["dimension1_value"] as? String == "Blue")
+                #expect(body["product_custom_attributes"] != nil)
                 return jsonResponse(request, #"{"id":1,"name":"Bottle","sku":"BOT-1"}"#)
             case "/products/1/variants":
                 if request.httpMethod == "GET" {
@@ -302,8 +309,24 @@ struct ImageRelayAPITests {
 
         let api = makeAPI()
         #expect(try await api.product(id: 1).sku == "BOT-1")
-        #expect(try await api.createProduct(ProductMutation(name: "Bottle", productTemplateID: 20, sku: "BOT-1")).id == 1)
-        #expect(try await api.updateProduct(id: 1, ProductMutation(name: "Updated Bottle")).name == "Updated Bottle")
+        let productMutation = ProductMutation(
+            name: "Bottle",
+            productTemplateID: 20,
+            productCategoryID: 40,
+            sku: "BOT-1",
+            dimension1Name: "Color",
+            dimension1Value: "Blue",
+            customAttributes: [ProductCustomAttributeAssignment(id: 5, value: "Steel")]
+        )
+        #expect(try await api.createProduct(productMutation).id == 1)
+        #expect(try await api.updateProduct(
+            id: 1,
+            ProductMutation(
+                name: "Updated Bottle",
+                dimension1ID: 30,
+                customAttributes: [ProductCustomAttributeAssignment(id: 5, value: "Aluminum")]
+            )
+        ).name == "Updated Bottle")
         try await api.deleteProduct(id: 1)
         #expect(try await api.productVariants(productID: 1).first?.id == 2)
         #expect(try await api.productVariant(productID: 1, variantID: 2).name == "Blue Bottle")

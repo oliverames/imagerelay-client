@@ -127,6 +127,7 @@ public struct ProductMutation: Encodable, Sendable {
     public let name: String?
     public let productTemplateID: Int?
     public let templateID: Int?
+    public let productCategoryID: Int?
     public let sku: String?
     public let dimension1Name: String?
     public let dimension1Value: String?
@@ -144,6 +145,7 @@ public struct ProductMutation: Encodable, Sendable {
         name: String? = nil,
         productTemplateID: Int? = nil,
         templateID: Int? = nil,
+        productCategoryID: Int? = nil,
         sku: String? = nil,
         dimension1Name: String? = nil,
         dimension1Value: String? = nil,
@@ -160,6 +162,7 @@ public struct ProductMutation: Encodable, Sendable {
         self.name = name
         self.productTemplateID = productTemplateID
         self.templateID = templateID
+        self.productCategoryID = productCategoryID
         self.sku = sku
         self.dimension1Name = dimension1Name
         self.dimension1Value = dimension1Value
@@ -178,18 +181,19 @@ public struct ProductMutation: Encodable, Sendable {
         case name
         case productTemplateID = "product_template_id"
         case templateID = "template_id"
+        case productCategoryID = "product_category_id"
         case sku
-        case dimension1Name = "dimension_1_name"
-        case dimension1Value = "dimension_1_value"
-        case dimension2Name = "dimension_2_name"
-        case dimension2Value = "dimension_2_value"
-        case dimension3Name = "dimension_3_name"
-        case dimension3Value = "dimension_3_value"
+        case dimension1Name = "dimension1_name"
+        case dimension1Value = "dimension1_value"
+        case dimension2Name = "dimension2_name"
+        case dimension2Value = "dimension2_value"
+        case dimension3Name = "dimension3_name"
+        case dimension3Value = "dimension3_value"
         case hasVariants = "has_variants"
-        case dimension1ID = "dimension_1_id"
-        case dimension2ID = "dimension_2_id"
-        case dimension3ID = "dimension_3_id"
-        case customAttributes = "custom_attributes"
+        case dimension1ID = "dimension1_id"
+        case dimension2ID = "dimension2_id"
+        case dimension3ID = "dimension3_id"
+        case customAttributes = "product_custom_attributes"
     }
 }
 

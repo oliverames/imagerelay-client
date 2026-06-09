@@ -162,6 +162,33 @@ struct LibraryAdminTests {
         #expect(dict["last_name"] == nil)
     }
 
+    @Test("SSOUserCreate encodes role_id request key")
+    func encodeSSOUserCreate() throws {
+        let payload = SSOUserCreate(
+            firstName: "Ava",
+            lastName: "Smith",
+            email: "ava@example.com",
+            company: nil,
+            permissionID: 8
+        )
+        let json = try JSONEncoder.imageRelay.encode(payload)
+        let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
+        #expect(dict["first_name"] as? String == "Ava")
+        #expect(dict["role_id"] as? Int == 8)
+        #expect(dict["permission_id"] == nil)
+        #expect(dict["company"] == nil)
+    }
+
+    @Test("SSOUserCreate decodes legacy permission_id alias")
+    func decodeSSOUserCreateLegacyPermissionID() throws {
+        let json = """
+        {"first_name":"Ava","last_name":"Smith","email":"ava@example.com","permission_id":8}
+        """.data(using: .utf8)!
+
+        let payload = try JSONDecoder.imageRelay.decode(SSOUserCreate.self, from: json)
+        #expect(payload.permissionID == 8)
+    }
+
     @Test("KeywordUpdate encodes name field")
     func encodeKeywordUpdate() throws {
         let payload = KeywordUpdate(name: "LOGO-V2")

@@ -47,7 +47,7 @@ distinguishes typed client coverage from UI exposure where that matters.
 | Permission groups | Covered | List and single get are typed. |
 | Users | Covered | Current user, list, single get, search, create/invite, delete, and permission-group update are implemented. |
 | User quick links | Typed | `ImageRelayAPI.userQuickLinks` covers `/users/{id}/quick_links`. Not shown in UI. |
-| Create SSO user | Typed | `ImageRelayAPI.createSSOUser` covers `/users/sso_user`. Not exposed because this affects identity provisioning. |
+| Create SSO user | Typed | `ImageRelayAPI.createSSOUser` covers `/users/sso_user` and sends the documented `role_id` request key. Not exposed because this affects identity provisioning. |
 | Webhooks | Covered | List, supported actions, create, delete, single get, update state, and optional relay consumption are implemented. |
 
 ## Products API
@@ -58,7 +58,7 @@ the visible app workflow until they are live-verified against the account.
 
 | Official area | App coverage | Notes |
 | --- | --- | --- |
-| Products | Typed | List, get, create, update, and delete are typed. UI remains read-only. |
+| Products | Typed | List, get, create, update, and delete are typed. UI remains read-only. Product mutations use the documented `product_category_id`, `dimension1_*`, and `product_custom_attributes` body keys. |
 | Product variants | Typed | List, get, create, PATCH update, and delete are typed. Variant mutations use the documented `variant_dimension_options` and `product_custom_attributes` body keys. |
 | Channel template mappings | Typed | List by channel template ID is typed. |
 | Catalogs and catalog products | Typed | Catalog list, get, create, update, delete, and catalog products are typed. |

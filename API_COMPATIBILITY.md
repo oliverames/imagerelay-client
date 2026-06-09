@@ -83,8 +83,10 @@ currently uses or intentionally leaves out.
   `GET /products.json` lists products when the account has product-catalog API access. Used by
   the Products browser window, with a specific entitlement message for 401/403 product responses.
   The shared typed API wrapper also covers product/catalog/template/attribute/category/dimension
-  reads and writes. Product variant updates use `PATCH /products/{product_id}/variants/{variant_id}`
-  and the documented `variant_dimension_options` and `product_custom_attributes` body keys.
+  reads and writes. Product mutations use the documented `product_category_id`, `dimension1_*`,
+  and `product_custom_attributes` body keys. Product variant updates use
+  `PATCH /products/{product_id}/variants/{variant_id}` and the documented
+  `variant_dimension_options` and `product_custom_attributes` body keys.
 - Webhook administration
   `GET /webhooks.json`, `GET /webhooks/supported.json`, `POST /webhooks.json`,
   `DELETE /webhooks/{id}.json`. The create body uses the live `resource`/`action` contract.
@@ -102,7 +104,9 @@ currently uses or intentionally leaves out.
   `POST /keyword_sets.json` + `DELETE`, `POST /keyword_sets/{id}/keywords.json` + `PUT`
   (rename) + `DELETE`, `POST /folder_links.json` + `DELETE`, `POST /invited_users.json` +
   `DELETE`, `POST /users.json` (invite), `DELETE /users/{id}.json`, and
-  `PUT /users/{id}/permission_group.json`. Used by the Library Admin window.
+  `PUT /users/{id}/permission_group.json`. `POST /users/sso_user` is typed and
+  uses the documented `role_id` request key, but it is not exposed because it
+  affects identity provisioning. Used by the Library Admin window.
 
 - User search
   `GET /users/search.json?q={query}`. The live v2 API filters with `?q=` only; the
