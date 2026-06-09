@@ -89,8 +89,8 @@ Task { completionHandler(...) }
 
 ## Known State
 
-- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). The stable `1.4.0` / build `43` live sync matrix passed there on 2026-06-02. Keep future release testing constrained to that folder unless explicitly asked otherwise.
-- **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version> --smoke-install` for Developer ID signed, notarized DMGs and installed-app smoke verification.
+- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). The stable `1.4.2` / build `45` release was published on 2026-06-09 after local release-candidate checks, Developer ID notarization, GitHub release publishing, and installed-app verification. The last full live sync matrix remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` from 2026-06-02. Keep future release testing constrained to that folder unless explicitly asked otherwise.
+- **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Open release risk**: The App Store Connect API key used for notarization should still be rotated when convenient because an earlier repo-local copy was treated as exposed.
 
 ## macOS 26 SDK Gotchas

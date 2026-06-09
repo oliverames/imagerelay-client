@@ -99,7 +99,12 @@ Task { completionHandler(...) }
 - **Live testing scope**: When exercising live sync with real assets, keep it
   inside the selected `Oliver's Stuff` folder (`2907644`) unless explicitly
   asked otherwise.
-- **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version> --smoke-install` for Developer ID signed, notarized DMGs and installed-app smoke verification.
+- **Current release**: `1.4.2` / build `45` was published on 2026-06-09 after
+  local release-candidate checks, Developer ID notarization, GitHub release
+  publishing, and installed-app verification. The last full live sync matrix
+  remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` (`2907644`) from
+  2026-06-02.
+- **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 
 ## macOS 26 SDK Gotchas

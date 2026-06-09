@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-06-09 - 1.4.2 rate-limit hardening release
+
+**What changed**:
+Shipped `1.4.2` / build `45`. The release includes atomic cross-process shared rate limiter updates so the host app and File Provider extension preserve the same first-window budget under concurrent starts. It also keeps release-candidate SwiftPM tests in `/tmp` via `SWIFTPM_SCRATCH_PATH` to avoid iCloud resource-fork metadata failures during codesign. `Casks/image-relay.rb` was advanced to the notarized DMG SHA-256 `15ea65cc45a097aa2a3ceeaed6086bb9dbe2e1a3f9116480da43f5a5a696a063`.
+
+**Decisions made**:
+- Cut `1.4.2` because `v1.4.1` predated commit `692a110`; the rate-limit hardening was on `main` but not in a public release.
+- Built artifacts first, pushed release metadata, then installed from the GitHub release DMG to match the requested release order.
+- Did not run live synthetic sync tests; verification stayed local, signed, and release-artifact based.
+
+**Left off at**:
+- Release commit `37a4848` is tagged as `v1.4.2` and published at https://github.com/oliverames/imagerelay-client/releases/tag/v1.4.2.
+- Installed `/Applications/Image Relay.app` reports `1.4.2` build `45`, passes codesign and Gatekeeper, launches from `/Applications`, and registers `com.oliverames.imagerelay-client.fileprovider(1.4.2)`.
+- Verification passed: `scripts/run-release-candidate-checks.sh 1.4.2`, Developer ID app/DMG notarization accepted and stapled, and release DMG checksum verified after downloading from GitHub.
+
+**Open questions**:
+- Still open: rotate the App Store Connect API key when convenient because an earlier repo-local copy was treated as exposed.
+
+---
+
 ## 2026-06-05 - Remove synthetic live-sync test harness
 
 **What changed**:
