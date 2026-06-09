@@ -81,6 +81,11 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
 /// The state file is updated through `NSFileCoordinator` to make read-modify-write
 /// safe across processes; the same coordination pattern is used by `ThrottleStateStore`.
 public actor SharedRateLimiter: AsyncRateLimiting {
+    private struct AcquireAttempt: Sendable {
+        let acquired: Bool
+        let sleepFor: Double
+    }
+
     // Image Relay documents a hard 5 requests/second/IP ceiling. Keep one
     // request/second of headroom for timing drift, browser/API activity, and
     // other Image Relay clients on the same network.
@@ -135,154 +140,156 @@ public actor SharedRateLimiter: AsyncRateLimiting {
             try? Task.checkCancellation()
 
             let now = Date().timeIntervalSince1970
-            var state = readState()
-            // Prune timestamps outside the rolling window.
-            let cutoff = now - period
-            state.timestamps = state.timestamps.filter { $0 >= cutoff }
+            let attempt = updateState { state in
+                // Prune timestamps outside the rolling window.
+                let cutoff = now - period
+                state.timestamps = state.timestamps.filter { $0 >= cutoff }
 
-            let effectiveMax = Self.effectiveMaxRequests(
-                rampPhase: state.rampPhase,
-                fullMax: maxRequests
-            )
-            let cooldownWait = state.nextProbeAfter.map { max(0, $0 - now) } ?? 0
-            let windowIsFull = state.timestamps.count >= effectiveMax
+                let effectiveMax = Self.effectiveMaxRequests(
+                    rampPhase: state.rampPhase,
+                    fullMax: maxRequests
+                )
+                let cooldownWait = state.nextProbeAfter.map { max(0, $0 - now) } ?? 0
+                let windowIsFull = state.timestamps.count >= effectiveMax
 
-            if state.rampPhase == 4 {
-                if let activeProbeToken {
-                    let tokenStillLeased = state.probeToken == activeProbeToken
-                        && (state.probeTokenExpires ?? 0) > now
-                    if !tokenStillLeased {
-                        self.activeProbeToken = nil
+                if state.rampPhase == 4 {
+                    if let activeProbeToken {
+                        let tokenStillLeased = state.probeToken == activeProbeToken
+                            && (state.probeTokenExpires ?? 0) > now
+                        if !tokenStillLeased {
+                            self.activeProbeToken = nil
+                        }
                     }
-                }
-                // Single-probe lock semantics: one in-flight request total. If
-                // the previous holder's lease has expired, grab it; otherwise wait until
-                // the next chance. The same actor is not allowed to reacquire while
-                // its previous probe is still awaiting an API outcome.
-                let lockIsFree: Bool
-                if state.probeToken != nil {
-                    if let expires = state.probeTokenExpires, expires < now {
-                        // Stale lease — steal.
-                        lockIsFree = true
+                    // Single-probe lock semantics: one in-flight request total. If
+                    // the previous holder's lease has expired, grab it; otherwise wait until
+                    // the next chance. The same actor is not allowed to reacquire while
+                    // its previous probe is still awaiting an API outcome.
+                    let lockIsFree: Bool
+                    if state.probeToken != nil {
+                        if let expires = state.probeTokenExpires, expires < now {
+                            // Stale lease — steal.
+                            lockIsFree = true
+                        } else {
+                            lockIsFree = false
+                        }
                     } else {
-                        lockIsFree = false
+                        lockIsFree = true
+                    }
+
+                    if cooldownWait <= 0, lockIsFree, !windowIsFull, activeProbeToken == nil {
+                        let token = "\(processIdentifier):\(UUID().uuidString)"
+                        activeProbeToken = token
+                        state.probeToken = token
+                        state.probeTokenExpires = now + probeLockTTL
+                        state.nextProbeAfter = nil
+                        state.timestamps.append(now)
+                        return AcquireAttempt(acquired: true, sleepFor: 0)
                     }
                 } else {
-                    lockIsFree = true
+                    if cooldownWait <= 0, !windowIsFull {
+                        state.nextProbeAfter = nil
+                        state.timestamps.append(now)
+                        return AcquireAttempt(acquired: true, sleepFor: 0)
+                    }
                 }
 
-                if cooldownWait <= 0, lockIsFree, !windowIsFull, activeProbeToken == nil {
-                    let token = "\(processIdentifier):\(UUID().uuidString)"
-                    activeProbeToken = token
-                    state.probeToken = token
-                    state.probeTokenExpires = now + probeLockTTL
-                    state.nextProbeAfter = nil
-                    state.timestamps.append(now)
-                    writeState(state)
-                    return
+                var sleepCandidates: [Double] = []
+                if cooldownWait > 0 {
+                    sleepCandidates.append(cooldownWait)
                 }
-            } else {
-                if cooldownWait <= 0, !windowIsFull {
-                    state.nextProbeAfter = nil
-                    state.timestamps.append(now)
-                    writeState(state)
-                    return
+                if windowIsFull, let oldest = state.timestamps.first {
+                    sleepCandidates.append(max(0.01, period - (now - oldest)))
                 }
+                if state.rampPhase == 4, activeProbeToken != nil {
+                    sleepCandidates.append(0.05)
+                } else if state.rampPhase == 4,
+                          let expires = state.probeTokenExpires,
+                          expires > now {
+                    sleepCandidates.append(max(0.05, expires - now))
+                }
+                return AcquireAttempt(acquired: false, sleepFor: sleepCandidates.min() ?? 0.05)
             }
 
-            var sleepCandidates: [Double] = []
-            if cooldownWait > 0 {
-                sleepCandidates.append(cooldownWait)
+            if attempt.acquired {
+                return
             }
-            if windowIsFull, let oldest = state.timestamps.first {
-                sleepCandidates.append(max(0.01, period - (now - oldest)))
-            }
-            if state.rampPhase == 4, activeProbeToken != nil {
-                sleepCandidates.append(0.05)
-            } else if state.rampPhase == 4,
-                      let expires = state.probeTokenExpires,
-                      expires > now {
-                sleepCandidates.append(max(0.05, expires - now))
-            }
-            let sleepFor = sleepCandidates.min() ?? 0.05
-            try? await Task.sleep(for: .seconds(sleepFor))
+            try? await Task.sleep(for: .seconds(attempt.sleepFor))
         }
     }
 
     public func recordRateLimit() async {
-        var state = readState()
-        let now = Date().timeIntervalSince1970
-        // Tighten gradually so one incidental 429 does not collapse the whole
-        // client into single-probe mode. Repeated 429s still converge quickly
-        // to phase 4, where only one cross-process recovery probe is allowed.
-        state.rampPhase = min(4, max(state.rampPhase, state.consecutiveRateLimits + 1))
-        state.consecutiveSuccesses = 0
-        state.consecutiveRateLimits = min(state.consecutiveRateLimits + 1, 20)
-        state.nextProbeAfter = now + Self.rateLimitCooldown(
-            consecutiveRateLimits: state.consecutiveRateLimits,
-            base: rateLimitCooldownBase,
-            maximum: maxRateLimitCooldown
-        )
-        // Releasing whatever probe token we may have held; the next probe will compete
-        // for the lock fresh.
-        if let activeProbeToken, state.probeToken == activeProbeToken {
-            state.probeToken = nil
-            state.probeTokenExpires = nil
-            self.activeProbeToken = nil
+        updateState { state in
+            let now = Date().timeIntervalSince1970
+            // Tighten gradually so one incidental 429 does not collapse the whole
+            // client into single-probe mode. Repeated 429s still converge quickly
+            // to phase 4, where only one cross-process recovery probe is allowed.
+            state.rampPhase = min(4, max(state.rampPhase, state.consecutiveRateLimits + 1))
+            state.consecutiveSuccesses = 0
+            state.consecutiveRateLimits = min(state.consecutiveRateLimits + 1, 20)
+            state.nextProbeAfter = now + Self.rateLimitCooldown(
+                consecutiveRateLimits: state.consecutiveRateLimits,
+                base: rateLimitCooldownBase,
+                maximum: maxRateLimitCooldown
+            )
+            // Releasing whatever probe token we may have held; the next probe will compete
+            // for the lock fresh.
+            if let activeProbeToken, state.probeToken == activeProbeToken {
+                state.probeToken = nil
+                state.probeTokenExpires = nil
+                self.activeProbeToken = nil
+            }
         }
-        writeState(state)
     }
 
     public func recordSuccess() async {
-        var state = readState()
-        let now = Date().timeIntervalSince1970
-        let hadRecoveryState = state.consecutiveRateLimits != 0 || state.nextProbeAfter != nil
-        let cooldownStillActive = state.nextProbeAfter.map { $0 > now } ?? false
-        let holdsActiveProbe = state.rampPhase == 4
-            && activeProbeToken != nil
-            && state.probeToken == activeProbeToken
+        updateState { state in
+            let now = Date().timeIntervalSince1970
+            let hadRecoveryState = state.consecutiveRateLimits != 0 || state.nextProbeAfter != nil
+            let cooldownStillActive = state.nextProbeAfter.map { $0 > now } ?? false
+            let holdsActiveProbe = state.rampPhase == 4
+                && activeProbeToken != nil
+                && state.probeToken == activeProbeToken
 
-        if cooldownStillActive && !holdsActiveProbe {
-            // This success belongs to a request that was already in flight when
-            // another request hit a 429. Do not let stale successes reopen the
-            // bucket before the coordinated cooldown expires.
-            if activeProbeToken != nil {
-                activeProbeToken = nil
+            if cooldownStillActive && !holdsActiveProbe {
+                // This success belongs to a request that was already in flight when
+                // another request hit a 429. Do not let stale successes reopen the
+                // bucket before the coordinated cooldown expires.
+                if activeProbeToken != nil {
+                    activeProbeToken = nil
+                }
+                return
             }
-            return
-        }
 
-        if state.rampPhase == 4 && !holdsActiveProbe {
-            // A success from a request that was already in flight before another
-            // process observed a 429 must not clear the shared cooldown.
-            if activeProbeToken != nil {
-                activeProbeToken = nil
+            if state.rampPhase == 4 && !holdsActiveProbe {
+                // A success from a request that was already in flight before another
+                // process observed a 429 must not clear the shared cooldown.
+                if activeProbeToken != nil {
+                    activeProbeToken = nil
+                }
+                return
             }
-            return
-        }
 
-        // Release single-probe lock if we hold it — the next request can compete.
-        if holdsActiveProbe {
-            state.probeToken = nil
-            state.probeTokenExpires = nil
-            self.activeProbeToken = nil
-        }
-        state.consecutiveRateLimits = 0
-        state.nextProbeAfter = nil
-        guard state.rampPhase > 0 else {
-            // Already at full rate — nothing to recover.
-            if state.consecutiveSuccesses != 0 || hadRecoveryState {
+            // Release single-probe lock if we hold it — the next request can compete.
+            if holdsActiveProbe {
+                state.probeToken = nil
+                state.probeTokenExpires = nil
+                self.activeProbeToken = nil
+            }
+            state.consecutiveRateLimits = 0
+            state.nextProbeAfter = nil
+            guard state.rampPhase > 0 else {
+                // Already at full rate — nothing to recover.
+                if state.consecutiveSuccesses != 0 || hadRecoveryState {
+                    state.consecutiveSuccesses = 0
+                }
+                return
+            }
+            state.consecutiveSuccesses += 1
+            if state.consecutiveSuccesses >= recoveryHysteresis {
+                state.rampPhase = max(0, state.rampPhase - 1)
                 state.consecutiveSuccesses = 0
-                writeState(state)
             }
-            return
         }
-        state.consecutiveSuccesses += 1
-        if state.consecutiveSuccesses >= recoveryHysteresis {
-            state.rampPhase = max(0, state.rampPhase - 1)
-            state.consecutiveSuccesses = 0
-        }
-        writeState(state)
     }
 
     /// Compute the in-window request budget at a given ramp phase. Pure function;
@@ -317,20 +324,12 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         let coordinator = NSFileCoordinator(filePresenter: nil)
 
         coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
-            guard FileManager.default.fileExists(atPath: coordinatedURL.path),
-                  let data = try? Data(contentsOf: coordinatedURL),
-                  let state = try? JSONDecoder().decode(SharedRateLimiterState.self, from: data) else {
-                return
-            }
-            loaded = state
+            loaded = Self.readStateDirect(from: coordinatedURL)
             coordinatedRead = true
         }
 
-        if !coordinatedRead,
-           FileManager.default.fileExists(atPath: url.path),
-           let data = try? Data(contentsOf: url),
-           let state = try? JSONDecoder().decode(SharedRateLimiterState.self, from: data) {
-            loaded = state
+        if !coordinatedRead {
+            loaded = Self.readStateDirect(from: url)
         }
 
         return loaded
@@ -340,7 +339,6 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     /// atomic write if coordination fails (the file is recoverable — at worst
     /// we'll re-read a slightly stale state on the next acquire).
     func writeState(_ state: SharedRateLimiterState) {
-        guard let data = try? JSONEncoder().encode(state) else { return }
         try? FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -350,16 +348,64 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         var coordinationError: NSError?
         let coordinator = NSFileCoordinator(filePresenter: nil)
         coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { coordinatedURL in
-            do {
-                try data.write(to: coordinatedURL, options: .atomic)
-                coordinatedWriteSucceeded = true
-            } catch {
-                coordinatedWriteSucceeded = false
-            }
+            coordinatedWriteSucceeded = Self.writeStateDirect(state, to: coordinatedURL)
         }
 
         if !coordinatedWriteSucceeded {
-            try? data.write(to: url, options: .atomic)
+            _ = Self.writeStateDirect(state, to: url)
+        }
+    }
+
+    @discardableResult
+    private func updateState<T>(_ update: (inout SharedRateLimiterState) -> T) -> T {
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        var result: T?
+        var coordinatedWriteSucceeded = false
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(writingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            var state = Self.readStateDirect(from: coordinatedURL)
+            let updateResult = update(&state)
+            coordinatedWriteSucceeded = Self.writeStateDirect(state, to: coordinatedURL)
+            if coordinatedWriteSucceeded {
+                result = updateResult
+            }
+        }
+
+        if let result {
+            return result
+        }
+
+        var state = Self.readStateDirect(from: url)
+        let updateResult = update(&state)
+        _ = Self.writeStateDirect(state, to: url)
+        return updateResult
+    }
+
+    private static func readStateDirect(from url: URL) -> SharedRateLimiterState {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let state = try? JSONDecoder().decode(SharedRateLimiterState.self, from: data) else {
+            return SharedRateLimiterState()
+        }
+        return state
+    }
+
+    private static func writeStateDirect(_ state: SharedRateLimiterState, to url: URL) -> Bool {
+        guard let data = try? JSONEncoder().encode(state) else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            return false
         }
     }
 }

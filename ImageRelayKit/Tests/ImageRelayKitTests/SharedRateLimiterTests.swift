@@ -41,6 +41,33 @@ struct SharedRateLimiterTests {
         #expect(elapsed >= 0.4)
     }
 
+    @Test("separate limiter instances share the same first-window budget")
+    func separateInstancesShareBudget() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiters = (0..<3).map { index in
+            SharedRateLimiter(
+                url: url,
+                maxRequests: 1,
+                period: 0.2,
+                processIdentifier: "process-\(index)"
+            )
+        }
+
+        let start = Date()
+        await withTaskGroup(of: Void.self) { group in
+            for limiter in limiters {
+                group.addTask {
+                    await limiter.acquire()
+                }
+            }
+        }
+        let elapsed = Date().timeIntervalSince(start)
+
+        #expect(elapsed >= 0.35)
+        #expect(await limiters[0].readState().timestamps.count <= 1)
+    }
+
     @Test("recordRateLimit tightens gradually and clears process probe")
     func recordRateLimitTightensGradually() async throws {
         let url = Self.makeURL()
