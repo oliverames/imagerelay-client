@@ -76,10 +76,15 @@ currently uses or intentionally leaves out.
   members, and `PUT /collections/{id}.json` appends to membership with comma-separated
   `asset_ids`. The PUT endpoint uses **delta-add** semantics on the live v2 API:
   IDs in the body are appended, IDs already present become no-ops, and omitted IDs are
-  NOT removed. Used by the Collections browser window.
+  NOT removed. Used by the Collections browser window. Individual removal is implemented
+  as a conservative workaround: create a replacement collection, add all remaining assets,
+  then delete the original only after the replacement is populated.
 - Products (read-only)
   `GET /products.json` lists products when the account has product-catalog API access. Used by
   the Products browser window, with a specific entitlement message for 401/403 product responses.
+  The shared typed API wrapper also covers product/catalog/template/attribute/category/dimension
+  reads and writes. Product variant updates use `PATCH /products/{product_id}/variants/{variant_id}`
+  and the documented `variant_dimension_options` and `product_custom_attributes` body keys.
 - Webhook administration
   `GET /webhooks.json`, `GET /webhooks/supported.json`, `POST /webhooks.json`,
   `DELETE /webhooks/{id}.json`. The create body uses the live `resource`/`action` contract.
@@ -115,19 +120,12 @@ currently uses or intentionally leaves out.
 
 ## Not Yet Implemented
 
-- Collection item removal
-  The Image Relay v2 API has no working endpoint for removing an individual file from a
-  collection. Probed paths (`DELETE /collections/{id}/files/{file_id}.json`,
-  `DELETE /collections/{id}/files.json`, `PATCH`/`PUT` variants) all return 404, and
-  `PUT /collections/{id}.json` is delta-add (omitting IDs does NOT drop them). Users must
-  remove items from the web app, or delete and recreate the collection. Tracked as a
-  request to Image Relay support.
 - Synced files / multi-folder asset memberships
   See "Partially Supported" below — multi-folder downloads work, but creating new
   multi-folder memberships through the dedicated synced-file API doesn't.
 - Upload by URL
 - Duplicate file and public sharing link write management
-- Catalog endpoints beyond product list
+- Product/catalog/template/attribute/category/dimension write workflows in the UI
 
 ## Important Edge-Case Decisions
 

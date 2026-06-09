@@ -130,7 +130,7 @@ public struct ImageRelayAPI: Sendable {
         variantID: Int,
         _ mutation: ProductVariantMutation
     ) async throws -> ProductVariant {
-        try await client.put("/products/\(productID)/variants/\(variantID)", body: mutation)
+        try await client.patch("/products/\(productID)/variants/\(variantID)", body: mutation)
     }
 
     public func deleteProductVariant(productID: Int, variantID: Int) async throws {

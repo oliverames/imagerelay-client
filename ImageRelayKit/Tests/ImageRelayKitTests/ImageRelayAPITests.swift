@@ -240,9 +240,17 @@ struct ImageRelayAPITests {
                 if request.httpMethod == "GET" {
                     return jsonResponse(request, #"[{"id":2,"name":"Blue Bottle","product_id":1}]"#)
                 }
+                let body = try jsonBody(request)
+                #expect(body["variant_dimension_options"] != nil)
+                #expect(body["product_custom_attributes"] != nil)
                 return jsonResponse(request, #"{"id":2,"name":"Blue Bottle","product_id":1}"#)
             case "/products/1/variants/2":
-                if request.httpMethod == "GET" || request.httpMethod == "PUT" {
+                if request.httpMethod == "GET" || request.httpMethod == "PATCH" {
+                    if request.httpMethod == "PATCH" {
+                        let body = try jsonBody(request)
+                        #expect(body["variant_dimension_options"] != nil)
+                        #expect(body["product_custom_attributes"] != nil)
+                    }
                     return jsonResponse(request, #"{"id":2,"name":"Blue Bottle","product_id":1}"#)
                 }
                 return jsonResponse(request, "{}")
@@ -299,8 +307,13 @@ struct ImageRelayAPITests {
         try await api.deleteProduct(id: 1)
         #expect(try await api.productVariants(productID: 1).first?.id == 2)
         #expect(try await api.productVariant(productID: 1, variantID: 2).name == "Blue Bottle")
-        #expect(try await api.createProductVariant(productID: 1, ProductVariantMutation(name: "Blue Bottle")).id == 2)
-        #expect(try await api.updateProductVariant(productID: 1, variantID: 2, ProductVariantMutation(name: "Blue Bottle")).id == 2)
+        let variantMutation = ProductVariantMutation(
+            name: "Blue Bottle",
+            options: [ProductVariantOptionAssignment(dimensionID: 20, dimensionOptionID: 21)],
+            customAttributes: [ProductCustomAttributeAssignment(id: 5, value: "Steel")]
+        )
+        #expect(try await api.createProductVariant(productID: 1, variantMutation).id == 2)
+        #expect(try await api.updateProductVariant(productID: 1, variantID: 2, variantMutation).id == 2)
         try await api.deleteProductVariant(productID: 1, variantID: 2)
         #expect(try await api.channelTemplateMappings(channelTemplateID: 77).first?.name == "Shopify Title")
         #expect(try await api.productCatalogs().first?.id == 3)
@@ -332,7 +345,7 @@ struct ImageRelayAPITests {
             "GET /products/1/variants",
             "GET /products/1/variants/2",
             "POST /products/1/variants",
-            "PUT /products/1/variants/2",
+            "PATCH /products/1/variants/2",
             "DELETE /products/1/variants/2",
             "GET /product_channel_template_mappings/77",
             "GET /product_catalogs",

@@ -59,7 +59,7 @@ the visible app workflow until they are live-verified against the account.
 | Official area | App coverage | Notes |
 | --- | --- | --- |
 | Products | Typed | List, get, create, update, and delete are typed. UI remains read-only. |
-| Product variants | Typed | List, get, create, update, and delete are typed. |
+| Product variants | Typed | List, get, create, PATCH update, and delete are typed. Variant mutations use the documented `variant_dimension_options` and `product_custom_attributes` body keys. |
 | Channel template mappings | Typed | List by channel template ID is typed. |
 | Catalogs and catalog products | Typed | Catalog list, get, create, update, delete, and catalog products are typed. |
 | Templates | Typed | List, get, create, and update are typed. |
@@ -96,6 +96,7 @@ Current policy:
 2. Decide which typed admin endpoints should become visible workflows versus
    staying as service coverage for future automation.
 3. Keep product mutation payloads conservative until real account responses
-   confirm required fields and validation rules for this workspace.
+   confirm required fields, validation rules, and the documented malformed
+   variant/catalog paths for this workspace.
 4. Re-check documented typo paths, especially `/files/{file_id}/dupicate`, before
    making user-facing actions depend on them.

@@ -423,6 +423,23 @@ struct APIClientTests {
         #expect(observedMethod == "PUT")
     }
 
+    @Test("Void PATCH accepts no-content success responses")
+    func patchNoContent() async throws {
+        var observedMethod = ""
+        MockURLProtocol.requestHandler = { request in
+            observedMethod = request.httpMethod ?? ""
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 204,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data())
+        }
+
+        let client = makeClient()
+        try await client.patch("/products/1/variants/2", body: ProductVariantMutation(name: "Blue Bottle"))
+        #expect(observedMethod == "PATCH")
+    }
+
     @Test("401 throws notAuthenticated")
     func handles401() async {
         MockURLProtocol.requestHandler = { request in

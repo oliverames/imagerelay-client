@@ -163,6 +163,16 @@ public actor APIClient {
         let _: EmptyResponse = try await execute(request)
     }
 
+    public func patch<T: Decodable & Sendable>(_ path: String, body: any Encodable & Sendable) async throws -> T {
+        let request = try buildRequest(method: "PATCH", path: path, body: body)
+        return try await execute(request)
+    }
+
+    public func patch(_ path: String, body: any Encodable & Sendable) async throws {
+        let request = try buildRequest(method: "PATCH", path: path, body: body)
+        let _: EmptyResponse = try await execute(request)
+    }
+
     public func delete(_ path: String) async throws {
         let request = try buildRequest(method: "DELETE", path: path)
         let _: EmptyResponse = try await execute(request)

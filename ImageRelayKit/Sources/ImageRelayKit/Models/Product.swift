@@ -118,7 +118,7 @@ public struct ProductCustomAttributeAssignment: Codable, Sendable, Hashable {
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(id, forKey: .id)
+        try c.encode(id, forKey: .productCustomAttributeID)
         try c.encode(value, forKey: .value)
     }
 }
@@ -275,8 +275,8 @@ public struct ProductVariantMutation: Encodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case name
-        case options
-        case customAttributes = "custom_attributes"
+        case options = "variant_dimension_options"
+        case customAttributes = "product_custom_attributes"
     }
 }
 
