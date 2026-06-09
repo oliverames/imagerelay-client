@@ -17,6 +17,7 @@ struct ImageRelayClientApp: App {
         let arguments = CommandLine.arguments
         let isUtilityInvocation = arguments.contains("--export-diagnostics")
             || arguments.contains("--reset-file-provider-domain")
+            || arguments.contains("--repair-api-key-from-env")
 
         _domainManager = State(initialValue: DomainManager(autoBootstrap: !isUtilityInvocation))
         _updateController = State(initialValue: UpdateController(startingUpdater: !isUtilityInvocation))
@@ -50,12 +51,46 @@ struct ImageRelayClientApp: App {
             return
         }
 
+        if arguments.contains("--repair-api-key-from-env") {
+            Task { @MainActor in
+                do {
+                    try Self.repairAPIKeyFromEnvironment()
+                    print("API key repaired")
+                    fflush(stdout)
+                    Darwin.exit(0)
+                } catch {
+                    fputs("API key repair failed: \(error.localizedDescription)\n", stderr)
+                    Darwin.exit(1)
+                }
+            }
+            return
+        }
+
         guard arguments.contains("--reset-file-provider-domain") else { return }
         Task { @MainActor in
             let manager = DomainManager(autoBootstrap: false)
             await manager.resetDomain()
             NSApplication.shared.terminate(nil)
         }
+    }
+
+    private static func repairAPIKeyFromEnvironment() throws {
+        guard let apiKey = ProcessInfo.processInfo.environment["IMAGERELAY_API_KEY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !apiKey.isEmpty else {
+            throw UtilityError.missingAPIKeyEnvironment
+        }
+
+        guard let container = AppConfiguration.containerURL() else {
+            throw UtilityError.appGroupUnavailable
+        }
+
+        let configURL = AppConfiguration.fileURL(in: container)
+        var config = (try? AppConfiguration.loadWithoutSecrets(from: configURL)) ?? .default
+        config.authMethod = .apiKey
+        config.apiKey = apiKey
+        config.userAgent = AppConfiguration.normalizedMacUserAgent(config.userAgent)
+        try config.save(to: configURL)
     }
 
     var body: some Scene {
@@ -172,6 +207,20 @@ struct ImageRelayClientApp: App {
             }
         default:
             break
+        }
+    }
+}
+
+private enum UtilityError: LocalizedError {
+    case missingAPIKeyEnvironment
+    case appGroupUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKeyEnvironment:
+            return "IMAGERELAY_API_KEY is not set."
+        case .appGroupUnavailable:
+            return "App Group container is unavailable."
         }
     }
 }

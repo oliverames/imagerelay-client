@@ -78,6 +78,55 @@ struct ConfigurationTests {
         #expect(json?["api_key"] == nil)
     }
 
+    @Test("Saving API key auth with an empty in-memory key preserves existing Keychain item")
+    func emptyAPIKeySavePreservesExistingKeychainItem() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        KeychainStore.save("stored-secret", account: account, accessGroup: nil)
+        var config = AppConfiguration.default
+        config.authMethod = .apiKey
+        config.apiKey = ""
+        config.defaultFileTypeID = 456
+
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.apiKey == "stored-secret")
+        #expect(loaded.defaultFileTypeID == 456)
+        #expect(KeychainStore.load(account: account, accessGroup: nil) == "stored-secret")
+    }
+
+    @Test("Saving OAuth auth clears stale API key")
+    func oauthSaveClearsStaleAPIKey() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        cleanOAuthKeychain()
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+            cleanOAuthKeychain()
+        }
+
+        KeychainStore.save("stored-secret", account: account, accessGroup: nil)
+        var config = AppConfiguration.default
+        config.authMethod = .oauth
+        config.apiKey = ""
+        config.oauthTenant = "tenant"
+        config.oauthClientID = "client"
+        config.oauthClientSecret = "secret"
+
+        try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
+
+        #expect(KeychainStore.load(account: account, accessGroup: nil) == nil)
+    }
+
     @Test("Legacy config.json with api_key migrates to Keychain")
     func legacyMigration() throws {
         let account = testKeychainAccount()
@@ -225,7 +274,9 @@ struct ConfigurationTests {
             "ImageRelayClient/1.4.0-beta.1",
             "ImageRelayClient/1.4.0-beta.1 (macOS)",
             "ImageRelayClient/1.4.0",
-            "ImageRelayClient/1.4.0 (macOS)"
+            "ImageRelayClient/1.4.0 (macOS)",
+            "ImageRelayClient/1.4.2 (macOS; https://github.com/oliverames/imagerelay-client)",
+            "ImageRelayClient/1.4.2 (https://github.com/oliverames/imagerelay-client)"
         ]
 
         for userAgent in previousBuiltInDefaults {

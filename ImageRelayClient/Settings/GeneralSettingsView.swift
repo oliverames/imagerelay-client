@@ -38,7 +38,7 @@ struct GeneralSettingsView: View {
     }
 
     private var hasValidationError: Bool {
-        !rootFolderIDValid || !defaultFileTypeIDValid
+        !rootFolderIDValid || !defaultFileTypeIDValid || uploadNeedsDefaultFileType
     }
 
     private var uploadNeedsDefaultFileType: Bool {
@@ -227,7 +227,6 @@ struct GeneralSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { loadConfig() }
-        .onDisappear { saveConfig() }
     }
 
     @ViewBuilder

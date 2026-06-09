@@ -93,15 +93,25 @@ public struct AppConfiguration: Codable, Sendable {
         if trimmed.isEmpty {
             return currentMacUserAgent
         }
-        return legacyMacUserAgents.contains(trimmed) ? currentMacUserAgent : trimmed
+        if legacyMacUserAgents.contains(trimmed) || isVersionedBuiltInUserAgent(trimmed, platform: "macOS") {
+            return currentMacUserAgent
+        }
+        return trimmed
     }
 
     public static func normalizedIOSUserAgent(_ userAgent: String) -> String {
         let trimmed = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || legacyIOSUserAgents.contains(trimmed) {
+        if trimmed.isEmpty || legacyIOSUserAgents.contains(trimmed) || isVersionedBuiltInUserAgent(trimmed, platform: "iOS") {
             return currentIOSUserAgent
         }
         return trimmed.contains("(iOS") ? trimmed : currentIOSUserAgent
+    }
+
+    private static func isVersionedBuiltInUserAgent(_ userAgent: String, platform: String) -> Bool {
+        let escapedURL = NSRegularExpression.escapedPattern(for: userAgentContactURL)
+        let escapedPlatform = NSRegularExpression.escapedPattern(for: platform)
+        let pattern = #"^ImageRelayClient/[0-9][A-Za-z0-9.\-]*( \(\#(escapedPlatform); \#(escapedURL)\)| \(\#(escapedURL)\))$"#
+        return userAgent.range(of: pattern, options: .regularExpression) != nil
     }
 
     // apiKey, OAuth tokens, OAuth client secret, and transient OAuth
@@ -315,9 +325,9 @@ public struct AppConfiguration: Codable, Sendable {
     }
 
     func save(to url: URL, keychainAccount: String, keychainAccessGroup: String?) throws {
-        if apiKey.isEmpty {
+        if apiKey.isEmpty, authMethod == .oauth {
             try KeychainStore.deleteRequired(account: keychainAccount, accessGroup: keychainAccessGroup)
-        } else {
+        } else if !apiKey.isEmpty {
             try KeychainStore.saveRequired(apiKey, account: keychainAccount, accessGroup: keychainAccessGroup)
         }
         if let oauthTokens {

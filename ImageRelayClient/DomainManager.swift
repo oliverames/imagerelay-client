@@ -548,6 +548,8 @@ final class DomainManager {
         refreshStatus()
         let progress = syncProgress
         let throttleState = AppConfiguration.sharedThrottleStateStore()?.load()
+        let limiterState = sharedRateLimiterState()
+        let nextSharedProbe = limiterState.nextProbeAfter.map { Date(timeIntervalSince1970: $0) }
         return """
         Image Relay Diagnostics Snapshot
         Domain active: \(isDomainActive)
@@ -564,6 +566,9 @@ final class DomainManager {
         Rate limited until: \(progress.rateLimitedUntil?.description ?? "not rate-limited")
         Rate-limit waits in flight: \(progress.rateLimitInFlight)
         429s recorded: \(progress.recentRateLimitCount)
+        Shared limiter phase: \(limiterState.rampPhase)
+        Shared limiter consecutive 429s: \(limiterState.consecutiveRateLimits)
+        Shared limiter next probe: \(nextSharedProbe?.description ?? "ready")
         Last File Provider signal: \(progress.lastFileProviderSignalAt?.description ?? "never")
         File Provider signal failures: \(progress.lastFileProviderSignalFailureCount)
         File Provider signal error: \(progress.lastFileProviderSignalError ?? "none")
@@ -574,6 +579,19 @@ final class DomainManager {
         Next remote poll: \(progress.nextRemotePollAt?.description ?? "unknown")
         File Provider PID: \(progress.fileProviderPID.map(String.init) ?? "unknown")
         """
+    }
+
+    private func sharedRateLimiterState() -> SharedRateLimiterState {
+        guard let container = AppConfiguration.containerURL() else {
+            return SharedRateLimiterState()
+        }
+        let url = SharedRateLimiter.fileURL(in: container)
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let state = try? JSONDecoder().decode(SharedRateLimiterState.self, from: data) else {
+            return SharedRateLimiterState()
+        }
+        return state
     }
 
     func completeOAuthCallback(_ url: URL) async {

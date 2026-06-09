@@ -19,7 +19,7 @@
   <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
     <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
-  <img src="https://img.shields.io/badge/status-1.4.2-f5a542?style=flat-square" alt="1.4.2">
+  <img src="https://img.shields.io/badge/status-1.4.3-f5a542?style=flat-square" alt="1.4.3">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
     <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
@@ -35,7 +35,7 @@ Explore the features, visual workflow, and architecture of the client on our pre
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.4 stable**: `1.4.2` is packaged, notarized, and published through the in-app Sparkle feed, the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest), and the Homebrew cask. This release focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, broader API coverage, rate-limit hardening, and better release automation.
+> **1.4 stable**: `1.4.3` is packaged, notarized, and published through the in-app Sparkle feed, the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest), and the Homebrew cask. This release focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, broader API coverage, rate-limit hardening, credential recovery, and better release automation.
 
 ## Why This Exists
 
@@ -208,7 +208,7 @@ swift test --package-path ImageRelayKit
 scripts/run-release-candidate-checks.sh
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.4.2 --smoke-install
+scripts/build-developer-id-release.sh --version 1.4.3 --smoke-install
 ```
 
 ## Known Limitations
