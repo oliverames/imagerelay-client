@@ -2,6 +2,7 @@ import Foundation
 
 public struct AppConfiguration: Codable, Sendable {
     private static let fallbackAppVersion = "1.4.0"
+    public static let userAgentContactURL = "https://github.com/oliverames/imagerelay-client"
     private static let versionedBundleIdentifiers: Set<String> = [
         "com.oliverames.imagerelay-client",
         "com.oliverames.imagerelay-client.fileprovider",
@@ -19,9 +20,9 @@ public struct AppConfiguration: Codable, Sendable {
         return version
     }
 
-    public static var currentServiceUserAgent: String { "ImageRelayClient/\(currentAppVersion)" }
-    public static var currentMacUserAgent: String { "\(currentServiceUserAgent) (macOS)" }
-    public static var currentIOSUserAgent: String { "\(currentServiceUserAgent) (iOS)" }
+    public static var currentServiceUserAgent: String { "ImageRelayClient/\(currentAppVersion) (\(userAgentContactURL))" }
+    public static var currentMacUserAgent: String { "ImageRelayClient/\(currentAppVersion) (macOS; \(userAgentContactURL))" }
+    public static var currentIOSUserAgent: String { "ImageRelayClient/\(currentAppVersion) (iOS; \(userAgentContactURL))" }
     public static let defaultOAuthRedirectURI = "https://imagerelay-oauth.amesvt.com/callback"
     private static let legacyNativeOAuthRedirectURI = "imagerelay-client://oauth/callback"
 
@@ -61,34 +62,46 @@ public struct AppConfiguration: Codable, Sendable {
         "ImageRelayClient/1.3.2",
         "ImageRelayClient/1.3.2 (macOS)",
         "ImageRelayClient/1.4.0-beta.1",
-        "ImageRelayClient/1.4.0-beta.1 (macOS)"
+        "ImageRelayClient/1.4.0-beta.1 (macOS)",
+        "ImageRelayClient/1.4.0",
+        "ImageRelayClient/1.4.0 (macOS)"
+    ]
+
+    private static let legacyIOSUserAgents: Set<String> = [
+        "ImageRelayClient/1.1 (iOS)",
+        "ImageRelayClient/1.1.0 (iOS)",
+        "ImageRelayClient/1.1.1 (iOS)",
+        "ImageRelayClient/1.1.2 (iOS)",
+        "ImageRelayClient/1.2.0-beta.1 (iOS)",
+        "ImageRelayClient/1.2.0-beta.2 (iOS)",
+        "ImageRelayClient/1.2.0-beta.3 (iOS)",
+        "ImageRelayClient/1.2.0-beta.4 (iOS)",
+        "ImageRelayClient/1.2.0 (iOS)",
+        "ImageRelayClient/1.2.1 (iOS)",
+        "ImageRelayClient/1.3.0-beta.1 (iOS)",
+        "ImageRelayClient/1.3.0-beta.2 (iOS)",
+        "ImageRelayClient/1.3.0-beta.3 (iOS)",
+        "ImageRelayClient/1.3.0 (iOS)",
+        "ImageRelayClient/1.3.1 (iOS)",
+        "ImageRelayClient/1.3.2 (iOS)",
+        "ImageRelayClient/1.4.0-beta.1 (iOS)",
+        "ImageRelayClient/1.4.0 (iOS)"
     ]
 
     public static func normalizedMacUserAgent(_ userAgent: String) -> String {
-        legacyMacUserAgents.contains(userAgent) ? currentMacUserAgent : userAgent
+        let trimmed = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return currentMacUserAgent
+        }
+        return legacyMacUserAgents.contains(trimmed) ? currentMacUserAgent : trimmed
     }
 
     public static func normalizedIOSUserAgent(_ userAgent: String) -> String {
-        if userAgent == "ImageRelayClient/1.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.1.0 (iOS)" ||
-            userAgent == "ImageRelayClient/1.1.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.1.2 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0-beta.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0-beta.2 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0-beta.3 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0-beta.4 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.0 (iOS)" ||
-            userAgent == "ImageRelayClient/1.2.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0-beta.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0-beta.2 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0-beta.3 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.0 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.1 (iOS)" ||
-            userAgent == "ImageRelayClient/1.3.2 (iOS)" ||
-            userAgent == "ImageRelayClient/1.4.0-beta.1 (iOS)" {
+        let trimmed = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || legacyIOSUserAgents.contains(trimmed) {
             return currentIOSUserAgent
         }
-        return userAgent.contains("(iOS)") ? userAgent : currentIOSUserAgent
+        return trimmed.contains("(iOS") ? trimmed : currentIOSUserAgent
     }
 
     // apiKey, OAuth tokens, OAuth client secret, and transient OAuth

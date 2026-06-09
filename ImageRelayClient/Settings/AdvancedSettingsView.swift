@@ -44,7 +44,7 @@ struct AdvancedSettingsView: View {
 
             Section {
                 TextField("User Agent", text: $userAgent)
-                    .help("Custom User-Agent header sent with all API requests. Leave blank to use the default.")
+                    .help("Custom User-Agent header sent with API requests. Include an app link or email. Leave blank to use the default.")
             } header: {
                 Text("Network")
             }
@@ -142,7 +142,7 @@ struct AdvancedSettingsView: View {
         config.syncUpload = syncUpload
         config.syncDownload = syncDownload
         config.showAdvancedInformation = showAdvancedInformation
-        config.userAgent = userAgent
+        config.userAgent = AppConfiguration.normalizedMacUserAgent(userAgent)
         let relayURL = webhookRelayURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if relayURL.isEmpty {
             config.webhookRelayURL = nil

@@ -154,11 +154,19 @@ struct ConfigurationTests {
         #expect(config.syncUpload == true)
         #expect(config.syncDownload == true)
         #expect(config.userAgent == AppConfiguration.currentMacUserAgent)
+        #expect(config.userAgent.contains(AppConfiguration.userAgentContactURL))
         #expect(config.maxConcurrentFiles == 10)
         #expect(config.webhookRelayURL == nil)
         #expect(config.webhookRelayIntervalSeconds == 15)
         #expect(config.authMethod == .apiKey)
         #expect(config.credential == .apiKey(""))
+    }
+
+    @Test("Built-in User-Agent values include a contact URL")
+    func builtInUserAgentsIncludeContactURL() {
+        #expect(AppConfiguration.currentServiceUserAgent.contains(AppConfiguration.userAgentContactURL))
+        #expect(AppConfiguration.currentMacUserAgent.contains(AppConfiguration.userAgentContactURL))
+        #expect(AppConfiguration.currentIOSUserAgent.contains(AppConfiguration.userAgentContactURL))
     }
 
     @Test("Load returns default when file missing")
@@ -215,7 +223,9 @@ struct ConfigurationTests {
             "ImageRelayClient/1.3.2",
             "ImageRelayClient/1.3.2 (macOS)",
             "ImageRelayClient/1.4.0-beta.1",
-            "ImageRelayClient/1.4.0-beta.1 (macOS)"
+            "ImageRelayClient/1.4.0-beta.1 (macOS)",
+            "ImageRelayClient/1.4.0",
+            "ImageRelayClient/1.4.0 (macOS)"
         ]
 
         for userAgent in previousBuiltInDefaults {
@@ -252,7 +262,28 @@ struct ConfigurationTests {
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.3.2 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.4.0-beta.1 (iOS)") == AppConfiguration.currentIOSUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.4.0 (iOS)") == AppConfiguration.currentIOSUserAgent)
         #expect(AppConfiguration.normalizedIOSUserAgent("ImageRelayClient/1.1.1 (macOS)") == AppConfiguration.currentIOSUserAgent)
+    }
+
+    @Test("Blank User-Agent falls back to current defaults")
+    func blankUserAgentFallsBackToCurrentDefaults() throws {
+        let account = testKeychainAccount()
+        cleanKeychain(account: account)
+        let url = tempURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            cleanKeychain(account: account)
+        }
+
+        let blankJSON = """
+        {"remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"   ","selected_folder_ids":[]}
+        """
+        try blankJSON.write(to: url, atomically: true, encoding: .utf8)
+
+        let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
+        #expect(loaded.userAgent == AppConfiguration.currentMacUserAgent)
+        #expect(AppConfiguration.normalizedIOSUserAgent("   ") == AppConfiguration.currentIOSUserAgent)
     }
 
     @Test("Custom User-Agent is preserved")

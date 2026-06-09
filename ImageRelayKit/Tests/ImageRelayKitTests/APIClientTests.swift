@@ -132,6 +132,29 @@ struct APIClientTests {
         let _: [RemoteFolder] = try await client.get("/folders.json")
     }
 
+    @Test("Blank APIClient User-Agent falls back to the service default")
+    func blankUserAgentFallsBackToServiceDefault() async throws {
+        MockURLProtocol.requestHandler = { request in
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == AppConfiguration.currentServiceUserAgent)
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, "[]".data(using: .utf8)!)
+        }
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let client = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "   ",
+            sessionConfiguration: config,
+            rateLimiter: RateLimiter(maxRequests: 100, period: 1.0)
+        )
+        let _: [RemoteFolder] = try await client.get("/folders.json")
+    }
+
     @Test("OAuth request uses Image Relay OAuth authorization header")
     func oauthRequestHeader() async throws {
         MockURLProtocol.requestHandler = { request in
@@ -523,6 +546,54 @@ struct APIClientTests {
         #expect(counts.acquires == 1)
         #expect(counts.rateLimits == 1)
         #expect(counts.successes == 0)
+    }
+
+    @Test("Download requests include User-Agent header")
+    func downloadIncludesUserAgentHeader() async throws {
+        MockURLProtocol.requestHandler = { request in
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "TestAgent/1.0")
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("file-body".utf8))
+        }
+
+        let client = makeClient()
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("download-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: destination) }
+
+        try await client.download(
+            URL(string: "https://cdn.test/download")!,
+            to: destination,
+            countsAgainstRateLimit: false
+        )
+
+        #expect(try String(contentsOf: destination, encoding: .utf8) == "file-body")
+    }
+
+    @Test("downloadData requests include User-Agent and Range headers")
+    func downloadDataIncludesUserAgentAndRangeHeaders() async throws {
+        MockURLProtocol.requestHandler = { request in
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "TestAgent/1.0")
+            #expect(request.value(forHTTPHeaderField: "Range") == "bytes=10-19")
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 206,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("0123456789".utf8))
+        }
+
+        let client = makeClient()
+        let result = try await client.downloadData(
+            from: URL(string: "https://cdn.test/ranged")!,
+            range: 10...19,
+            countsAgainstRateLimit: false
+        )
+
+        #expect(result.data == Data("0123456789".utf8))
+        #expect(result.response.statusCode == 206)
     }
 
     @Test("Download can bypass API rate limiter for external CDN URLs")

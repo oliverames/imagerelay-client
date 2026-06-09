@@ -60,7 +60,7 @@ public actor APIClient {
         self.baseURL = baseURL
         self._credential = credential
         self.credentialProvider = nil
-        self.userAgent = userAgent
+        self.userAgent = Self.normalizedUserAgent(userAgent)
         // 30 s per request, 10 min total resource timeout (large uploads excluded — they
         // use URLSession.upload which has its own deadline per chunk).
         sessionConfiguration.timeoutIntervalForRequest = 30
@@ -89,7 +89,7 @@ public actor APIClient {
         self.baseURL = baseURL
         self._credential = .apiKey("")
         self.credentialProvider = credentialProvider
-        self.userAgent = userAgent
+        self.userAgent = Self.normalizedUserAgent(userAgent)
         sessionConfiguration.timeoutIntervalForRequest = 30
         sessionConfiguration.timeoutIntervalForResource = 600
         sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -186,7 +186,10 @@ public actor APIClient {
         if countsAgainstRateLimit {
             await rateLimiter.acquire()
         }
-        let (tempURL, response) = try await session.download(from: url)
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        let (tempURL, response) = try await session.download(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -222,6 +225,7 @@ public actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         if let range {
             request.setValue("bytes=\(range.lowerBound)-\(range.upperBound)", forHTTPHeaderField: "Range")
         }
@@ -418,6 +422,11 @@ public actor APIClient {
     }
 
     // MARK: - Private
+
+    private static func normalizedUserAgent(_ userAgent: String) -> String {
+        let trimmed = userAgent.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? AppConfiguration.currentServiceUserAgent : trimmed
+    }
 
     private func buildRequest(
         method: String, path: String,
