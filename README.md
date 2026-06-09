@@ -81,7 +81,8 @@ brew install --cask image-relay
 - **Sync issue recovery** - Settings > Issues groups unresolved sync failures with retry and copy-report actions
 - **Bulk retry** — Retry N Failed Uploads in the menu bar re-queues every failed item in one click
 - **Webhook relay support** - optional relay polling wakes Finder quickly from Image Relay webhook events while preserving the slower safety poll
-- **OAuth Security** — connect via classic API key or an Image Relay Developer-app OAuth flow featuring process-safe coordinated refresh and anti-prompt Keychain caching
+- **OAuth Security** — connect via classic API key or an Image Relay Developer-app OAuth flow using the Cloudflare-hosted `https://imagerelay-oauth.amesvt.com/callback` bridge, process-safe coordinated refresh, and anti-prompt Keychain caching
+- **Scratch-file protection** - Finder, macOS metadata, editor swap, Office lock, partial-download files, and legacy AI release-matrix fixture names are ignored before upload so temporary local artifacts are not synchronized to Image Relay
 - **Update checks** — Sparkle-backed Check for Updates action from the menu bar
 - **Diagnostics export** - export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
 - **Domain reset** - Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
@@ -106,6 +107,8 @@ brew install --cask image-relay
 **Conflict detection** -- On every modify, the extension compares the content version the OS provides against the version in the local database. If they differ, the local edit is uploaded as a conflict copy and the remote version is fetched.
 
 **Coordinated OAuth Refresh** -- Sandboxed File Provider extensions and the host app share the same credentials container. To prevent token invalidation races (which occur if multiple processes refresh an expired token concurrently), the library implements an atomic lock-file protocol (`config.json.lock`) inside the shared App Group. Only one process performs the API refresh exchange, while other processes await completion and read the new token.
+
+**OAuth Callback Bridge** -- Image Relay requires the registered callback URI to be a web service. The default redirect URI is `https://imagerelay-oauth.amesvt.com/callback`, backed by the deployable Cloudflare Worker source in `Cloudflare/imagerelay-oauth-callback/`. The Worker preserves the OAuth response query and opens `imagerelay-client://oauth/callback` locally; token exchange remains in the signed app.
 
 **Keychain Prompt-Storm Protection** -- Sandboxed extensions query the secure Keychain under strict OS sandbox restrictions. Frequent secure queries during rapid parallel sync operations can flood the user with macOS password prompt storms. The client utilizes a thread-safe `CredentialCache` that monitors the modification date of `config.json` on disk; if the file timestamp has not changed and the in-memory token is valid, it skips redundant Keychain queries entirely.
 

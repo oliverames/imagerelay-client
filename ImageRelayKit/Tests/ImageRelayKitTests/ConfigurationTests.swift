@@ -25,6 +25,11 @@ struct ConfigurationTests {
         KeychainStore.delete(account: AppConfiguration.oauthStateKeychainAccount, accessGroup: nil)
     }
 
+    @Test("Default OAuth redirect uses Cloudflare callback bridge")
+    func defaultOAuthRedirectUsesCloudflareBridge() {
+        #expect(AppConfiguration.default.oauthRedirectURI == "https://imagerelay-oauth.amesvt.com/callback")
+    }
+
     @Test("Save and load configuration")
     func saveAndLoad() throws {
         let account = testKeychainAccount()
@@ -99,6 +104,17 @@ struct ConfigurationTests {
         #expect(!rewritten.contains("legacy-secret"))
         let json = try JSONSerialization.jsonObject(with: Data(rewritten.utf8)) as? [String: Any]
         #expect(json?["api_key"] == nil)
+    }
+
+    @Test("Legacy native OAuth redirect migrates to Cloudflare bridge")
+    func legacyNativeOAuthRedirectMigratesToCloudflareBridge() throws {
+        let legacyJSON = """
+        {"auth_method":"oauth","oauth_redirect_uri":"imagerelay-client://oauth/callback","poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"test","selected_folder_ids":[]}
+        """
+
+        let config = try JSONDecoder.imageRelay.decode(AppConfiguration.self, from: Data(legacyJSON.utf8))
+
+        #expect(config.oauthRedirectURI == AppConfiguration.defaultOAuthRedirectURI)
     }
 
     @Test("Legacy api_key is scrubbed when Keychain already has a value")

@@ -19,7 +19,7 @@ public actor RateLimiter: AsyncRateLimiting {
     private let period: Duration
     private var timestamps: [ContinuousClock.Instant] = []
 
-    public init(maxRequests: Int = 5, period: Double = 1.0) {
+    public init(maxRequests: Int = SharedRateLimiter.defaultMaxRequests, period: Double = 1.0) {
         self.maxRequests = maxRequests
         self.period = .seconds(period)
     }

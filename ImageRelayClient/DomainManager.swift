@@ -618,8 +618,7 @@ final class DomainManager {
         }
         guard !config.oauthTenant.isEmpty,
               !config.oauthClientID.isEmpty,
-              !config.oauthClientSecret.isEmpty,
-              let verifier = config.oauthCodeVerifier else {
+              !config.oauthClientSecret.isEmpty else {
             let message = "OAuth settings are incomplete. Check Settings and start OAuth again."
             lastError = message
             oauthStatusMessage = message
@@ -633,7 +632,7 @@ final class DomainManager {
                 clientID: config.oauthClientID,
                 clientSecret: config.oauthClientSecret,
                 redirectURI: config.oauthRedirectURI,
-                codeVerifier: verifier
+                codeVerifier: config.oauthCodeVerifier
             )
             config.authMethod = .oauth
             config.oauthTokens = tokens
@@ -681,17 +680,15 @@ final class DomainManager {
         config.oauthClientID = trimmedClientID
         config.oauthClientSecret = clientSecret
         config.oauthRedirectURI = trimmedRedirectURI
-        config.oauthCodeVerifier = OAuthFlow.makeCodeVerifier()
+        config.oauthCodeVerifier = nil
         config.oauthState = UUID().uuidString
 
-        guard let verifier = config.oauthCodeVerifier,
-              let state = config.oauthState,
+        guard let state = config.oauthState,
               let url = OAuthFlow.authorizationURL(
                 tenant: config.oauthTenant,
                 clientID: config.oauthClientID,
                 redirectURI: config.oauthRedirectURI,
-                state: state,
-                codeChallenge: OAuthFlow.codeChallenge(for: verifier)
+                state: state
               ) else {
             oauthStatusMessage = "Could not create the Image Relay authorization URL. Check the tenant and redirect URI."
             return

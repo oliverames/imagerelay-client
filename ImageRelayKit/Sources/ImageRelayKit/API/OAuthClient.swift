@@ -19,20 +19,23 @@ public enum OAuthFlow {
         clientID: String,
         redirectURI: String,
         state: String,
-        codeChallenge: String
+        codeChallenge: String? = nil
     ) -> URL? {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "\(tenant).imagerelay.com"
         components.path = "/oauth/authorize"
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "client_id", value: clientID),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "code_challenge", value: codeChallenge),
-            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "state", value: state)
         ]
+        if let codeChallenge, !codeChallenge.isEmpty {
+            queryItems.append(URLQueryItem(name: "code_challenge", value: codeChallenge))
+            queryItems.append(URLQueryItem(name: "code_challenge_method", value: "S256"))
+        }
+        components.queryItems = queryItems
         return components.url
     }
 
@@ -101,16 +104,19 @@ public struct OAuthClient: Sendable {
         clientID: String,
         clientSecret: String,
         redirectURI: String,
-        codeVerifier: String
+        codeVerifier: String? = nil
     ) async throws -> OAuthTokens {
-        try await tokenRequest(queryItems: [
+        var queryItems = [
             URLQueryItem(name: "client_id", value: clientID),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "client_secret", value: clientSecret),
             URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "code_verifier", value: codeVerifier),
-            URLQueryItem(name: "grant_type", value: "authorization_code"),
-        ])
+            URLQueryItem(name: "grant_type", value: "authorization_code")
+        ]
+        if let codeVerifier, !codeVerifier.isEmpty {
+            queryItems.append(URLQueryItem(name: "code_verifier", value: codeVerifier))
+        }
+        return try await tokenRequest(queryItems: queryItems)
     }
 
     public func refresh(

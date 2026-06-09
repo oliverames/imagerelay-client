@@ -22,6 +22,8 @@ public struct AppConfiguration: Codable, Sendable {
     public static var currentServiceUserAgent: String { "ImageRelayClient/\(currentAppVersion)" }
     public static var currentMacUserAgent: String { "\(currentServiceUserAgent) (macOS)" }
     public static var currentIOSUserAgent: String { "\(currentServiceUserAgent) (iOS)" }
+    public static let defaultOAuthRedirectURI = "https://imagerelay-oauth.amesvt.com/callback"
+    private static let legacyNativeOAuthRedirectURI = "imagerelay-client://oauth/callback"
 
     private static let legacyMacUserAgents: Set<String> = [
         "ImageRelayClient/1.0",
@@ -158,7 +160,7 @@ public struct AppConfiguration: Codable, Sendable {
         oauthTenant: String = "",
         oauthClientID: String = "",
         oauthClientSecret: String = "",
-        oauthRedirectURI: String = "imagerelay-client://oauth/callback",
+        oauthRedirectURI: String = defaultOAuthRedirectURI,
         oauthCodeVerifier: String? = nil,
         oauthState: String? = nil,
         oauthTokens: OAuthTokens? = nil,
@@ -182,7 +184,7 @@ public struct AppConfiguration: Codable, Sendable {
         self.oauthTenant = Self.normalizedTenant(oauthTenant)
         self.oauthClientID = oauthClientID
         self.oauthClientSecret = oauthClientSecret
-        self.oauthRedirectURI = oauthRedirectURI
+        self.oauthRedirectURI = Self.normalizedOAuthRedirectURI(oauthRedirectURI)
         self.oauthCodeVerifier = oauthCodeVerifier
         self.oauthState = oauthState
         self.oauthTokens = oauthTokens
@@ -210,7 +212,8 @@ public struct AppConfiguration: Codable, Sendable {
         oauthTenant = Self.normalizedTenant(try c.decodeIfPresent(String.self, forKey: .oauthTenant) ?? "")
         oauthClientID = try c.decodeIfPresent(String.self, forKey: .oauthClientID) ?? ""
         oauthClientSecret = ""
-        oauthRedirectURI = try c.decodeIfPresent(String.self, forKey: .oauthRedirectURI) ?? "imagerelay-client://oauth/callback"
+        let decodedOAuthRedirectURI = try c.decodeIfPresent(String.self, forKey: .oauthRedirectURI)
+        oauthRedirectURI = Self.normalizedOAuthRedirectURI(decodedOAuthRedirectURI ?? Self.defaultOAuthRedirectURI)
         oauthCodeVerifier = nil
         oauthState = nil
         oauthTokens = nil
@@ -268,7 +271,7 @@ public struct AppConfiguration: Codable, Sendable {
         oauthTenant: "",
         oauthClientID: "",
         oauthClientSecret: "",
-        oauthRedirectURI: "imagerelay-client://oauth/callback",
+        oauthRedirectURI: defaultOAuthRedirectURI,
         oauthCodeVerifier: nil,
         oauthState: nil,
         oauthTokens: nil,
@@ -568,6 +571,14 @@ public struct AppConfiguration: Codable, Sendable {
         trimmed = trimmed.replacingOccurrences(of: "http://", with: "")
         if let first = trimmed.split(separator: ".").first {
             trimmed = String(first)
+        }
+        return trimmed
+    }
+
+    private static func normalizedOAuthRedirectURI(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == legacyNativeOAuthRedirectURI {
+            return defaultOAuthRedirectURI
         }
         return trimmed
     }

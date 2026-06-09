@@ -80,8 +80,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 cache.getCredential()
             },
             userAgent: loadedConfig.userAgent,
-            // #16 fix: the App Group shared limiter pools 5 RPS across the host
-            // app + this extension, with a single-probe ramp protocol that
+            // #16 fix: the App Group shared limiter pools one below-cap API
+            // budget across the host app + this extension, with a single-probe ramp protocol that
             // recovers gracefully from a 429 in either process.
             rateLimiter: AppConfiguration.sharedRateLimiter(in: container),
             throttleStateStore: throttleStore,
@@ -395,12 +395,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
             var operationID: String?
             do {
-                // Filter out .DS_Store and temp files
-                let ignoredNames: Set<String> = [".DS_Store"]
-                let ignoredSuffixes = [".imagerelay-download"]
-
-                if ignoredNames.contains(itemTemplate.filename) ||
-                   ignoredSuffixes.contains(where: { itemTemplate.filename.hasSuffix($0) }) {
+                if Self.shouldIgnoreLocalSyncItem(named: itemTemplate.filename) {
                     handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
@@ -2348,6 +2343,50 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             throw ExtensionError.missingContentFingerprint
         }
         return fingerprint
+    }
+
+    static func shouldIgnoreLocalSyncItem(named name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+
+        let lowercased = trimmed.lowercased()
+        let ignoredNames: Set<String> = [
+            ".ds_store",
+            ".localized",
+            ".temporaryitems",
+            ".trashes",
+            ".fseventsd",
+            "desktop.ini",
+            "thumbs.db",
+            "icon\r"
+        ]
+        if ignoredNames.contains(lowercased) {
+            return true
+        }
+
+        let ignoredPrefixes = [
+            "codex-releaselivematrix",
+            "._",
+            "~$",
+            ".~",
+            "#"
+        ]
+        if ignoredPrefixes.contains(where: { lowercased.hasPrefix($0) }) {
+            return true
+        }
+
+        let ignoredSuffixes = [
+            ".imagerelay-download",
+            ".tmp",
+            ".temp",
+            ".swp",
+            ".swo",
+            ".download",
+            ".part",
+            ".crdownload",
+            "~"
+        ]
+        return ignoredSuffixes.contains { lowercased.hasSuffix($0) }
     }
 
     static func failureMessageForLocalMutation(_ error: any Error) -> String {

@@ -105,6 +105,21 @@ struct ResilienceTests {
         #expect(object["parent_id"] as? Int == 2_907_644)
     }
 
+    @Test("Temporary local items are ignored before upload")
+    func temporaryLocalItemsAreIgnoredBeforeUpload() {
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: ".DS_Store"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "._Annual Report.pdf"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "~$Annual Report.docx"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "Annual Report.tmp"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "Annual Report.download"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "Annual Report.imagerelay-download"))
+        #expect(Extension.shouldIgnoreLocalSyncItem(named: "Codex-ReleaseLiveMatrix-20260609-12345"))
+
+        #expect(!Extension.shouldIgnoreLocalSyncItem(named: "DSC04873.ARW"))
+        #expect(!Extension.shouldIgnoreLocalSyncItem(named: "DSC04873.xmp"))
+        #expect(!Extension.shouldIgnoreLocalSyncItem(named: "Social Media Manager Meme Executive Approval.png"))
+    }
+
     @Test("Validation API errors are not reported as server-unreachable retries")
     func validationErrorsMapToCannotSynchronize() {
         let validation = APIError.serverError(statusCode: 422, message: nil).asFileProviderError as NSError

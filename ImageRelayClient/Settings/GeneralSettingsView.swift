@@ -10,7 +10,7 @@ struct GeneralSettingsView: View {
     @State private var oauthTenant = ""
     @State private var oauthClientID = ""
     @State private var oauthClientSecret = ""
-    @State private var oauthRedirectURI = "imagerelay-client://oauth/callback"
+    @State private var oauthRedirectURI = AppConfiguration.defaultOAuthRedirectURI
     @State private var remoteRootFolderID = ""
     @State private var defaultFileTypeID = ""
     @State private var launchAtLogin = false

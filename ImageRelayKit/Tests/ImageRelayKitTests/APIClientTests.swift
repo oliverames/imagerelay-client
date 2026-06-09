@@ -161,6 +161,28 @@ struct APIClientTests {
         #expect(OAuthFlow.codeChallenge(for: verifier) == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
     }
 
+    @Test("OAuth authorization URL uses documented Image Relay parameters by default")
+    func oauthAuthorizationURLUsesDocumentedParameters() throws {
+        let url = try #require(OAuthFlow.authorizationURL(
+            tenant: "amesvt",
+            clientID: "client-id",
+            redirectURI: AppConfiguration.defaultOAuthRedirectURI,
+            state: "state-token"
+        ))
+        let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let query = components.queryItems ?? []
+
+        #expect(components.scheme == "https")
+        #expect(components.host == "amesvt.imagerelay.com")
+        #expect(components.path == "/oauth/authorize")
+        #expect(query.contains(URLQueryItem(name: "response_type", value: "code")))
+        #expect(query.contains(URLQueryItem(name: "client_id", value: "client-id")))
+        #expect(query.contains(URLQueryItem(name: "redirect_uri", value: AppConfiguration.defaultOAuthRedirectURI)))
+        #expect(query.contains(URLQueryItem(name: "state", value: "state-token")))
+        #expect(!query.contains { $0.name == "code_challenge" })
+        #expect(!query.contains { $0.name == "code_challenge_method" })
+    }
+
     @Test("OAuth callback parser reads code state and error")
     func oauthCallbackParser() throws {
         let success = try #require(URL(string: "imagerelay-client://oauth/callback?code=abc&state=xyz"))

@@ -24,6 +24,11 @@ struct SharedRateLimiterTests {
         #expect(SharedRateLimiter.effectiveMaxRequests(rampPhase: 99, fullMax: full) == 1)
     }
 
+    @Test("Default budget leaves headroom below Image Relay's five RPS IP cap")
+    func defaultBudgetLeavesHeadroom() {
+        #expect(SharedRateLimiter.defaultMaxRequests == 4)
+    }
+
     @Test("acquire stays within budget under sequential calls")
     func acquireBudget() async throws {
         let url = Self.makeURL()
@@ -233,6 +238,28 @@ struct SharedRateLimiterTests {
         #expect(state.consecutiveSuccesses == 0)
         #expect(state.nextProbeAfter == cooldownUntil)
         #expect(state.consecutiveRateLimits == 2)
+    }
+
+    @Test("Pre-throttle success does not clear partial cooldown")
+    func staleSuccessDoesNotClearPartialCooldown() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiter = SharedRateLimiter(url: url, processIdentifier: "process-A")
+        let cooldownUntil = Date().timeIntervalSince1970 + 60
+        await limiter.writeState(SharedRateLimiterState(
+            rampPhase: 2,
+            consecutiveSuccesses: 0,
+            nextProbeAfter: cooldownUntil,
+            consecutiveRateLimits: 1
+        ))
+
+        await limiter.recordSuccess()
+
+        let state = await limiter.readState()
+        #expect(state.rampPhase == 2)
+        #expect(state.consecutiveSuccesses == 0)
+        #expect(state.nextProbeAfter == cooldownUntil)
+        #expect(state.consecutiveRateLimits == 1)
     }
 }
 

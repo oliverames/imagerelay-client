@@ -67,11 +67,11 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
 }
 
 /// Cross-process rate limiter shared by the host app and File Provider extension
-/// via the App Group container. Coordinates a single 5-RPS token bucket and a
+/// via the App Group container. Coordinates one conservative token bucket and a
 /// single-probe ramp protocol so that:
 ///
 /// - Combined throughput across both processes stays below Image Relay's documented
-///   5 requests/second limit (see #16).
+///   5 requests/second/IP limit with one request/second reserved as safety headroom.
 /// - After a 429 in either process, both processes immediately observe the tightened
 ///   ramp on their next acquire (no per-process drift).
 /// - During deep throttle (`rampPhase == 4`), only ONE in-flight request is allowed
@@ -81,7 +81,10 @@ public struct SharedRateLimiterState: Codable, Equatable, Sendable {
 /// The state file is updated through `NSFileCoordinator` to make read-modify-write
 /// safe across processes; the same coordination pattern is used by `ThrottleStateStore`.
 public actor SharedRateLimiter: AsyncRateLimiting {
-    public static let defaultMaxRequests = 5
+    // Image Relay documents a hard 5 requests/second/IP ceiling. Keep one
+    // request/second of headroom for timing drift, browser/API activity, and
+    // other Image Relay clients on the same network.
+    public static let defaultMaxRequests = 4
     public static let defaultPeriodSeconds: Double = 1.0
     /// Number of consecutive successes required before stepping ramp phase down by one.
     public static let defaultRecoveryHysteresis = 5
@@ -232,10 +235,22 @@ public actor SharedRateLimiter: AsyncRateLimiting {
 
     public func recordSuccess() async {
         var state = readState()
+        let now = Date().timeIntervalSince1970
         let hadRecoveryState = state.consecutiveRateLimits != 0 || state.nextProbeAfter != nil
+        let cooldownStillActive = state.nextProbeAfter.map { $0 > now } ?? false
         let holdsActiveProbe = state.rampPhase == 4
             && activeProbeToken != nil
             && state.probeToken == activeProbeToken
+
+        if cooldownStillActive && !holdsActiveProbe {
+            // This success belongs to a request that was already in flight when
+            // another request hit a 429. Do not let stale successes reopen the
+            // bucket before the coordinated cooldown expires.
+            if activeProbeToken != nil {
+                activeProbeToken = nil
+            }
+            return
+        }
 
         if state.rampPhase == 4 && !holdsActiveProbe {
             // A success from a request that was already in flight before another

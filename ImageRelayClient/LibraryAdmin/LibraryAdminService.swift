@@ -208,7 +208,7 @@ final class LibraryAdminService {
             baseURL: config.baseURL,
             credential: config.credential,
             userAgent: AppConfiguration.currentServiceUserAgent,
-            // #16 fix: shared App Group limiter pools 5 RPS across host + FP extension.
+            // #16 fix: shared App Group limiter pools one below-cap API budget across host + FP extension.
             rateLimiter: AppConfiguration.sharedOrPerProcessRateLimiter(),
             throttleStateStore: AppConfiguration.sharedThrottleStateStore()
         )

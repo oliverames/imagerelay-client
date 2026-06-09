@@ -1,0 +1,8 @@
+name = "imagerelay-oauth-callback"
+main = "src/index.ts"
+compatibility_date = "2026-06-09"
+workers_dev = false
+
+[[routes]]
+pattern = "imagerelay-oauth.amesvt.com"
+custom_domain = true

@@ -48,16 +48,22 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Local-To-Remote Upload
 
-- In Finder, create or copy a small test file into the selected synced folder.
+- Do not create generated, synthetic, AI-created, empty, or temporary files for
+  live-account testing. Live Image Relay account activity remains visible in
+  audit logs even after cleanup.
+- Use only a real, approved source asset for live upload coverage. Current
+  approved local source file:
+  `/Users/oliverames/Desktop/Social Media Manager Meme Executive Approval.png`.
+- Copy the approved source asset into the selected synced folder.
 - Confirm the menu bar activity records an upload.
 - Confirm the file appears in Image Relay in the expected folder.
-- Repeat with an empty text file and confirm it appears remotely as 0 bytes.
-- Rename or remove the test file in Image Relay after testing if it is only a probe.
+- Remove the uploaded copy from Image Relay after testing if it is only a probe.
 
 ## Pause And Resume
 
 - Use the menu bar pause control.
-- While paused, add a local test file and confirm it does not upload immediately.
+- While paused, copy the approved source asset into the selected synced folder
+  and confirm it does not upload immediately.
 - Resume syncing.
 - Confirm the queued local change uploads.
 - Confirm the sync status returns to idle or shows the next remote poll time.
@@ -80,7 +86,8 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 
 ## Delete, Rename, And Move Behavior
 
-- Delete a small local test file in Finder and confirm it is removed from Image Relay.
+- Delete the approved uploaded probe copy in Finder and confirm it is removed
+  from Image Relay.
 - Rename a local folder and confirm the folder rename reaches Image Relay.
 - Rename a local file and confirm the new filename reaches Image Relay while the file remains downloadable.
 - Move a local file between synced folders and confirm Image Relay reflects the move.
@@ -156,7 +163,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Run `scripts/run-release-candidate-checks.sh` on a macOS 26 machine with Xcode 26. With no argument, it validates Project.yml's `MARKETING_VERSION`.
 - Live account coverage is by real-asset usage only. Do NOT fabricate test
   files/folders on the server; the old synthetic `RUN_LIVE_SYNC` matrix was
-  removed. Verify live sync by uploading or editing a real asset inside
-  `Oliver's Stuff` and confirming it appears, then clean it up manually.
+  removed. Verify live sync only with the approved source asset named above,
+  inside `Oliver's Stuff`, then clean it up manually.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.

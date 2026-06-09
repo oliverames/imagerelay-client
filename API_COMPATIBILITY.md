@@ -44,8 +44,9 @@ currently uses or intentionally leaves out.
 - Pagination handling
   Supports both top-level `pagination` objects and `Link` header pagination styles.
 - Rate limiting
-  Enforces the documented `5 requests/second` limit per IP from within this client and
-  retries `429`, `502`, and `503` responses with backoff.
+  Stays below the documented `5 requests/second` limit per IP from within this client,
+  keeps one request/second of safety headroom, and retries `429`, `502`, and `503`
+  responses with backoff.
 
 ## Partially Supported
 
@@ -104,8 +105,9 @@ currently uses or intentionally leaves out.
   and return the full user list.
 - OAuth-based auth flows
   Settings supports an Image Relay Developer-app OAuth flow with tenant, client ID, client
-  secret, redirect URI, browser authorization, callback handling, token exchange, coordinated
-  refresh, and Keychain-backed token storage. API keys remain the simpler default path.
+  secret, the Cloudflare-hosted `https://imagerelay-oauth.amesvt.com/callback` redirect
+  bridge, browser authorization, native callback handling, token exchange, coordinated refresh,
+  and Keychain-backed token storage. API keys remain the simpler default path.
 - Webhook relay consumption
   Settings > Advanced accepts an HTTPS relay URL. The host app polls that relay for Image
   Relay webhook cursors, records the cursor in the shared database, and signals File Provider
