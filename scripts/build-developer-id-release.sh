@@ -116,6 +116,9 @@ cleanup() {
   fi
   rm -f "$KEY_PATH"
   rm -f "$SPARKLE_KEY_PATH"
+  if [[ -n "${STAGE_DIR:-}" && "$STAGE_DIR" == /tmp/imagerelay-release.* ]]; then
+    rm -rf "$STAGE_DIR"
+  fi
 }
 trap cleanup EXIT
 
@@ -589,7 +592,7 @@ cat <<EOF
 
 Release artifacts created successfully.
 Artifact directory: $ARTIFACT_DIR
-Temporary staging directory: $STAGE_DIR
+Temporary staging directory removed: $STAGE_DIR
 DMG: $DMG_PATH
 Appcast: $APPCAST_PATH
 EOF
