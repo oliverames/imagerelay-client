@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0950333D2FBD0A0B7ACFD780 /* WebhooksAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D53A68B665657946F223C4D /* WebhooksAdminView.swift */; };
 		0B6D6305DC1868B1AE40508B /* ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */; };
+		0BDDD9F7D8AB65C3888522D5 /* UploadFileTypeResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE247637D809AACFBF0C0FD3 /* UploadFileTypeResolverTests.swift */; };
 		127F1DB94C7A817B7A0D3EBA /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
 		1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
 		138FE9F4035E06E942725316 /* FileProviderSignalCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9CA591F5FDBC9C8E34343E /* FileProviderSignalCoordinator.swift */; };
@@ -210,6 +211,7 @@
 		D8174F47023DC5F681694A0D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB2C9198BD6DFB73E9ACBE34 /* SetupOptionsiOSState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupOptionsiOSState.swift; sourceTree = "<group>"; };
 		DDD835267C9E6B9423321FB4 /* PartialContentFetching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialContentFetching.swift; sourceTree = "<group>"; };
+		DE247637D809AACFBF0C0FD3 /* UploadFileTypeResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadFileTypeResolverTests.swift; sourceTree = "<group>"; };
 		DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIDirectoryiOSView.swift; sourceTree = "<group>"; };
 		E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderItem.swift; sourceTree = "<group>"; };
 		E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminView.swift; sourceTree = "<group>"; };
@@ -302,6 +304,7 @@
 				F43D66C196BA9E0171106E32 /* PartialContentFetcherTests.swift */,
 				F02C915C80812BA31D41D1BE /* QuickLinkCleanupTests.swift */,
 				51367DFA880452804C918C49 /* ResilienceTests.swift */,
+				DE247637D809AACFBF0C0FD3 /* UploadFileTypeResolverTests.swift */,
 			);
 			path = FileProviderExtensionTests;
 			sourceTree = "<group>";
@@ -785,6 +788,7 @@
 				7F145372D694E4765CBC2120 /* SearchEnumerator.swift in Sources */,
 				1726F39FDAED2060443427E7 /* StartupThrottleGate.swift in Sources */,
 				CD243F9C5CFEC6CCBA093FAC /* Thumbnailing.swift in Sources */,
+				0BDDD9F7D8AB65C3888522D5 /* UploadFileTypeResolverTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

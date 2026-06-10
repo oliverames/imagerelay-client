@@ -166,7 +166,7 @@ struct GeneralSettingsView: View {
                             }
                         }
 
-                        TextField("Manual Root Folder ID", text: $remoteRootFolderID)
+                        TextField("Root Folder ID", text: $remoteRootFolderID)
                         if !rootFolderIDValid {
                             Text("Enter a positive integer (e.g. 12345), \"root\", or leave blank")
                                 .font(.caption)
@@ -184,7 +184,7 @@ struct GeneralSettingsView: View {
                             }
                         }
 
-                        TextField("Manual Default File Type ID", text: $defaultFileTypeID)
+                        TextField("Default File Type ID", text: $defaultFileTypeID)
                         if !defaultFileTypeIDValid {
                             Text("Must be a positive integer, or leave blank")
                                 .font(.caption)
@@ -209,11 +209,11 @@ struct GeneralSettingsView: View {
                     #endif
                     if credentialsPresent {
                         Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
-                        Text("Default File Type ID is required for uploading new files.")
+                        Text("Default File Type ID picks which metadata template new uploads get. If your account defines exactly one file type, it's used automatically and this can stay blank.")
                     }
                     if uploadNeedsDefaultFileType {
-                        Label("Uploads are enabled, so new Finder files will fail until a Default File Type ID is set.", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                        Label("Uploads are enabled. If your account defines more than one file type, set a Default File Type ID or new Finder uploads will fail. Load Account Choices fills this in.", systemImage: "info.circle")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .font(.caption)
@@ -313,6 +313,12 @@ struct GeneralSettingsView: View {
         )
         if remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             remoteRootFolderID = "root"
+        }
+        // File types are metadata templates, not formats — when the account
+        // defines exactly one, the choice is unambiguous, so make it.
+        if defaultFileTypeID.isEmpty, setupOptions.fileTypes.count == 1,
+           let sole = setupOptions.fileTypes.first {
+            defaultFileTypeID = String(sole.id)
         }
     }
 

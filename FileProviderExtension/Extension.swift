@@ -19,6 +19,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     /// requests; drained into the orphan-cleanup queue in `invalidate()`.
     private let partialContentQuickLinkCache = QuickLinkURLCache()
 
+    /// Resolves the file-type ID for uploads: the configured default, or the
+    /// account's sole file type fetched once and cached for the extension's
+    /// lifetime. Stored (not computed) so the cache is shared across uploads.
+    private let uploadFileTypeResolver: UploadFileTypeResolver
+
     private var quickLinkJanitor: QuickLinkJanitor {
         QuickLinkJanitor(api: api, db: db, logger: logger)
     }
@@ -48,6 +53,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 rateLimiter: RateLimiter.fileProviderExtensionShared
             )
             self.db = SyncDatabase.makeInMemory()
+            self.uploadFileTypeResolver = UploadFileTypeResolver(
+                api: self.api,
+                configuredID: AppConfiguration.default.defaultFileTypeID
+            )
             super.init()
             return
         }
@@ -94,6 +103,10 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             rateLimiter: AppConfiguration.sharedRateLimiter(in: container),
             throttleStateStore: throttleStore,
             telemetry: database
+        )
+        self.uploadFileTypeResolver = UploadFileTypeResolver(
+            api: self.api,
+            configuredID: loadedConfig.defaultFileTypeID
         )
 
         super.init()
@@ -511,9 +524,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     )
                 } else if let contentURL = url {
                     let fingerprint = try FileFingerprinting.fingerprint(of: contentURL)
-                    guard let fileTypeID = config.defaultFileTypeID else {
-                        throw ExtensionError.missingDefaultFileTypeID
-                    }
+                    let fileTypeID = try await self.uploadFileTypeResolver.resolve()
 
                     self.beginOperation(phase: "Uploading", currentItem: itemTemplate.filename, expectedBytes: fingerprint.size)
                     defer { self.incrementProgress() }
@@ -710,9 +721,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                         // Upload local edits as a conflict copy so neither version is lost.
                         // If the upload fails, surface the error — do NOT tell the OS the
                         // operation succeeded while silently discarding the user's edits.
-                        guard let fileTypeID = config.defaultFileTypeID else {
-                            throw ExtensionError.missingDefaultFileTypeID
-                        }
+                        let fileTypeID = try await self.uploadFileTypeResolver.resolve()
                         let parentFolderID = try await self.resolveParentFolderID(item.parentItemIdentifier)
                         let fingerprint = try Self.requireContentFingerprint(contentFingerprint)
                         operationID = try db.beginSyncOperation(
@@ -2492,6 +2501,63 @@ extension Extension: NSFileProviderSearching {
 }
 #endif
 
+/// Resolves the file-type ID required by `POST /upload_jobs.json`.
+///
+/// Image Relay file types are tenant-defined metadata templates, not file
+/// formats, so the right ID can't be derived from the file being uploaded.
+/// But when the account defines exactly one file type the choice is
+/// unambiguous: this resolver fetches the list once, caches the sole type's
+/// ID for the extension's lifetime, and only demands explicit configuration
+/// for multi-type accounts.
+actor UploadFileTypeResolver {
+    private let api: APIClient
+    private let configuredID: Int?
+    private var cachedSoleTypeID: Int?
+    private var inFlight: Task<Int, any Error>?
+
+    init(api: APIClient, configuredID: Int?) {
+        self.api = api
+        self.configuredID = configuredID
+    }
+
+    func resolve() async throws -> Int {
+        if let configuredID { return configuredID }
+        if let cachedSoleTypeID { return cachedSoleTypeID }
+        // Coalesce concurrent uploads into one /file_types.json fetch.
+        if let inFlight { return try await inFlight.value }
+
+        let api = self.api
+        let task = Task<Int, any Error> {
+            let fileTypes: [FileType] = try await api.getAllPages("/file_types.json")
+            guard fileTypes.count == 1, let sole = fileTypes.first else {
+                throw UploadFileTypeResolverError.ambiguousFileTypes(count: fileTypes.count)
+            }
+            return sole.id
+        }
+        inFlight = task
+        defer { inFlight = nil }
+        // Network/auth failures propagate as-is so retry semantics apply;
+        // only a genuinely ambiguous account surfaces as a config problem.
+        let resolved = try await task.value
+        cachedSoleTypeID = resolved
+        return resolved
+    }
+}
+
+enum UploadFileTypeResolverError: LocalizedError {
+    case ambiguousFileTypes(count: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .ambiguousFileTypes(let count):
+            if count == 0 {
+                return "Image Relay returned no file types for this account. Set a Default File Type ID in Settings."
+            }
+            return "This account defines \(count) file types, so Image Relay can't choose one automatically. Set a Default File Type ID in Settings."
+        }
+    }
+}
+
 // MARK: - Request Body Types
 
 private struct QuickLinkRequest: Encodable, Sendable {
@@ -2539,7 +2605,6 @@ private struct MoveRequest: Encodable, Sendable {
 }
 
 private enum ExtensionError: LocalizedError {
-    case missingDefaultFileTypeID
     case missingRootFolderID
     case invalidParentIdentifier(String)
     case fileTooLarge
@@ -2554,8 +2619,6 @@ private enum ExtensionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingDefaultFileTypeID:
-            return "Set a Default File Type ID in Settings before uploading new files."
         case .missingRootFolderID:
             return "Set a Root Folder ID in Settings before changing files."
         case .invalidParentIdentifier(let identifier):

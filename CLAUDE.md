@@ -38,8 +38,8 @@ xcodebuild build \
   -destination 'platform=macOS' \
   CODE_SIGNING_ALLOWED=NO
 
-# Run all unit tests (currently 295:
-# 221 ImageRelayKitTests + 74 FileProviderExtensionTests)
+# Run all unit tests (currently 299:
+# 221 ImageRelayKitTests + 78 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
