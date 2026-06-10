@@ -112,13 +112,12 @@ API key was disabled over it):
 
 ## Known State
 
-- **API key is disabled (2026-06-10)**: the account API key was disabled
-  after a colleague flagged this client's quick-links on restricted-use
-  assets. Live API verification is impossible until a new key is issued and
-  entered in Settings. The quick-link lifecycle fixes (short transient
-  expiry, janitor cleanup queue, startup sweep, 7-day Copy Download Link)
-  landed the same day and are unit-tested; live verification of the sweep
-  is still pending a working key.
+- **API key rotated (2026-06-10)**: the old key was disabled after a
+  colleague flagged this client's quick-links on restricted-use assets; a
+  replacement was issued the same day and stored in 1Password ("Image Relay
+  API Key" in Development). The new key still needs to be entered in the
+  installed app's Settings, after which live verification of the quick-link
+  lifecycle (transient expiry, janitor sweep) can run.
 - **Never fabricate test files on the server**: Release verification must NOT
   create synthetic fixtures (throwaway files/folders) on the live Image Relay
   account. Verify with real assets only, through normal app usage. The old
@@ -129,11 +128,17 @@ API key was disabled over it):
 - **Live testing scope**: When exercising live sync with real assets, keep it
   inside the selected `Oliver's Stuff` folder (`2907644`) unless explicitly
   asked otherwise.
-- **Current release**: `1.4.2` / build `45` was published on 2026-06-09 after
-  local release-candidate checks, Developer ID notarization, GitHub release
-  publishing, and installed-app verification. The last full live sync matrix
+- **Current release**: `1.4.3` / build `46` was published on 2026-06-10
+  (release-candidate checks, Developer ID notarization, GitHub release,
+  published-DMG SHA verification, smoke install on this Mac). It contains the
+  quick-link lifecycle fixes, long-duration rate-limit hardening, the login
+  regression fix, and the OAuth UI removal. The last full live sync matrix
   remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` (`2907644`) from
   2026-06-02.
+- **Homebrew tap missing**: `scripts/sync-cask-to-tap.sh` targets
+  `oliverames/homebrew-tap`, which does not exist on GitHub. The in-repo cask
+  is updated, but publishing to a public tap requires creating that repo
+  first (user decision).
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 

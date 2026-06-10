@@ -1,5 +1,25 @@
 # Worklog
 
+## 2026-06-10 - 1.4.3 release
+
+**What changed**:
+Shipped `1.4.3` / build `46`: quick-link lifecycle hygiene, long-duration rate-limit hardening, the first-login save regression fix, OAuth configuration UI removal (gated behind `ENABLE_OAUTH_CONFIG_UI`), and contactable User-Agent identification. Cask advanced to DMG SHA-256 `933ca9eb2a860dbd949fed639d3017724e90ac97d099b2ad7002b5336199dc48`.
+
+**Decisions made**:
+- Cut `1.4.3` (not 1.4.4) because Project.yml was already pre-bumped to `1.4.3`/`46` after the 1.4.2 release.
+- Smoke install replaced the missing `/Applications/Image Relay.app` (no app had been installed on this Mac since the key-disable fallout).
+- Skipped `scripts/sync-cask-to-tap.sh`: the target repo `oliverames/homebrew-tap` does not exist on GitHub; creating a public repo is a user decision.
+
+**Left off at**:
+- Release commit `15d3a1a` tagged `v1.4.3`, published at https://github.com/oliverames/imagerelay-client/releases/tag/v1.4.3 with DMG, sha256, and appcast assets.
+- Published DMG re-downloaded from GitHub and SHA-verified. Installed app reports `1.4.3`/`46`, Notarized Developer ID, Gatekeeper accepted, fileprovider plugin registered at 1.4.3, app launched.
+- Next: enter the rotated API key (1Password "Image Relay API Key") in Settings, then run live verification of the quick-link lifecycle in `Oliver's Stuff` (2907644) and delete the lingering year-out VEHI quick-link in the web admin.
+
+**Open questions**:
+- Create `oliverames/homebrew-tap` so the cask sync step can publish, or retire the script?
+
+---
+
 ## 2026-06-10 - Quick-link lifecycle hygiene
 
 **What changed**:
