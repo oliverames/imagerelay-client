@@ -34,8 +34,8 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run all unit tests (currently 248:
-# 187 ImageRelayKitTests + 61 FileProviderExtensionTests)
+# Run all unit tests (currently 295:
+# 221 ImageRelayKitTests + 74 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -87,8 +87,34 @@ Task { completionHandler(...) }
 
 **Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end.
 
+**Quick-link hygiene** (added 2026-06-10 after a colleague flagged this
+client's quick-links on restricted-use assets in the admin audit list; the
+API key was disabled over it):
+- Quick-links are audit-visible to account admins. Never mint one that can
+  outlive its purpose.
+- *Transient* links (internal download pipeline: `fetchContents`, partial
+  content, rename-by-version) must use
+  `QuickLinkLifetime.transientExpiryDateString()` (2 days; calendar-date
+  parsing makes 1 day unsafe near midnight) and be deleted via
+  `QuickLinkJanitor.deleteTransientQuickLink`, which queues failed deletes
+  in the `orphaned_quick_links` table for the startup sweep.
+- *User-facing* links (Finder Copy actions): Copy Download Link = 7 days,
+  Copy Public Link / QR / mail = 1 year, Copy Long-Lived Public Link = no
+  expiry. These are intentional shares and are never auto-deleted or swept.
+- The startup sweep (`QuickLinkJanitor.sweep`) only deletes IDs this client
+  queued. Do NOT add a list-all-quick_links sweep: it cannot distinguish
+  this client's transient links from anyone's intentional share links, and
+  it adds bulk API churn against the shared 5-RPS budget.
+
 ## Known State
 
+- **API key is disabled (2026-06-10)**: the account API key was disabled
+  after a colleague flagged this client's quick-links on restricted-use
+  assets. Live API verification is impossible until a new key is issued and
+  entered in Settings. The quick-link lifecycle fixes (short transient
+  expiry, janitor cleanup queue, startup sweep, 7-day Copy Download Link)
+  landed the same day and are unit-tested; live verification of the sweep
+  is still pending a working key.
 - **Never fabricate test files on the server**: Release verification must NOT
   create synthetic fixtures (throwaway files/folders) on the live Image Relay
   account. Verify with real assets only, through normal app usage. The old
@@ -128,7 +154,9 @@ host app means it works only there.
 **iOS extension is stateless and on-demand.** Unlike the macOS extension,
 the iOS extension does NOT use `SyncDatabase` or `RemoteChangePoller`.
 Every enumeration calls the API live; every `fetchContents` mints a
-fresh quick-link, downloads to a temp file, and deletes the quick-link.
+fresh short-expiry quick-link, downloads to a temp file, and deletes the
+quick-link (on both success and failure paths — being stateless, a failed
+delete can't be retried later, so the 2-day expiry is the backstop).
 `Enumerator.currentSyncAnchor` returns nil so the system never asks for
 incremental changes — this trades efficiency for simplicity, appropriate
 for a mobile read-only client.

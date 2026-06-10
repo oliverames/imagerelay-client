@@ -15,6 +15,14 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     private let throttleStateStore: ThrottleStateStore?
     private var poller: RemoteChangePoller?
 
+    /// Extension-lifetime cache of quick-links minted for partial-content Range
+    /// requests; drained into the orphan-cleanup queue in `invalidate()`.
+    private let partialContentQuickLinkCache = QuickLinkURLCache()
+
+    private var quickLinkJanitor: QuickLinkJanitor {
+        QuickLinkJanitor(api: api, db: db, logger: logger)
+    }
+
     required init(domain: NSFileProviderDomain) {
         self.domain = domain
 
@@ -101,6 +109,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 .warning("Stale folder move detected on init; may require manual cleanup: \(stale)")
         }
 
+        // Retry server-side deletes of transient quick-links that earlier runs
+        // couldn't clean up (failed DELETE mid-429-storm, teardown before the
+        // delete ran). Waits for the startup throttle gate so a recent 429
+        // penalty is honored; no API calls happen when the queue is empty.
+        let sweepJanitor = QuickLinkJanitor(api: api, db: database, logger: logger)
+        let sweepGate = startupThrottleGate
+        Task(priority: .utility) {
+            await sweepGate.waitIfNeeded()
+            await sweepJanitor.sweep()
+        }
+
         let pollerDomain = domain
         let pollerConfig = config
         let pollerDB = db
@@ -120,8 +139,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
     func invalidate() {
         let pollerRef = poller
+        let cache = partialContentQuickLinkCache
+        let janitor = quickLinkJanitor
         Task {
             await pollerRef?.stop()
+            // Queue (don't DELETE) cached partial-content quick-links: the
+            // process may exit before a network call completes, but the DB
+            // write is synchronous and survives. Next launch's sweep deletes
+            // them; the 2-day expiry covers the case where it never runs.
+            let ids = await cache.drainAllQuickLinkIDs()
+            if !ids.isEmpty {
+                janitor.enqueueForLaterCleanup(ids: ids)
+            }
         }
         logger.info("File Provider extension invalidated")
     }
@@ -186,7 +215,16 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 self.beginOperation(phase: "Downloading", currentItem: tracked.name)
                 defer { self.incrementProgress() }
 
-                let quickLinkRequest = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
+                // Transient quick-link: short expiry so a failed cleanup can't
+                // leave it audit-visible for long, deleted via the janitor so a
+                // failed DELETE is queued for the startup sweep instead of
+                // silently orphaning the link.
+                let quickLinkRequest = QuickLinkRequest(
+                    asset_id: fileID,
+                    purpose: "download",
+                    disposition: "attachment",
+                    expires: QuickLinkLifetime.transientExpiryDateString()
+                )
                 let quickLink: QuickLink = try await api.post(
                     "/quick_links.json",
                     body: quickLinkRequest
@@ -196,11 +234,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
                 let tempFile = TemporaryFileURL.make(originalName: tracked.name)
 
-                // Retry up to 3 times on transient network failures.
-                try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
+                do {
+                    // Retry up to 3 times on transient network failures.
+                    try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
+                } catch {
+                    // The old code skipped the delete entirely on download
+                    // failure, orphaning the link every time.
+                    await self.quickLinkJanitor.deleteTransientQuickLink(id: quickLink.id)
+                    throw error
+                }
                 progress.completedUnitCount = 90
 
-                try? await api.delete("/quick_links/\(quickLink.id).json")
+                await self.quickLinkJanitor.deleteTransientQuickLink(id: quickLink.id)
                 progress.completedUnitCount = 100
 
                 try? db.logActivity(action: .downloaded, itemName: tracked.name, itemType: .file)
@@ -247,7 +292,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         let api = self.api
         let logger = self.logger
         let handler = UncheckedBox(value: completionHandler)
-        let fetcher = PartialContentFetcher(api: api, logger: logger)
+        let fetcher = PartialContentFetcher(
+            api: api,
+            logger: logger,
+            cache: partialContentQuickLinkCache,
+            janitor: quickLinkJanitor
+        )
 
         Task {
             await self.waitForFileOperationSlot()
@@ -1003,7 +1053,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             case FileProviderAction.copyPublicLink.rawValue:
                 await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "inline", expiresAtOverride: .yearOut, handler: handler)
             case FileProviderAction.copyDownloadLink.rawValue:
-                await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "attachment", expiresAtOverride: .yearOut, handler: handler)
+                await self.runCopyQuickLinkAction(itemIdentifiers: itemIdentifiers, disposition: "attachment", expiresAtOverride: .week, handler: handler)
             case FileProviderAction.copyImageRelayID.rawValue:
                 await self.runCopyImageRelayIDAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.copyFolderShareLink.rawValue:
@@ -1052,12 +1102,16 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         }
     }
 
-    /// Quick-link expiry choice. `.yearOut` is the conservative default used by
-    /// Copy Public Link and Copy Download Link; `.noExpiry` is the Copy
-    /// Long-Lived Public Link variant. Image Relay treats an omitted `expires`
-    /// field as "never expires" — verified live 2026-05-17 (memory:
-    /// `reference_finder_copy_public_link.md`).
+    /// Quick-link expiry choice. `.week` is the personal-download default for
+    /// Copy Download Link — those links typically get pasted into a terminal or
+    /// a one-off message and don't need to outlive the week (shortened
+    /// 2026-06-10 after a quick-link audit review). `.yearOut` remains the
+    /// default for the explicit share variants (Copy Public Link, QR, mail);
+    /// `.noExpiry` is the Copy Long-Lived Public Link variant. Image Relay
+    /// treats an omitted `expires` field as "never expires" — verified live
+    /// 2026-05-17 (memory: `reference_finder_copy_public_link.md`).
     fileprivate enum QuickLinkExpiry: Sendable {
+        case week
         case yearOut
         case noExpiry
     }
@@ -1105,6 +1159,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
         let expiresAt: String?
         switch expiresAtOverride {
+        case .week:
+            expiresAt = QuickLinkLifetime.expiryDateString(daysFromNow: 7)
         case .yearOut:
             expiresAt = Self.yearOutExpiryDateString()
         case .noExpiry:
@@ -2201,7 +2257,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     }
 
     private func downloadRemoteFileToTemporaryFile(remoteID: Int, name: String) async throws -> (url: URL, fingerprint: FileFingerprint) {
-        let quickLinkRequest = QuickLinkRequest(asset_id: remoteID, purpose: "download", disposition: "attachment")
+        let quickLinkRequest = QuickLinkRequest(
+            asset_id: remoteID,
+            purpose: "download",
+            disposition: "attachment",
+            expires: QuickLinkLifetime.transientExpiryDateString()
+        )
         let quickLink: QuickLink = try await api.post(
             "/quick_links.json",
             body: quickLinkRequest
@@ -2211,11 +2272,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         do {
             try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
             let fingerprint = try FileFingerprinting.fingerprint(of: tempFile)
-            try? await api.delete("/quick_links/\(quickLink.id).json")
+            await quickLinkJanitor.deleteTransientQuickLink(id: quickLink.id)
             return (tempFile, fingerprint)
         } catch {
             try? FileManager.default.removeItem(at: tempFile)
-            try? await api.delete("/quick_links/\(quickLink.id).json")
+            await quickLinkJanitor.deleteTransientQuickLink(id: quickLink.id)
             throw error
         }
     }

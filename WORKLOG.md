@@ -1,5 +1,28 @@
 # Worklog
 
+## 2026-06-10 - Quick-link lifecycle hygiene
+
+**What changed**:
+Reworked every quick-link path after Gina flagged this client's quick-links on restricted-use VEHI/VSTRS assets in the admin audit list (2026-06-09/10) and the API key was disabled. Three fixes plus a cleanup mechanism:
+
+- All internal transient quick-links (`fetchContents`, partial-content Range requests, rename-by-version download) now carry a 2-day server-side `expires` so a failed cleanup can never leave them audit-visible for long. Two days, not one, because Image Relay parses `expires` as a calendar date.
+- New `QuickLinkJanitor` (`FileProviderExtension/QuickLinkCleanup.swift`) replaces the silent `try? api.delete` calls: a failed DELETE queues the link ID in the new `orphaned_quick_links` table (SyncDatabase migration v10) and a startup sweep retries queued deletes on the next extension launch, capped at 20 per launch, oldest first, behind the startup throttle gate, zero API calls when the queue is empty. Entries older than 3 days are pruned locally because the expiry already killed them server-side. Also fixed a worse latent bug: the `fetchContents` and iOS download failure paths never deleted the quick-link at all.
+- `PartialContentFetcher` now genuinely caches one quick-link per asset (15-minute TTL in the extension-lifetime `QuickLinkURLCache`) instead of minting one per Range request and never deleting any of them; cached IDs are drained into the cleanup queue at `invalidate()`.
+- Finder "Copy Download Link" (the personal-download variant) dropped from 1-year to 7-day expiry. Copy Public Link/QR/mail stay at 1 year; Copy Long-Lived Public Link stays no-expiry — those are explicit shares.
+
+**Decisions made**:
+- Queue-based sweep only: never list-and-delete the tenant's quick_links, because the API can't distinguish this client's transient links from anyone's intentional share links, and bulk listing churns the shared 5-RPS budget.
+- iOS extension stays stateless: short expiry plus best-effort delete on both paths, no queue.
+- Verified by the full macOS suite: 295 tests passing (221 ImageRelayKitTests + 74 FileProviderExtensionTests, up from 248 — new coverage for the orphan queue, lifetime helpers, URL cache, and janitor against a mock transport). iOS Simulator build succeeds.
+
+**Left off at**:
+- Live verification of the sweep and short-expiry links is blocked on the disabled API key. When a new key is issued: enter it in Settings, exercise a download in `Oliver's Stuff` (2907644), and confirm in the web admin that the transient quick-link disappears and nothing accumulates in the audit list.
+
+**Open questions**:
+- Should the host app surface the orphan queue length in Settings > Advanced as a diagnostic?
+
+---
+
 ## 2026-06-09 - 1.4.2 rate-limit hardening release
 
 **What changed**:

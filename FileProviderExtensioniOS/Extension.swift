@@ -223,12 +223,28 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 let fileMeta: RemoteFile = try await services.api.get("/files/\(fileID).json")
                 progress.completedUnitCount = 15
 
-                let request = QuickLinkRequest(asset_id: fileID, purpose: "download", disposition: "attachment")
+                // Transient quick-link with a short server-side expiry: the iOS
+                // extension is stateless, so a delete that fails here cannot be
+                // retried later — the expiry guarantees the link still dies
+                // instead of lingering in the tenant's audit-visible list.
+                let request = QuickLinkRequest(
+                    asset_id: fileID,
+                    purpose: "download",
+                    disposition: "attachment",
+                    expires: QuickLinkRequest.transientExpiryDateString()
+                )
                 let quickLink: QuickLink = try await services.api.post("/quick_links.json", body: request)
                 progress.completedUnitCount = 35
 
                 let tempFile = TemporaryFileURL.make(originalName: fileMeta.name)
-                try await services.api.download(quickLink.url, to: tempFile, countsAgainstRateLimit: false)
+                do {
+                    try await services.api.download(quickLink.url, to: tempFile, countsAgainstRateLimit: false)
+                } catch {
+                    // Best-effort delete on the failure path too — previously a
+                    // failed download always orphaned the link.
+                    try? await services.api.delete("/quick_links/\(quickLink.id).json")
+                    throw error
+                }
                 progress.completedUnitCount = 90
 
                 try? await services.api.delete("/quick_links/\(quickLink.id).json")
@@ -302,4 +318,19 @@ private struct QuickLinkRequest: Encodable, Sendable {
     let asset_id: Int
     let purpose: String
     let disposition: String
+    let expires: String
+
+    /// `yyyy-MM-dd` two days out, UTC. Two days (not one) because Image Relay
+    /// parses `expires` as a calendar date — "tomorrow" minted just before
+    /// midnight could expire within minutes. Mirrors the macOS extension's
+    /// `QuickLinkLifetime.transientExpiryDateString()` (this target doesn't
+    /// compile that file).
+    static func transientExpiryDateString(now: Date = Date()) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: now.addingTimeInterval(2 * 24 * 60 * 60))
+    }
 }

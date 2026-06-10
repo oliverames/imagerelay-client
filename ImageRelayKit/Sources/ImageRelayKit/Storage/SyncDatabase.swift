@@ -153,6 +153,19 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v10") { db in
+            // Quick-links this client minted for its own transient downloads whose
+            // server-side DELETE failed (or was skipped at extension teardown).
+            // Drained by the File Provider extension's startup sweep. Quick-links
+            // minted for user-facing share actions are never enqueued here.
+            try db.create(table: "orphaned_quick_links") { t in
+                t.primaryKey("id", .integer).notNull()
+                t.column("firstFailedAt", .datetime).notNull()
+                t.column("lastAttemptAt", .datetime).notNull()
+                t.column("attemptCount", .integer).notNull()
+            }
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -573,6 +586,55 @@ public final class SyncDatabase: Sendable {
                 .order(Column("lastSeenAt").desc)
                 .limit(limit)
                 .fetchAll(db)
+        }
+    }
+
+    // MARK: - Orphaned Quick-Links
+
+    /// Records a quick-link whose server-side DELETE failed so a later sweep can
+    /// retry. Re-enqueueing an existing ID bumps its attempt counter.
+    public func enqueueOrphanedQuickLink(id: Int, now: Date = Date()) throws {
+        try writer.write { db in
+            if var existing = try OrphanedQuickLink.fetchOne(db, key: id) {
+                existing.lastAttemptAt = now
+                existing.attemptCount += 1
+                try existing.update(db)
+                return
+            }
+            try OrphanedQuickLink(
+                id: id,
+                firstFailedAt: now,
+                lastAttemptAt: now,
+                attemptCount: 1
+            ).insert(db)
+        }
+    }
+
+    public func clearOrphanedQuickLink(id: Int) throws {
+        try writer.write { db in
+            _ = try OrphanedQuickLink.deleteOne(db, key: id)
+        }
+    }
+
+    /// Oldest-first so links closest to their server-side expiry are retried first.
+    public func orphanedQuickLinks(limit: Int = 100) throws -> [OrphanedQuickLink] {
+        try writer.read { db in
+            try OrphanedQuickLink
+                .order(Column("firstFailedAt").asc)
+                .limit(limit)
+                .fetchAll(db)
+        }
+    }
+
+    /// Drops queue entries that first failed before `cutoff`. Transient quick-links
+    /// carry a short server-side expiry, so entries older than that expiry are
+    /// already dead on the server and need no DELETE call.
+    @discardableResult
+    public func pruneOrphanedQuickLinks(firstFailedBefore cutoff: Date) throws -> Int {
+        try writer.write { db in
+            try OrphanedQuickLink
+                .filter(Column("firstFailedAt") < cutoff)
+                .deleteAll(db)
         }
     }
 

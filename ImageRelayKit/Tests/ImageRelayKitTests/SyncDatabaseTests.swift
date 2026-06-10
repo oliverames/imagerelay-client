@@ -691,4 +691,62 @@ struct SyncDatabaseTests {
         #expect(links.links.first?.name == "Contributor Drop")
         #expect(links.fetchedAt == .distantPast)
     }
+
+    // MARK: - Orphaned Quick-Links
+
+    @Test("Orphaned quick-link enqueue, list, and clear")
+    func orphanedQuickLinkLifecycle() throws {
+        let db = try makeDB()
+
+        try db.enqueueOrphanedQuickLink(id: 101)
+        try db.enqueueOrphanedQuickLink(id: 202)
+
+        let queued = try db.orphanedQuickLinks()
+        #expect(queued.map(\.id) == [101, 202])
+        #expect(queued.allSatisfy { $0.attemptCount == 1 })
+
+        try db.clearOrphanedQuickLink(id: 101)
+        #expect(try db.orphanedQuickLinks().map(\.id) == [202])
+    }
+
+    @Test("Re-enqueueing an orphaned quick-link bumps its attempt count, not its age")
+    func orphanedQuickLinkReenqueueBumpsAttempts() throws {
+        let db = try makeDB()
+        let first = Date(timeIntervalSince1970: 1_000_000)
+        let second = first.addingTimeInterval(600)
+
+        try db.enqueueOrphanedQuickLink(id: 303, now: first)
+        try db.enqueueOrphanedQuickLink(id: 303, now: second)
+
+        let queued = try db.orphanedQuickLinks()
+        #expect(queued.count == 1)
+        #expect(queued.first?.attemptCount == 2)
+        #expect(queued.first?.firstFailedAt == first)
+        #expect(queued.first?.lastAttemptAt == second)
+    }
+
+    @Test("Orphaned quick-links list oldest first and respect the limit")
+    func orphanedQuickLinkOrderingAndLimit() throws {
+        let db = try makeDB()
+        let base = Date(timeIntervalSince1970: 2_000_000)
+
+        try db.enqueueOrphanedQuickLink(id: 3, now: base.addingTimeInterval(30))
+        try db.enqueueOrphanedQuickLink(id: 1, now: base.addingTimeInterval(10))
+        try db.enqueueOrphanedQuickLink(id: 2, now: base.addingTimeInterval(20))
+
+        #expect(try db.orphanedQuickLinks(limit: 2).map(\.id) == [1, 2])
+    }
+
+    @Test("Pruning drops only entries that first failed before the cutoff")
+    func orphanedQuickLinkPrune() throws {
+        let db = try makeDB()
+        let cutoff = Date(timeIntervalSince1970: 3_000_000)
+
+        try db.enqueueOrphanedQuickLink(id: 11, now: cutoff.addingTimeInterval(-60))
+        try db.enqueueOrphanedQuickLink(id: 22, now: cutoff.addingTimeInterval(60))
+
+        let pruned = try db.pruneOrphanedQuickLinks(firstFailedBefore: cutoff)
+        #expect(pruned == 1)
+        #expect(try db.orphanedQuickLinks().map(\.id) == [22])
+    }
 }

@@ -209,6 +209,31 @@ public struct PendingRemoteDeletion: Codable, Sendable, FetchableRecord, Persist
     }
 }
 
+/// A quick-link this client minted for its own transient download whose
+/// server-side DELETE failed. Persisted so the File Provider extension can
+/// retry the delete on a later launch instead of leaving the link visible in
+/// the tenant's quick-link audit list until it expires.
+public struct OrphanedQuickLink: Codable, Sendable, FetchableRecord, PersistableRecord, Identifiable {
+    public static let databaseTableName = "orphaned_quick_links"
+
+    public var id: Int
+    public var firstFailedAt: Date
+    public var lastAttemptAt: Date
+    public var attemptCount: Int
+
+    public init(
+        id: Int,
+        firstFailedAt: Date = Date(),
+        lastAttemptAt: Date = Date(),
+        attemptCount: Int = 1
+    ) {
+        self.id = id
+        self.firstFailedAt = firstFailedAt
+        self.lastAttemptAt = lastAttemptAt
+        self.attemptCount = max(1, attemptCount)
+    }
+}
+
 public struct ActivityEntry: Codable, Sendable, FetchableRecord, PersistableRecord {
     public static let databaseTableName = "activity_log"
 

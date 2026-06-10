@@ -6,23 +6,50 @@ import os.log
 /// Helper that mints an Image Relay quick-link and issues a Range request against
 /// the CDN URL. Used by `Extension.fetchPartialContents`.
 ///
-/// We deliberately do NOT delete the quick-link after fetching:
-///
-/// - The download URL is valid for the quick-link's lifetime, so subsequent
-///   range requests against the same asset (Quick Look scrubbing through a
-///   large video, for instance) can re-use the URL via the cache.
-/// - DELETE-ing a quick-link burns rate-limit budget; minor garbage in the
-///   tenant's quick-link list is the better tradeoff.
+/// Quick-link lifecycle (revised 2026-06-10 after a colleague flagged orphaned
+/// audit-visible links): links are cached in the extension-lifetime
+/// `QuickLinkURLCache` so Quick Look scrubbing reuses one link per asset
+/// instead of minting one per Range request, minted with the short transient
+/// expiry so the server kills them even if cleanup never runs, and their IDs
+/// are drained into the orphan-cleanup queue at extension teardown
+/// (`Extension.invalidate`) for deletion on the next launch.
 struct PartialContentFetcher: Sendable {
     let api: APIClient
     let logger: Logger
+    let cache: QuickLinkURLCache
+    let janitor: QuickLinkJanitor
 
-    /// Returns the absolute URL to use for Range requests against `fileID`, minting
-    /// a fresh quick-link as needed.
+    /// Returns the absolute URL to use for Range requests against `fileID`,
+    /// reusing a cached quick-link when one is fresh and minting otherwise.
+    /// Links displaced from the cache are deleted off the request path.
     func quickLinkURL(forFileID fileID: Int) async throws -> URL {
-        let request = QuickLinkRequestBody(asset_id: fileID, purpose: "download", disposition: "attachment")
+        let lookup = await cache.lookup(forFileID: fileID)
+        if let fresh = lookup.fresh {
+            return fresh.url
+        }
+        if let evicted = lookup.evictedQuickLinkID {
+            cleanUpOffRequestPath(quickLinkID: evicted)
+        }
+        let request = QuickLinkRequestBody(
+            asset_id: fileID,
+            purpose: "download",
+            disposition: "attachment",
+            expires: QuickLinkLifetime.transientExpiryDateString()
+        )
         let response: QuickLinkResponseBody = try await api.post("/quick_links.json", body: request)
+        if let displaced = await cache.store(quickLinkID: response.id, url: response.url, forFileID: fileID) {
+            cleanUpOffRequestPath(quickLinkID: displaced)
+        }
         return response.url
+    }
+
+    /// Fire-and-forget delete so the user's Range request doesn't wait on
+    /// cleanup. The janitor queues the ID if the delete fails.
+    private func cleanUpOffRequestPath(quickLinkID: Int) {
+        let janitor = self.janitor
+        Task {
+            await janitor.deleteTransientQuickLink(id: quickLinkID)
+        }
     }
 
     /// Writes `data` into `destination` at the given offset, producing a sparse
@@ -76,6 +103,7 @@ private struct QuickLinkRequestBody: Encodable, Sendable {
     let asset_id: Int
     let purpose: String
     let disposition: String
+    let expires: String
 }
 
 private struct QuickLinkResponseBody: Decodable, Sendable {
