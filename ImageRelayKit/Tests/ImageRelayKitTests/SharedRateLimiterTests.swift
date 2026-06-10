@@ -29,6 +29,55 @@ struct SharedRateLimiterTests {
         #expect(SharedRateLimiter.defaultMaxRequests == 4)
     }
 
+    @Test("Incidental-tier cooldown schedule is unchanged")
+    func incidentalCooldownScheduleUnchanged() {
+        // Up to the sustained threshold, the original 15s * 2^n schedule
+        // capped at 10 minutes still applies.
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 1) == 15)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 2) == 30)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 4) == 120)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 6) == 480)
+    }
+
+    @Test("Sustained tier escalates past the incidental cap toward three hours")
+    func sustainedTierEscalates() {
+        // Beyond the threshold (6 consecutive 429s) the cooldown keeps doubling
+        // from the incidental cap (10 min) toward the sustained cap (3 h),
+        // matching Image Relay's empirically observed account penalty duration.
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 7) == 20 * 60)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 8) == 40 * 60)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 9) == 80 * 60)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 10) == 160 * 60)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 11) == 3 * 60 * 60)
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 20) == 3 * 60 * 60)
+    }
+
+    @Test("Server cooldown hint extends but never shortens the schedule")
+    func serverHintExtendsCooldown() {
+        // A longer server hint (Retry-After or daily-limit reset) wins.
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 1, retryAfter: 5000) == 5000)
+        // A shorter hint never undercuts the client-side schedule.
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 11, retryAfter: 60) == 3 * 60 * 60)
+        // Hints are sanity-clamped to 24 hours.
+        #expect(SharedRateLimiter.rateLimitCooldown(consecutiveRateLimits: 1, retryAfter: 999_999) == 24 * 60 * 60)
+    }
+
+    @Test("recordRateLimit applies a server hint to the shared cooldown")
+    func recordRateLimitAppliesServerHint() async throws {
+        let url = Self.makeURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let limiter = SharedRateLimiter(url: url, processIdentifier: "test-process")
+
+        let before = Date().timeIntervalSince1970
+        await limiter.recordRateLimit(retryAfter: 500)
+        let state = await limiter.readState()
+
+        let nextProbeAfter = try #require(state.nextProbeAfter)
+        // First 429 alone would set ~15s; the 500s hint must win.
+        #expect(nextProbeAfter >= before + 500)
+        #expect(nextProbeAfter <= Date().timeIntervalSince1970 + 500 + 1)
+    }
+
     @Test("acquire stays within budget under sequential calls")
     func acquireBudget() async throws {
         let url = Self.makeURL()

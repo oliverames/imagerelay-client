@@ -34,13 +34,15 @@ private actor RecordingRateLimiter: AsyncRateLimiting {
     private var acquireCount = 0
     private var rateLimitCount = 0
     private var successCount = 0
+    private var retryAfterHints: [TimeInterval?] = []
 
     func acquire() async {
         acquireCount += 1
     }
 
-    func recordRateLimit() async {
+    func recordRateLimit(retryAfter: TimeInterval?) async {
         rateLimitCount += 1
+        retryAfterHints.append(retryAfter)
     }
 
     func recordSuccess() async {
@@ -49,6 +51,10 @@ private actor RecordingRateLimiter: AsyncRateLimiting {
 
     func snapshot() -> (acquires: Int, rateLimits: Int, successes: Int) {
         (acquireCount, rateLimitCount, successCount)
+    }
+
+    func recordedHints() -> [TimeInterval?] {
+        retryAfterHints
     }
 }
 
@@ -114,6 +120,110 @@ struct APIClientTests {
     func retryJitterMultiplierRange() {
         #expect(APIClient.jitteredDelay(10, multiplier: 0.5) == 5)
         #expect(APIClient.jitteredDelay(10, multiplier: 1.5) == 15)
+    }
+
+    @Test("Daily-limit body detection matches the live Image Relay message")
+    func dailyLimitBodyDetection() {
+        let live = "You have reached your daily API usage limit. Access will resume at 2026-06-10 00:00:00 UTC"
+        #expect(APIClient.isDailyLimitBody(live))
+        #expect(APIClient.isDailyLimitBody("you have reached your DAILY api USAGE LIMIT"))
+        #expect(!APIClient.isDailyLimitBody("Too many requests"))
+        #expect(!APIClient.isDailyLimitBody(""))
+    }
+
+    @Test("Daily-limit resume timestamp parses as UTC")
+    func dailyLimitResumeDateParsing() throws {
+        let body = "You have reached your daily API usage limit. Access will resume at 2026-06-10 00:00:00 UTC"
+        let parsed = try #require(APIClient.parseDailyLimitResumeDate(from: body))
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: parsed)
+        #expect(components.year == 2026)
+        #expect(components.month == 6)
+        #expect(components.day == 10)
+        #expect(components.hour == 0)
+
+        // Bodies without a parseable timestamp degrade to nil, not a crash.
+        #expect(APIClient.parseDailyLimitResumeDate(from: "daily API usage limit, try later") == nil)
+    }
+
+    @Test("Next UTC midnight fallback lands on a midnight within 24 hours")
+    func nextUTCMidnightFallback() {
+        let now = Date()
+        let midnight = APIClient.nextUTCMidnight(after: now)
+        #expect(midnight > now)
+        #expect(midnight.timeIntervalSince(now) <= 24 * 60 * 60)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let components = calendar.dateComponents([.hour, .minute, .second], from: midnight)
+        #expect(components.hour == 0)
+        #expect(components.minute == 0)
+    }
+
+    @Test("Daily-limit 429 throws dailyLimitReached and hints the shared limiter")
+    func dailyLimit429ThrowsAndHintsLimiter() async throws {
+        let body = "You have reached your daily API usage limit. Access will resume at 2030-01-01 00:00:00 UTC"
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 429,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data(body.utf8))
+        }
+
+        let limiter = RecordingRateLimiter()
+        let client = makeClient(rateLimiter: limiter)
+
+        do {
+            let _: [RemoteFolder] = try await client.get("/folders.json")
+            Issue.record("Expected daily limit error")
+        } catch let error as APIError {
+            guard case .dailyLimitReached(let resumesAt) = error else {
+                Issue.record("Expected dailyLimitReached, got \(error)")
+                return
+            }
+            #expect(resumesAt != nil)
+        }
+
+        // Non-retryable: exactly one attempt, one throttle signal carrying the
+        // until-reset interval (far future, so well over an hour).
+        let counts = await limiter.snapshot()
+        #expect(counts.acquires == 1)
+        #expect(counts.rateLimits == 1)
+        #expect(counts.successes == 0)
+        let hints = await limiter.recordedHints()
+        let hint = try #require(hints.first ?? nil)
+        #expect(hint > 60 * 60)
+    }
+
+    @Test("Per-second 429 passes the parsed Retry-After hint to the limiter")
+    func rateLimit429PassesRetryAfterHint() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 429,
+                httpVersion: nil, headerFields: ["Retry-After": "120"]
+            )!
+            return (response, Data())
+        }
+
+        let limiter = RecordingRateLimiter()
+        let client = makeClient(maxRetries: 0, rateLimiter: limiter)
+
+        do {
+            let _: [RemoteFolder] = try await client.get("/folders.json")
+            Issue.record("Expected rate limit error")
+        } catch let error as APIError {
+            guard case .rateLimited(let retryAfter) = error else {
+                Issue.record("Expected rateLimited, got \(error)")
+                return
+            }
+            #expect(retryAfter == 120)
+        }
+
+        let hints = await limiter.recordedHints()
+        #expect(hints == [120])
     }
 
     @Test("GET request includes auth and user-agent headers")

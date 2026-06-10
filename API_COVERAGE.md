@@ -87,7 +87,22 @@ Current policy:
   does not force single-probe mode; repeated 429s converge to one in-flight
   cross-process recovery probe.
 - Honor `Retry-After` when present. When missing, use a defensive cooldown so
-  the client does not immediately re-trigger account-level throttling.
+  the client does not immediately re-trigger account-level throttling. Parsed
+  `Retry-After` values are plumbed into the shared limiter cooldown, not just
+  the local retry delay. (Live probes on 2026-05-14 showed Image Relay 429s
+  carry no `Retry-After` header today, so this path is defensive.)
+- Escalate cooldowns for sustained penalties. The incidental schedule
+  (15 s doubling, capped at 10 minutes) applies through 6 consecutive 429s;
+  beyond that the cooldown keeps doubling to a 3-hour cap, matching the
+  empirically observed account-level penalty duration from the 2026-05-13
+  storm (~3 hours of cumulative silence to clear).
+- Detect daily-quota exhaustion. Image Relay reuses 429 for the daily API
+  limit; the response body ("You have reached your daily API usage limit.
+  Access will resume at YYYY-MM-DD HH:MM:SS UTC") is the only distinguishing
+  signal. The client parses the resume timestamp, surfaces a distinct
+  `dailyLimitReached` error (non-retryable in the request loop), and feeds the
+  until-reset interval into the shared limiter so both processes stay quiet
+  until the quota resets at midnight UTC.
 
 ## Recommended Backlog
 

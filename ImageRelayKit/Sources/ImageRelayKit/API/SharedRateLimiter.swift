@@ -98,8 +98,20 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     public static let defaultProbeLockTTL: TimeInterval = 30
     /// First cooldown after a 429 when Image Relay omits Retry-After.
     public static let defaultRateLimitCooldownBase: TimeInterval = 15
-    /// Upper bound for coordinated recovery probes after repeated 429s.
+    /// Upper bound for coordinated recovery probes after repeated 429s in the
+    /// incidental tier (a short burst that trips the 5-RPS bucket).
     public static let defaultMaxRateLimitCooldown: TimeInterval = 10 * 60
+    /// Consecutive 429s after which the cooldown escalates past the incidental
+    /// cap into the sustained-penalty tier.
+    public static let defaultSustainedRateLimitThreshold = 6
+    /// Upper bound for sustained-penalty cooldowns. Image Relay's account-level
+    /// penalty empirically takes ~3 hours of cumulative silence to clear
+    /// (2026-05-13 storm data), so probing every 10 minutes wastes budget
+    /// without advancing recovery.
+    public static let defaultSustainedMaxCooldown: TimeInterval = 3 * 60 * 60
+    /// Sanity ceiling for server-provided cooldown hints (a daily limit resets
+    /// within 24 hours by definition).
+    public static let maxServerCooldownHint: TimeInterval = 24 * 60 * 60
 
     let url: URL
     let maxRequests: Int
@@ -108,6 +120,8 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     let probeLockTTL: TimeInterval
     let rateLimitCooldownBase: TimeInterval
     let maxRateLimitCooldown: TimeInterval
+    let sustainedRateLimitThreshold: Int
+    let sustainedMaxCooldown: TimeInterval
     let processIdentifier: String
     private var activeProbeToken: String?
 
@@ -119,6 +133,8 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         probeLockTTL: TimeInterval = SharedRateLimiter.defaultProbeLockTTL,
         rateLimitCooldownBase: TimeInterval = SharedRateLimiter.defaultRateLimitCooldownBase,
         maxRateLimitCooldown: TimeInterval = SharedRateLimiter.defaultMaxRateLimitCooldown,
+        sustainedRateLimitThreshold: Int = SharedRateLimiter.defaultSustainedRateLimitThreshold,
+        sustainedMaxCooldown: TimeInterval = SharedRateLimiter.defaultSustainedMaxCooldown,
         processIdentifier: String = UUID().uuidString
     ) {
         self.url = url
@@ -128,6 +144,8 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         self.probeLockTTL = max(1.0, probeLockTTL)
         self.rateLimitCooldownBase = max(0.1, rateLimitCooldownBase)
         self.maxRateLimitCooldown = max(self.rateLimitCooldownBase, maxRateLimitCooldown)
+        self.sustainedRateLimitThreshold = max(1, sustainedRateLimitThreshold)
+        self.sustainedMaxCooldown = max(self.maxRateLimitCooldown, sustainedMaxCooldown)
         self.processIdentifier = processIdentifier
     }
 
@@ -217,7 +235,7 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         }
     }
 
-    public func recordRateLimit() async {
+    public func recordRateLimit(retryAfter: TimeInterval?) async {
         updateState { state in
             let now = Date().timeIntervalSince1970
             // Tighten gradually so one incidental 429 does not collapse the whole
@@ -229,7 +247,10 @@ public actor SharedRateLimiter: AsyncRateLimiting {
             state.nextProbeAfter = now + Self.rateLimitCooldown(
                 consecutiveRateLimits: state.consecutiveRateLimits,
                 base: rateLimitCooldownBase,
-                maximum: maxRateLimitCooldown
+                maximum: maxRateLimitCooldown,
+                sustainedThreshold: sustainedRateLimitThreshold,
+                sustainedMaximum: sustainedMaxCooldown,
+                retryAfter: retryAfter
             )
             // Releasing whatever probe token we may have held; the next probe will compete
             // for the lock fresh.
@@ -307,11 +328,32 @@ public actor SharedRateLimiter: AsyncRateLimiting {
     public static func rateLimitCooldown(
         consecutiveRateLimits: Int,
         base: TimeInterval = SharedRateLimiter.defaultRateLimitCooldownBase,
-        maximum: TimeInterval = SharedRateLimiter.defaultMaxRateLimitCooldown
+        maximum: TimeInterval = SharedRateLimiter.defaultMaxRateLimitCooldown,
+        sustainedThreshold: Int = SharedRateLimiter.defaultSustainedRateLimitThreshold,
+        sustainedMaximum: TimeInterval = SharedRateLimiter.defaultSustainedMaxCooldown,
+        retryAfter: TimeInterval? = nil
     ) -> TimeInterval {
         let failures = max(1, consecutiveRateLimits)
-        let exponent = min(failures - 1, 10)
-        return min(base * pow(2.0, Double(exponent)), maximum)
+        let computed: TimeInterval
+        if failures <= sustainedThreshold {
+            // Incidental tier: short exponential schedule for a burst that
+            // tripped the per-second bucket.
+            let exponent = min(failures - 1, 10)
+            computed = min(base * pow(2.0, Double(exponent)), maximum)
+        } else {
+            // Sustained tier: 429s persisting past the incidental schedule mean
+            // the account is in Image Relay's penalty box, which clears only
+            // after hours of cumulative silence. Keep doubling from the
+            // incidental cap toward the multi-hour ceiling.
+            let exponent = min(failures - sustainedThreshold, 10)
+            computed = min(maximum * pow(2.0, Double(exponent)), sustainedMaximum)
+        }
+        // A server-provided hint (Retry-After header or daily-limit reset
+        // interval) overrides the client-side schedule when it is longer.
+        if let retryAfter, retryAfter > computed {
+            return min(retryAfter, maxServerCooldownHint)
+        }
+        return computed
     }
 
     /// Reads the persisted state with `NSFileCoordinator`, falling back to a

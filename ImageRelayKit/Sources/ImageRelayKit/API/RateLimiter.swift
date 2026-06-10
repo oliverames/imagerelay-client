@@ -5,10 +5,19 @@ import Foundation
 public protocol AsyncRateLimiting: Sendable {
     /// Block until the caller may issue a request.
     func acquire() async
-    /// Called by `APIClient` after a 429 response so the limiter can tighten its budget.
-    func recordRateLimit() async
+    /// Called by `APIClient` after a 429 response so the limiter can tighten its
+    /// budget. `retryAfter` carries a server-provided cooldown hint when one
+    /// exists — a parsed `Retry-After` header or a daily-limit reset interval.
+    func recordRateLimit(retryAfter: TimeInterval?) async
     /// Called by `APIClient` after a successful request so the limiter can recover.
     func recordSuccess() async
+}
+
+public extension AsyncRateLimiting {
+    /// Convenience for call sites without a server cooldown hint.
+    func recordRateLimit() async {
+        await recordRateLimit(retryAfter: nil)
+    }
 }
 
 public actor RateLimiter: AsyncRateLimiting {
@@ -44,6 +53,6 @@ public actor RateLimiter: AsyncRateLimiting {
 
     // The in-process limiter is dumb on purpose — feedback hooks no-op so callers
     // that target a single limiter type don't need to special-case the variant.
-    public func recordRateLimit() async {}
+    public func recordRateLimit(retryAfter: TimeInterval?) async {}
     public func recordSuccess() async {}
 }

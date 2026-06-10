@@ -24,7 +24,7 @@ extension Error {
             return NSFileProviderError(.notAuthenticated)
         case .notFound:
             return NSFileProviderError(.noSuchItem)
-        case .rateLimited, .serverError, .networkError:
+        case .rateLimited, .dailyLimitReached, .serverError, .networkError:
             return NSFileProviderError(.serverUnreachable)
         case .forbidden, .decodingError, .invalidResponse, .invalidURL:
             return fileProviderCannotSynchronize(

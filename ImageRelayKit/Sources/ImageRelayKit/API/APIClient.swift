@@ -199,8 +199,8 @@ public actor APIClient {
                 await rateLimiter.recordSuccess()
             }
         } catch let error as APIError {
-            if countsAgainstRateLimit, case .rateLimited = error {
-                await rateLimiter.recordRateLimit()
+            if countsAgainstRateLimit {
+                await informLimiterOfThrottle(error)
             }
             throw error
         }
@@ -245,8 +245,8 @@ public actor APIClient {
             do {
                 try checkStatus(httpResponse, data: data)
             } catch let error as APIError {
-                if countsAgainstRateLimit, case .rateLimited = error {
-                    await rateLimiter.recordRateLimit()
+                if countsAgainstRateLimit {
+                    await informLimiterOfThrottle(error)
                 }
                 throw error
             }
@@ -523,21 +523,18 @@ public actor APIClient {
                 try? telemetry?.recordSuccessfulAPI()
                 return (data, httpResponse)
             } catch let error as APIError where error.isRetryable && attempt < maxRetries {
-                if case .rateLimited = error {
-                    // Snap the shared limiter into single-probe mode immediately —
-                    // the only way for the other process to see we're throttled.
-                    await rateLimiter.recordRateLimit()
-                }
+                // Snap the shared limiter into single-probe mode immediately —
+                // the only way for the other process to see we're throttled.
+                await informLimiterOfThrottle(error)
                 logger.warning("\(method) \(path) retryable error: \(error.userMessage)")
                 lastError = error
                 continue
             } catch let error as APIError {
                 // Non-retryable, or final attempt. Still inform the shared limiter
-                // about 429s so the other process can see the throttle signal
-                // before the error escapes to the caller.
-                if case .rateLimited = error {
-                    await rateLimiter.recordRateLimit()
-                }
+                // about throttles (including daily-limit 429s, which carry an
+                // until-reset cooldown hint) so the other process can see the
+                // signal before the error escapes to the caller.
+                await informLimiterOfThrottle(error)
                 throw error
             }
         }
@@ -650,6 +647,50 @@ public actor APIClient {
         return try JSONDecoder.imageRelay.decode(Pagination.PageInfo.self, from: data)
     }
 
+    static func isDailyLimitBody(_ body: String) -> Bool {
+        body.range(of: "daily API usage limit", options: .caseInsensitive) != nil
+    }
+
+    /// Parses "Access will resume at 2026-06-10 00:00:00 UTC" out of a
+    /// daily-limit 429 body. Returns nil if the timestamp is absent or malformed.
+    static func parseDailyLimitResumeDate(from body: String) -> Date? {
+        guard let match = body.range(
+            of: #"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC"#,
+            options: .regularExpression
+        ) else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss 'UTC'"
+        return formatter.date(from: String(body[match]))
+    }
+
+    /// Fallback resume estimate when a daily-limit 429 body has no parseable
+    /// timestamp: the quota resets at the next UTC midnight.
+    static func nextUTCMidnight(after now: Date = Date()) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let components = DateComponents(hour: 0, minute: 0, second: 0)
+        return calendar.nextDate(after: now, matching: components, matchingPolicy: .nextTime)
+            ?? now.addingTimeInterval(60 * 60)
+    }
+
+    /// Pushes a throttle signal (with any server-provided cooldown hint) into
+    /// the shared limiter so the other process observes it on its next acquire.
+    private func informLimiterOfThrottle(_ error: APIError) async {
+        switch error {
+        case .rateLimited(let retryAfter):
+            await rateLimiter.recordRateLimit(retryAfter: retryAfter)
+        case .dailyLimitReached(let resumesAt):
+            let resume = resumesAt ?? Self.nextUTCMidnight()
+            await rateLimiter.recordRateLimit(retryAfter: max(60, resume.timeIntervalSince(Date())))
+        default:
+            break
+        }
+    }
+
     private static func parseRetryAfter(_ value: String?) -> TimeInterval? {
         guard let value else { return nil }
         // Numeric seconds form: "120"
@@ -675,8 +716,16 @@ public actor APIClient {
         case 404:
             throw APIError.notFound(resource: "resource")
         case 429:
-            let retryAfter = Self.parseRetryAfter(response.value(forHTTPHeaderField: "Retry-After"))
             throttleStateStore?.recordRateLimit()
+            // Image Relay reuses 429 for the daily quota; the body is the only
+            // way to tell it apart from per-second throttling. Observed live:
+            // "You have reached your daily API usage limit. Access will resume
+            // at 2026-06-10 00:00:00 UTC".
+            if let body = data.flatMap({ String(data: $0, encoding: .utf8) }),
+               Self.isDailyLimitBody(body) {
+                throw APIError.dailyLimitReached(resumesAt: Self.parseDailyLimitResumeDate(from: body))
+            }
+            let retryAfter = Self.parseRetryAfter(response.value(forHTTPHeaderField: "Retry-After"))
             throw APIError.rateLimited(retryAfter: retryAfter)
         default:
             let message = data.flatMap { String(data: $0, encoding: .utf8) }

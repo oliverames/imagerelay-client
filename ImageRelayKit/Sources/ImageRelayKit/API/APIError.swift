@@ -5,6 +5,10 @@ public enum APIError: Error, LocalizedError, Sendable {
     case forbidden
     case notFound(resource: String)
     case rateLimited(retryAfter: TimeInterval?)
+    /// The account's daily API quota is exhausted. Distinct from `rateLimited`
+    /// because in-loop retries are pointless until the quota resets (midnight
+    /// UTC); `resumesAt` is parsed from the 429 body when present.
+    case dailyLimitReached(resumesAt: Date?)
     case serverError(statusCode: Int, message: String?)
     case networkError(underlying: any Error)
     case decodingError(underlying: any Error)
@@ -31,6 +35,14 @@ public enum APIError: Error, LocalizedError, Sendable {
             return "The \(resource) was not found on Image Relay."
         case .rateLimited:
             return "Too many requests. The client will retry automatically."
+        case .dailyLimitReached(let resumesAt):
+            if let resumesAt {
+                let formatter = DateFormatter()
+                formatter.dateStyle = .none
+                formatter.timeStyle = .short
+                return "Daily Image Relay API limit reached. Access resumes at \(formatter.string(from: resumesAt))."
+            }
+            return "Daily Image Relay API limit reached. Access resumes when the quota resets (midnight UTC)."
         case .serverError(let code, _):
             if code < 500 {
                 return "Image Relay rejected this change (\(code)). Check the item and try again."

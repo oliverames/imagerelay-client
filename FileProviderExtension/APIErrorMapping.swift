@@ -24,7 +24,7 @@ extension Error {
             return NSFileProviderError(.notAuthenticated)
         case .notFound:
             return NSFileProviderError(.noSuchItem)
-        case .rateLimited, .networkError:
+        case .rateLimited, .dailyLimitReached, .networkError:
             return NSFileProviderError(.serverUnreachable)
         case .serverError(let statusCode, _):
             if statusCode >= 500 {
