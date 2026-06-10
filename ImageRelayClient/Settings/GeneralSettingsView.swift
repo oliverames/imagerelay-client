@@ -85,6 +85,12 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                // OAuth configuration UI disabled 2026-06-10: the app is
+                // API-key-only in practice and the OAuth fields cluttered the
+                // login screen. ImageRelayKit's OAuth support is untouched;
+                // re-enable by defining ENABLE_OAUTH_CONFIG_UI in the target's
+                // SWIFT_ACTIVE_COMPILATION_CONDITIONS (Project.yml).
+                #if ENABLE_OAUTH_CONFIG_UI
                 Picker("Authorization", selection: $authMethod) {
                     Text("API Key").tag(AuthMethod.apiKey)
                     Text("OAuth").tag(AuthMethod.oauth)
@@ -128,6 +134,10 @@ struct GeneralSettingsView: View {
                             .foregroundStyle(oauthStatusColor(oauthStatus))
                     }
                 }
+                #else
+                SecureField("API Key", text: $apiKey)
+                    .textContentType(.password)
+                #endif
 
                 // Library fields stay hidden until credentials exist: the
                 // first-run login screen is just the auth fields, and the IDs
@@ -194,7 +204,9 @@ struct GeneralSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
+                    #if ENABLE_OAUTH_CONFIG_UI
                     Text("OAuth support requires a registered Image Relay Developer app. Image Relay currently documents a client-secret token exchange, so do not ship a public client secret.")
+                    #endif
                     if credentialsPresent {
                         Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
                         Text("Default File Type ID is required for uploading new files.")
@@ -273,6 +285,12 @@ struct GeneralSettingsView: View {
         containerAvailable = true
         let config = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
         authMethod = config.authMethod
+        #if !ENABLE_OAUTH_CONFIG_UI
+        // With the OAuth config UI disabled, this view always edits API-key
+        // auth. A stored .oauth method would otherwise leave credentialsPresent
+        // checking invisible fields.
+        authMethod = .apiKey
+        #endif
         apiKey = config.apiKey
         oauthTenant = config.oauthTenant
         oauthClientID = config.oauthClientID
