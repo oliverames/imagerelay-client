@@ -139,6 +139,19 @@ API key was disabled over it):
   `oliverames/homebrew-tap`, which does not exist on GitHub. The in-repo cask
   is updated, but publishing to a public tap requires creating that repo
   first (user decision).
+- **Webhook relay worker deployed, subscription pending (2026-06-10)**: the
+  `Cloudflare/imagerelay-webhook-relay` worker is live at
+  `https://imagerelay-webhooks.amesvt.com` (auth token in 1Password: "Image
+  Relay Webhook Relay Token"; also the worker secret `RELAY_TOKEN`). Endpoint
+  behavior verified by direct curl. Still pending, blocked on the daily API
+  quota (resets midnight UTC): (1) create/update exactly ONE Image Relay
+  webhook subscription — list `GET /webhooks.json` first, never create
+  duplicates — named "Finder client change relay — managed by
+  imagerelay-client (Oliver Ames)" pointing at
+  `…/webhook?token=…`; deleting it is part of decommissioning; (2) set
+  `webhook_relay_url` to `…/poll?token=…` in the app group `config.json`;
+  (3) verify with real organic web-UI activity only — never synthetic
+  server-side fixtures.
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 

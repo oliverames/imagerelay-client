@@ -1,0 +1,16 @@
+name = "imagerelay-webhook-relay"
+main = "src/index.ts"
+compatibility_date = "2026-06-09"
+workers_dev = false
+
+[[routes]]
+pattern = "imagerelay-webhooks.amesvt.com"
+custom_domain = true
+
+[[durable_objects.bindings]]
+name = "RELAY"
+class_name = "WebhookRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WebhookRelay"]
