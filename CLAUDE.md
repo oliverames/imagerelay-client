@@ -28,11 +28,15 @@ ImageRelayClientiOS/          # iOS host (TabView: Files / Library / Settings)
 # Regenerate Xcode project after any Project.yml change
 xcodegen generate
 
-# Build macOS host (macOS 26 SDK required)
+# Build macOS host (macOS 26 SDK required). CODE_SIGNING_ALLOWED=NO is
+# required for plain dev/compile-check builds: the macOS targets use Manual
+# "Developer ID Application" signing (since the 1.4.2 release prep) and a
+# signed build wants provisioning profiles only the release script sets up.
 xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
-  -destination 'platform=macOS'
+  -destination 'platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO
 
 # Run all unit tests (currently 295:
 # 221 ImageRelayKitTests + 74 FileProviderExtensionTests)
