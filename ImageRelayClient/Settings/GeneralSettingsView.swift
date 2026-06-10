@@ -37,8 +37,13 @@ struct GeneralSettingsView: View {
         defaultFileTypeID.isEmpty || Int(defaultFileTypeID).map { $0 > 0 } == true
     }
 
+    // Format errors only. uploadNeedsDefaultFileType is deliberately NOT a
+    // save blocker: saveConfig() guards on this, so blocking would silently
+    // no-op every save path (including first-time API-key login, where the
+    // file type ID is not yet known). It surfaces as the orange footer
+    // warning instead. (Regression 2026-06-09, reverted 2026-06-10.)
     private var hasValidationError: Bool {
-        !rootFolderIDValid || !defaultFileTypeIDValid || uploadNeedsDefaultFileType
+        !rootFolderIDValid || !defaultFileTypeIDValid
     }
 
     private var uploadNeedsDefaultFileType: Bool {
@@ -124,52 +129,57 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                Button {
-                    Task { await loadSetupOptions() }
-                } label: {
-                    if setupOptions.isLoading {
-                        Label("Loading Account Choices", systemImage: "arrow.triangle.2.circlepath")
-                    } else {
-                        Label("Load Account Choices", systemImage: "list.bullet.rectangle")
+                // Library fields stay hidden until credentials exist: the
+                // first-run login screen is just the auth fields, and the IDs
+                // are meaningless before there is an account to look them up in.
+                if credentialsPresent {
+                    Button {
+                        Task { await loadSetupOptions() }
+                    } label: {
+                        if setupOptions.isLoading {
+                            Label("Loading Account Choices", systemImage: "arrow.triangle.2.circlepath")
+                        } else {
+                            Label("Load Account Choices", systemImage: "list.bullet.rectangle")
+                        }
                     }
-                }
-                .disabled(!credentialsPresent || setupOptions.isLoading)
+                    .disabled(setupOptions.isLoading)
 
-                setupOptionsMessage
+                    setupOptionsMessage
 
-                VStack(alignment: .leading, spacing: 2) {
-                    if !setupOptions.rootFolders.isEmpty {
-                        Picker("Root Folder", selection: $remoteRootFolderID) {
-                            Text("Account Root").tag("root")
-                            ForEach(setupOptions.rootFolders) { folder in
-                                Text(folderChoiceLabel(folder)).tag(String(folder.id))
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !setupOptions.rootFolders.isEmpty {
+                            Picker("Root Folder", selection: $remoteRootFolderID) {
+                                Text("Account Root").tag("root")
+                                ForEach(setupOptions.rootFolders) { folder in
+                                    Text(folderChoiceLabel(folder)).tag(String(folder.id))
+                                }
                             }
+                        }
+
+                        TextField("Manual Root Folder ID", text: $remoteRootFolderID)
+                        if !rootFolderIDValid {
+                            Text("Enter a positive integer (e.g. 12345), \"root\", or leave blank")
+                                .font(.caption)
+                                .foregroundStyle(.red)
                         }
                     }
 
-                    TextField("Manual Root Folder ID", text: $remoteRootFolderID)
-                    if !rootFolderIDValid {
-                        Text("Enter a positive integer (e.g. 12345), \"root\", or leave blank")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    if !setupOptions.fileTypes.isEmpty {
-                        Picker("Default File Type", selection: $defaultFileTypeID) {
-                            Text("None").tag("")
-                            ForEach(setupOptions.fileTypes) { fileType in
-                                Text("\(fileType.name) (\(fileType.id))").tag(String(fileType.id))
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !setupOptions.fileTypes.isEmpty {
+                            Picker("Default File Type", selection: $defaultFileTypeID) {
+                                Text("None").tag("")
+                                ForEach(setupOptions.fileTypes) { fileType in
+                                    Text("\(fileType.name) (\(fileType.id))").tag(String(fileType.id))
+                                }
                             }
                         }
-                    }
 
-                    TextField("Manual Default File Type ID", text: $defaultFileTypeID)
-                    if !defaultFileTypeIDValid {
-                        Text("Must be a positive integer, or leave blank")
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                        TextField("Manual Default File Type ID", text: $defaultFileTypeID)
+                        if !defaultFileTypeIDValid {
+                            Text("Must be a positive integer, or leave blank")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
 
@@ -185,8 +195,10 @@ struct GeneralSettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your API key is in Image Relay under Account Settings → API.")
                     Text("OAuth support requires a registered Image Relay Developer app. Image Relay currently documents a client-secret token exchange, so do not ship a public client secret.")
-                    Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
-                    Text("Default File Type ID is required for uploading new files.")
+                    if credentialsPresent {
+                        Text("Root Folder ID is the number in the URL when viewing a folder: .../folders/**12345**. Leave blank or enter **root** to sync your account's entire library.")
+                        Text("Default File Type ID is required for uploading new files.")
+                    }
                     if uploadNeedsDefaultFileType {
                         Label("Uploads are enabled, so new Finder files will fail until a Default File Type ID is set.", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
@@ -227,6 +239,10 @@ struct GeneralSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear { loadConfig() }
+        // Save-on-close matches the pre-1.4.2 behavior users expect: typing an
+        // API key and closing the window must not silently discard it.
+        // saveConfig() validates, so invalid IDs still never persist.
+        .onDisappear { saveConfig() }
     }
 
     @ViewBuilder
