@@ -1,5 +1,26 @@
 # Worklog
 
+## 2026-06-10 - Post-release: login fix, OAuth UI removal, file-type auto-resolve, webhook relay
+
+**What changed**:
+Afternoon follow-ups after the 1.4.3 release (same day). Fixed the first-login save regression introduced by the 2026-06-09 16:42 auto-sync commit (`uploadNeedsDefaultFileType` blocked `saveConfig()` entirely for API-key-only setups; reverted to a warning, restored save-on-close, library fields now hidden until credentials exist). Removed the OAuth configuration UI behind `ENABLE_OAUTH_CONFIG_UI` (off by default; kit OAuth support intact). Added `UploadFileTypeResolver`: uploads auto-resolve the account's sole file type when no default is configured (Image Relay file types are metadata templates, not formats; this account has exactly one, "Default" 6096). Built and deployed the `Cloudflare/imagerelay-webhook-relay` worker (Durable Object event queue at `imagerelay-webhooks.amesvt.com`, token in 1Password "Image Relay Webhook Relay Token") matching the existing `WebhookRelayClient` contract. 299 tests passing.
+
+**Decisions made**:
+- API key rotated after the quick-link audit flag; new key in 1Password, entered in the installed 1.4.3 app, and verified live (file_types endpoint).
+- The daily API quota was exhausted mid-day by a full-account initial enumeration (Root Folder briefly = Account Root). The `dailyLimitReached` handling from `a108336` worked in production: clear error, deletes parked, shared-limiter probe at midnight UTC. Recommended re-scoping folder selection to `Oliver's Stuff`.
+- The 11 ARW deletions at 12:27 PM were confirmed intentional (Oliver culling in Finder); 5 remained queued for after the quota reset, safe because delete-by-remoteID matches intent and 404s count as success.
+- "Commit-push-all swept WIP onto main" identified as the root cause of the 06-09 login regression; consider excluding active dev repos from the sweep.
+
+**Left off at**:
+- Pending after the daily quota reset (midnight UTC): (1) create/update the single Image Relay webhook subscription and flip `webhook_relay_url` in config.json; (2) live quick-link lifecycle verification via one real download in `Oliver's Stuff`; (3) export the ~600 orphaned no-expiry quick-links (old client's leftovers, audit-visible) for Oliver's review before any deletion — never bulk-delete by pattern, intentional long-lived links share the signature.
+- The lingering year-out VEHI quick-link still needs manual deletion in the web admin.
+
+**Open questions**:
+- Create `oliverames/homebrew-tap` or retire `sync-cask-to-tap.sh`? (carried from the 1.4.3 entry)
+- `~/.claude/.env` has a dead `GOOGLE_API_KEY` op:// reference (item no longer exists) that breaks `op run --env-file`; Oliver to decide delete vs re-point.
+
+---
+
 ## 2026-06-10 - 1.4.3 release
 
 **What changed**:

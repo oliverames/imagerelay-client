@@ -34,8 +34,8 @@ xcodebuild build \
   -scheme ImageRelayClient \
   -destination 'platform=macOS'
 
-# Run all unit tests (currently 248:
-# 187 ImageRelayKitTests + 61 FileProviderExtensionTests)
+# Run all unit tests (currently 299:
+# 221 ImageRelayKitTests + 78 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -89,7 +89,7 @@ Task { completionHandler(...) }
 
 ## Known State
 
-- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). The stable `1.4.2` / build `45` release was published on 2026-06-09 after local release-candidate checks, Developer ID notarization, GitHub release publishing, and installed-app verification. The last full live sync matrix remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` from 2026-06-02. Keep future release testing constrained to that folder unless explicitly asked otherwise.
+- **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Oliver's Stuff` folder (`2907644`). The stable `1.4.3` / build `46` release was published on 2026-06-10 after release-candidate checks, Developer ID notarization, GitHub release publishing, published-DMG SHA verification, and a smoke install. The last full live sync matrix remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` from 2026-06-02. Keep future release testing constrained to that folder unless explicitly asked otherwise.
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Open release risk**: The App Store Connect API key used for notarization should still be rotated when convenient because an earlier repo-local copy was treated as exposed.
 
@@ -109,8 +109,11 @@ platform only.
 
 **iOS extension is stateless and on-demand.** No `SyncDatabase`, no
 `RemoteChangePoller`, no upload paths. Every enumeration calls the API
-live; every `fetchContents` mints a fresh quick-link, downloads to a
-temp file, and deletes the quick-link. `Enumerator.currentSyncAnchor`
+live; every `fetchContents` mints a fresh short-expiry (2-day)
+quick-link, downloads to a temp file, and deletes the quick-link on both
+success and failure paths. Quick-link hygiene rules (transient expiry,
+janitor cleanup queue, no list-based sweeps) are in CLAUDE.md and apply
+on both platforms. `Enumerator.currentSyncAnchor`
 returns nil so the system never asks for incremental changes.
 
 **iOS read-only by protocol.** `NSFileProviderReplicatedExtension`

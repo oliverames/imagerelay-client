@@ -194,8 +194,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (currently 248 tests:
-# 187 ImageRelayKitTests + 61 FileProviderExtensionTests)
+# Run the unit test suite (currently 299 tests:
+# 221 ImageRelayKitTests + 78 FileProviderExtensionTests)
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -213,7 +213,7 @@ scripts/build-developer-id-release.sh --version 1.4.3 --smoke-install
 
 ## Known Limitations
 
-- **Remote change detection** still keeps a safety poll. For faster remote updates, configure a webhook relay endpoint in Settings > Advanced. The relay should receive Image Relay webhook POSTs, expose a long-poll `GET` endpoint, and return JSON shaped like `{"events":[{"id":"evt_123","resource":"file","action":"update"}],"next_cursor":"evt_123"}`.
+- **Remote change detection** still keeps a safety poll. For faster remote updates, configure a webhook relay endpoint in Settings > Advanced. A ready-to-deploy Cloudflare Worker relay lives in `Cloudflare/imagerelay-webhook-relay/`. Any relay should receive Image Relay webhook POSTs, expose a poll `GET` endpoint, and return JSON shaped like `{"events":[{"id":"evt_123","resource":"file","action":"update"}],"next_cursor":"evt_123"}`.
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 - **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 
