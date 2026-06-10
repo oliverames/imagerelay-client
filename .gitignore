@@ -10,3 +10,6 @@ ImageRelayClient.xcodeproj/xcuserdata/
 ImageRelayClient [0-9]*.xcodeproj/
 *.xcuserstate
 DerivedData/
+
+# Wrangler local cache
+Cloudflare/**/.wrangler/
