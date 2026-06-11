@@ -6,8 +6,8 @@
     {
       "layers" : [
         {
-          "image-name" : "Image Relay Icon 2.svg",
-          "name" : "Image Relay Icon 2",
+          "image-name" : "Image Relay Icon.svg",
+          "name" : "Image Relay Icon",
           "position" : {
             "scale" : 2.5,
             "translation-in-points" : [
