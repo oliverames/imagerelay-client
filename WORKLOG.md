@@ -1,5 +1,22 @@
 # Worklog
 
+## 2026-06-11 - Icon asset rename (sync-conflict audit follow-up)
+
+**What changed**:
+Renamed `ImageRelayClient/AppIcon.icon/Assets/Image Relay Icon 2.svg` to `Image Relay Icon.svg` and updated both `icon.json` references (`image-name`, layer `name`). The " 2" was baked in at asset creation (2026-04-29) and matched the iCloud sync-conflict duplicate pattern that a workspace-wide audit cleaned up today (~450 untracked artifacts across `~/Developer`; this file was the audit's lone false positive: real, git-tracked, and load-bearing via `icon.json`). Untracked conflict copies inside `ImageRelayKit/.build` (including a GRDB checkout `.git/index 2`) were removed as part of the same sweep. Verified with the documented `CODE_SIGNING_ALLOWED=NO` build (BUILD SUCCEEDED); committed `46afc05` and pushed. The root-level `Image Relay Icon.svg` the README embeds is a separate file and was untouched.
+
+**Decisions made**:
+- `~/Developer` no longer syncs with iCloud (Oliver, 2026-06-11), so conflict copies should not recur. The new `Scripts/check-dupes` (first kitchensync step) is the tripwire if they do; renaming this icon let its exclusion list go empty.
+
+**Left off at**:
+No app code touched. Carried from 2026-06-10, untouched this session: webhook subscription creation + `webhook_relay_url` flip after quota reset; live quick-link lifecycle verification; orphaned no-expiry quick-links export for review; manual VEHI quick-link deletion.
+
+**Open questions**:
+- Still open (carried): create `oliverames/homebrew-tap` or retire `sync-cask-to-tap.sh`?
+- Still open (carried): dead `GOOGLE_API_KEY` op:// reference in `~/.claude/.env`.
+
+---
+
 ## 2026-06-10 - Post-release: login fix, OAuth UI removal, file-type auto-resolve, webhook relay
 
 **What changed**:
