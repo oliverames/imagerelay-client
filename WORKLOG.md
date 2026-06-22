@@ -1,5 +1,20 @@
 # Worklog
 
+## 2026-06-22 - Security: sanitized AWS key + client data from test fixture and history
+
+**What changed**: A security audit found a real AWS Access Key ID `AKIAJVLMPTIIZCRKAFSQ` (Image Relay's own `imagerelay-assets` bucket) inside an S3 presigned URL in `ImageRelayKit/Tests/ImageRelayKitTests/ModelsTests.swift`, alongside real client data (filename `Q1-Q2-Report-Out-TRA-Edits-8.14.24.pptx`, file id 169640035, a "BCBSVT API" fixture comment). Replaced the fixture with synthetic values (AWS-documented example key `AKIAIOSFODNN7EXAMPLE`, `example-presentation.pptx`, generic id) in HEAD and redacted the real values across all history with `git-filter-repo --replace-text`. Force-pushed `main` AND all 37 tags. Verified 0 occurrences from a fresh clone including tags (gitleaks: 0 real findings; the placeholder example key is the only remaining AKIA match).
+
+**Decisions made**:
+- Low severity, no rotation on our side: the presigned URL already expired (2026-05-19) and the AccessKeyId belongs to Image Relay, not us. Apple Reminder set to notify Image Relay as a courtesy. Fixture sanitization preserves the test (still asserts `host == "s3.amazonaws.com"` and `_thumb.jpg` suffix). Note: this is sanitizing committed fixture *data*, not fabricating files on the live server — the "never fabricate test files on the server" rule is unaffected.
+- `UserInfoTests` was already sanitized (`@example.com`); WORKLOG operational notes left intact (own project documentation, not credentials).
+- Lesson learned: `git push --force` on `main` left the secret alive in tag `v1.3.0-beta.1` — tags are independent refs and must be force-pushed too (`push --tags --force`); re-verify from a fresh clone. Ran filter-repo with `GIT_CONFIG_GLOBAL=/dev/null` (the global `alias.cleanup-preview` newline crashes its config parser).
+
+**Left off at**: Fixture sanitized, history + 37 tags rewritten and verified clean. Carried open items from 2026-06-11 untouched (webhook subscription creation + `webhook_relay_url` flip; quick-link lifecycle verification; orphaned no-expiry quick-link export; `oliverames/homebrew-tap` decision; dead `GOOGLE_API_KEY` op:// ref in `~/.claude/.env`).
+
+**Open questions**: None new.
+
+---
+
 ## 2026-06-11 - Icon asset rename (sync-conflict audit follow-up)
 
 **What changed**:
