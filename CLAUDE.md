@@ -152,8 +152,8 @@ API key was disabled over it):
   subscription; change notifications stay poll-based. The 1Password item
   "Image Relay Webhook Relay Token" (former worker secret `RELAY_TOKEN`)
   is now dead and can be deleted after confirmation. The
-  `Cloudflare/imagerelay-webhook-relay/` source directory is retained in
-  git history; remove it from the working tree if it is no longer useful.
+  `Cloudflare/imagerelay-webhook-relay/` source directory was removed from
+  the working tree on 2026-06-25 (retained in git history).
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 
