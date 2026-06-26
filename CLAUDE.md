@@ -139,19 +139,21 @@ API key was disabled over it):
   `oliverames/homebrew-tap`, which does not exist on GitHub. The in-repo cask
   is updated, but publishing to a public tap requires creating that repo
   first (user decision).
-- **Webhook relay worker deployed, subscription pending (2026-06-10)**: the
-  `Cloudflare/imagerelay-webhook-relay` worker is live at
-  `https://imagerelay-webhooks.amesvt.com` (auth token in 1Password: "Image
-  Relay Webhook Relay Token"; also the worker secret `RELAY_TOKEN`). Endpoint
-  behavior verified by direct curl. Still pending, blocked on the daily API
-  quota (resets midnight UTC): (1) create/update exactly ONE Image Relay
-  webhook subscription — list `GET /webhooks.json` first, never create
-  duplicates — named "Finder client change relay — managed by
-  imagerelay-client (Oliver Ames)" pointing at
-  `…/webhook?token=…`; deleting it is part of decommissioning; (2) set
-  `webhook_relay_url` to `…/poll?token=…` in the app group `config.json`;
-  (3) verify with real organic web-UI activity only — never synthetic
-  server-side fixtures.
+- **Webhook relay worker decommissioned (2026-06-25)**: the
+  `Cloudflare/imagerelay-webhook-relay` worker was deployed at
+  `https://imagerelay-webhooks.amesvt.com` on 2026-06-10 but torn down on
+  2026-06-25 because it contradicted the standing decision to never
+  implement a consumer webhook relay (Phase 7). Teardown deleted the
+  custom-domain binding, the Worker script, and the auto-managed DNS AAAA
+  record; verified afterward (endpoint HTTP 530, script absent, 0 DNS
+  records, binding gone). The Image Relay webhook subscription was never
+  created (blocked on the daily API quota), so there was no upstream
+  cleanup. Do not redeploy this worker or create an Image Relay webhook
+  subscription; change notifications stay poll-based. The 1Password item
+  "Image Relay Webhook Relay Token" (former worker secret `RELAY_TOKEN`)
+  is now dead and can be deleted after confirmation. The
+  `Cloudflare/imagerelay-webhook-relay/` source directory is retained in
+  git history; remove it from the working tree if it is no longer useful.
 - **Release workflow**: GitHub publishing is unblocked. Use `scripts/build-developer-id-release.sh --version <version>` for Developer ID signed, notarized DMGs; add `--smoke-install` when pre-publication installed-app smoke verification is needed. When validating a published GitHub release, download the release DMG, verify its SHA-256 file, install `/Applications/Image Relay.app`, then verify version/build, codesign, Gatekeeper, launch, and `pluginkit` registration.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 
