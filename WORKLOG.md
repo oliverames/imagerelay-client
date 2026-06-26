@@ -1,5 +1,21 @@
 # Worklog
 
+## 2026-06-25 - Webhook relay worker decommissioned
+
+**What changed**: Tore down the `imagerelay-webhook-relay` Cloudflare Worker that was deployed 2026-06-10 at `https://imagerelay-webhooks.amesvt.com`. It conflicted with the standing 2026-05-11 decision to never implement a consumer webhook relay (Phase 7). Removed three Cloudflare objects via the Global API Key (auth recipe in memory `wrangler-auth-global-key`): the custom-domain binding (`/accounts/.../workers/domains/{id}`), the Worker script (`DELETE .../workers/scripts/imagerelay-webhook-relay`), and the auto-managed DNS AAAA `100::` record. Deleting the custom-domain binding cascaded the DNS removal (the explicit DNS delete returned "Record does not exist"). Verified afterward: endpoint returns HTTP 530, script absent from `workers/scripts` list, 0 DNS records for the host, custom-domain binding gone. The `imagerelay-oauth-callback` worker and its `imagerelay-oauth.amesvt.com` binding were left intact. The Image Relay webhook subscription was never created (blocked on the daily API quota), so there was no upstream IR cleanup.
+
+Also deleted the now-dead 1Password item "Image Relay Webhook Relay Token" (id `ddgwut75byvvez66nwhryqxjuu`, Development vault); it was only ever the worker's `RELAY_TOKEN` secret, never mirrored into `~/.claude/.env` or `settings.json` (audited, no dangling `op://` refs). Removed the `Cloudflare/imagerelay-webhook-relay/` source directory from the working tree (README, src/index.ts, wrangler.toml; retained in git history).
+
+**Decisions made**:
+- The carried "create the IR webhook subscription + flip `webhook_relay_url`" item is retired by reversal, not by completion: the relay it was for no longer exists, and the standing decision forbids re-creating it. Change notifications stay poll-based.
+- README line 216 updated to drop the dangling pointer to the deleted worker directory; the app's generic Settings > Advanced "Webhook Relay URL" feature docs were left in place (separate from the rejected Phase 7 worker; bring-your-own-relay if used).
+
+**Left off at**: All teardown verified live. Commits `52ff4a3` (CLAUDE.md decommission record), `5dcd249` (source dir removal), `675c991` (GEMINI.md mirror), plus a README docs fix, all on `main` and pushed. Memory `imagerelay-webhook-relay` rewritten to decommissioned state; `MEMORY.md` index line updated; the prior `⚠ conflicts with no-webhook-relay` flag is resolved.
+
+**Open questions**: None new. Still-open carried items from earlier: quick-link lifecycle verification (needs the rotated API key entered in the installed app); orphaned no-expiry quick-link export for review; `oliverames/homebrew-tap` create-or-retire decision; dead `GOOGLE_API_KEY` op:// ref in `~/.claude/.env`.
+
+---
+
 ## 2026-06-22 - Security: sanitized AWS key + client data from test fixture and history
 
 **What changed**: A security audit found a real AWS Access Key ID `AKIAJVLMPTIIZCRKAFSQ` (Image Relay's own `imagerelay-assets` bucket) inside an S3 presigned URL in `ImageRelayKit/Tests/ImageRelayKitTests/ModelsTests.swift`, alongside real client data (filename `Q1-Q2-Report-Out-TRA-Edits-8.14.24.pptx`, file id 169640035, a "BCBSVT API" fixture comment). Replaced the fixture with synthetic values (AWS-documented example key `AKIAIOSFODNN7EXAMPLE`, `example-presentation.pptx`, generic id) in HEAD and redacted the real values across all history with `git-filter-repo --replace-text`. Force-pushed `main` AND all 37 tags. Verified 0 occurrences from a fresh clone including tags (gitleaks: 0 real findings; the placeholder example key is the only remaining AKIA match).

@@ -213,7 +213,7 @@ scripts/build-developer-id-release.sh --version 1.4.3 --smoke-install
 
 ## Known Limitations
 
-- **Remote change detection** still keeps a safety poll. For faster remote updates, configure a webhook relay endpoint in Settings > Advanced. A ready-to-deploy Cloudflare Worker relay lives in `Cloudflare/imagerelay-webhook-relay/`. Any relay should receive Image Relay webhook POSTs, expose a poll `GET` endpoint, and return JSON shaped like `{"events":[{"id":"evt_123","resource":"file","action":"update"}],"next_cursor":"evt_123"}`.
+- **Remote change detection** still keeps a safety poll. For faster remote updates, configure a webhook relay endpoint in Settings > Advanced. Any relay should receive Image Relay webhook POSTs, expose a poll `GET` endpoint, and return JSON shaped like `{"events":[{"id":"evt_123","resource":"file","action":"update"}],"next_cursor":"evt_123"}`. (The bundled `Cloudflare/imagerelay-webhook-relay/` worker that previously served this was decommissioned and removed on 2026-06-25; bring your own relay if you use this feature.)
 - **Multi-folder assets** download as a single file; the client does not create additional remote synced-file memberships for new uploads.
 - **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 
