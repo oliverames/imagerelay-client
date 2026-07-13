@@ -1999,7 +1999,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension {
 
 - [ ] **Step 7: Generate Xcode project**
 
-Run: `cd "/Users/oliverames/Library/Mobile Documents/com~apple~CloudDocs/Developer/Projects/imagerelay-client" && xcodegen generate`
+Run: `cd "/path/to/imagerelay-client" && xcodegen generate`
 Expected: "Generated project: ImageRelayClient.xcodeproj"
 
 - [ ] **Step 8: Verify project opens**

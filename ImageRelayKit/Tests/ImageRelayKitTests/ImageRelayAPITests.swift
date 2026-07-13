@@ -60,7 +60,7 @@ struct ImageRelayAPITests {
             case "/files":
                 let body = try jsonBody(request)
                 #expect(body["filename"] as? String == "remote.jpg")
-                #expect(body["folder_id"] as? String == "2907644")
+                #expect(body["folder_id"] as? String == "12345")
                 #expect(body["file_type_id"] as? String == "6096")
                 #expect(body["url"] as? String == "https://example.com/remote.jpg")
                 return jsonResponse(request, #"{"id":101,"filename":"remote.jpg","size":0}"#)
@@ -101,7 +101,7 @@ struct ImageRelayAPITests {
         let uploaded = try await api.uploadFileFromURL(
             FileURLUploadRequest(
                 filename: "remote.jpg",
-                folderID: 2_907_644,
+                folderID: 12_345,
                 fileTypeID: 6_096,
                 terms: [FileTermValue(termID: 8_393, value: "Credit")],
                 url: URL(string: "https://example.com/remote.jpg")!,

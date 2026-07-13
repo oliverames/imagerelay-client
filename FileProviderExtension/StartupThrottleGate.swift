@@ -10,7 +10,7 @@ actor StartupThrottleGate {
     func waitIfNeeded() async {
         guard let readyAt else { return }
 
-        let delay = readyAt.timeIntervalSinceNow
+        let delay = remainingDelay(at: Date())
         guard delay > 0 else {
             self.readyAt = nil
             return
@@ -20,5 +20,10 @@ actor StartupThrottleGate {
         if Date() >= readyAt {
             self.readyAt = nil
         }
+    }
+
+    func remainingDelay(at now: Date) -> TimeInterval {
+        guard let readyAt else { return 0 }
+        return max(0, readyAt.timeIntervalSince(now))
     }
 }

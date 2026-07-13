@@ -45,7 +45,7 @@ struct SettingsiOSView: View {
                     }
                 }
 
-                TextField("Manual root folder ID", text: $configuration.draftRootFolderID, prompt: Text("root or 2907644"))
+                TextField("Manual root folder ID", text: $configuration.draftRootFolderID, prompt: Text("root or 12345"))
                     .keyboardType(.numbersAndPunctuation)
                     .autocorrectionDisabled()
             } header: {

@@ -192,7 +192,7 @@ struct UploadLinkTests {
             "uid": "abc123",
             "upload_link_url": "https://app.imagerelay.com/upload/abc123",
             "purpose": "Contributor drop",
-            "folder_id": 2907644,
+            "folder_id": 12345,
             "expires_on": null,
             "created_at": "2026-05-09T15:09:00Z"
         }

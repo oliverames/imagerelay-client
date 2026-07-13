@@ -126,14 +126,14 @@ API key was disabled over it):
   folder, which a colleague flagged. Do not reintroduce server-side test
   fabrication in any form.
 - **Live testing scope**: When exercising live sync with real assets, keep it
-  inside the selected `Oliver's Stuff` folder (`2907644`) unless explicitly
+  inside the selected `Test Library` folder (`12345`) unless explicitly
   asked otherwise.
 - **Current release**: `1.4.3` / build `46` was published on 2026-06-10
   (release-candidate checks, Developer ID notarization, GitHub release,
   published-DMG SHA verification, smoke install on this Mac). It contains the
   quick-link lifecycle fixes, long-duration rate-limit hardening, the login
   regression fix, and the OAuth UI removal. The last full live sync matrix
-  remains the `1.4.0` / build `43` matrix in `Oliver's Stuff` (`2907644`) from
+  remains the `1.4.0` / build `43` matrix in `Test Library` (`12345`) from
   2026-06-02.
 - **Homebrew tap missing**: `scripts/sync-cask-to-tap.sh` targets
   `oliverames/homebrew-tap`, which does not exist on GitHub. The in-repo cask

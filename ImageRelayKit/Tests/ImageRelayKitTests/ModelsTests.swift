@@ -108,7 +108,7 @@ struct ModelsTests {
             "file_type_id": 6096,
             "folder_ids": [1923998],
             "deleted": null,
-            "short_lived_thumbnail": "https://s3.amazonaws.com/example-bucket/client/0/assets/0/example_thumb.jpg?AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE&Expires=1700000000&Signature=EXAMPLESIG%3D"
+            "short_lived_thumbnail": "https://s3.amazonaws.com/example-bucket/client/0/assets/0/example_thumb.jpg?AWSAccessKeyId=EXAMPLEACCESSKEYID&Expires=1700000000&Signature=EXAMPLESIG%3D"
         }
         """.data(using: .utf8)!
 
@@ -188,7 +188,7 @@ struct ModelsTests {
             "id": 36305650,
             "user_id": 274329,
             "metagroup_id": 6096,
-            "catalog_id": 2907644,
+            "catalog_id": 12345,
             "prefix": "/",
             "finished": true,
             "created_at": "2026-04-29T19:54:09.000Z",

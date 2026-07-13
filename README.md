@@ -19,6 +19,9 @@
   <a href="https://github.com/oliverames/imagerelay-client/releases/latest">
     <img src="https://img.shields.io/github/v/release/oliverames/imagerelay-client?include_prereleases&style=flat-square&color=f5a542&label=release" alt="Latest release">
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-f5a542?style=flat-square" alt="MIT License">
+  </a>
   <img src="https://img.shields.io/badge/status-1.4.3-f5a542?style=flat-square" alt="1.4.3">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
@@ -35,7 +38,7 @@ Explore the features, visual workflow, and architecture of the client on our pre
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.4 stable**: `1.4.3` is packaged, notarized, and published through the in-app Sparkle feed, the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest), and the Homebrew cask. This release focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, broader API coverage, rate-limit hardening, credential recovery, and better release automation.
+> **1.4 stable**: `1.4.3` is packaged, notarized, and published through the in-app Sparkle feed and the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest). This release focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, broader API coverage, rate-limit hardening, credential recovery, and better release automation.
 
 ## Why This Exists
 
@@ -47,16 +50,7 @@ This client fixes that by mounting your DAM through Apple's [File Provider API](
 
 **macOS 26 (Tahoe) required.** The app uses File Provider APIs introduced in macOS 26.
 
-### Install with Homebrew (recommended)
-
-```sh
-brew tap oliverames/tap
-brew install --cask image-relay
-```
-
-`brew upgrade --cask image-relay` pulls every new stable release.
-
-### Manual DMG install
+### Install from the DMG
 
 1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)
 2. Open the DMG and drag **Image Relay** to Applications
@@ -65,7 +59,7 @@ brew install --cask image-relay
 
 **Finding your API key**: Image Relay web app → Account Settings → API.
 
-**Finding a folder ID**: leave the field blank or enter `root` to mount the account root. To mount one folder instead, navigate to that folder in the Image Relay web app; the numeric ID appears in the URL (`/folders/2907644`).
+**Finding a folder ID**: leave the field blank or enter `root` to mount the account root. To mount one folder instead, navigate to that folder in the Image Relay web app; the numeric ID appears in the URL (`/folders/12345`).
 
 ## Features
 
@@ -194,8 +188,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (currently 299 tests:
-# 221 ImageRelayKitTests + 78 FileProviderExtensionTests)
+# Run the unit test suite (currently 299 tests)
+# 221 ImageRelayKitTests + 78 FileProviderExtensionTests
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
@@ -219,7 +213,11 @@ scripts/build-developer-id-release.sh --version 1.4.3 --smoke-install
 
 ## Contributing & Issues
 
-Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). Please include a diagnostics export when reporting sync behavior; see [Support](SUPPORT.md), [Privacy](PRIVACY.md), and the [release testing checklist](RELEASE_TESTING.md) for what is collected and redacted.
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). Please include a diagnostics export when reporting sync behavior; see [Contributing](CONTRIBUTING.md), [Support](SUPPORT.md), [Privacy](PRIVACY.md), [Security](SECURITY.md), and the [release testing checklist](RELEASE_TESTING.md) for what is collected and redacted.
+
+## License and trademarks
+
+The source code is available under the [MIT License](LICENSE). Image Relay and its logos are trademarks of Canto, Inc. Those names and marks are not included in the MIT license. This independent project is not affiliated with, endorsed by, or sponsored by Canto or Image Relay.
 
 ---
 

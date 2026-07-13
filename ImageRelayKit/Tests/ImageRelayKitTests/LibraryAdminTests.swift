@@ -73,7 +73,7 @@ struct LibraryAdminTests {
             "uid": "abc",
             "folder_link_url": "https://app.imagerelay.com/folder/abc",
             "purpose": "Review",
-            "folder_id": 2907644,
+            "folder_id": 12345,
             "allows_download": true,
             "view_count": 12
         }
@@ -201,14 +201,14 @@ struct LibraryAdminTests {
     @Test("FolderLinkCreate encodes all fields and omits nil optionals")
     func encodeFolderLinkCreate() throws {
         let payload = FolderLinkCreate(
-            folderID: 2907644,
+            folderID: 12345,
             purpose: "Review",
             allowsDownload: true,
             expiresOn: "2026-12-31"
         )
         let json = try JSONEncoder.imageRelay.encode(payload)
         let dict = try JSONSerialization.jsonObject(with: json) as? [String: Any] ?? [:]
-        #expect(dict["folder_id"] as? Int == 2907644)
+        #expect(dict["folder_id"] as? Int == 12345)
         #expect(dict["purpose"] as? String == "Review")
         #expect(dict["allows_download"] as? Bool == true)
         #expect(dict["expires_on"] as? String == "2026-12-31")

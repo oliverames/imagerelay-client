@@ -178,14 +178,14 @@ struct ConfigurationTests {
 
         KeychainStore.save("stored-secret", account: account, accessGroup: nil)
         let legacyJSON = """
-        {"api_key":"stale-plaintext-secret","remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"test","selected_folder_ids":[2907644]}
+        {"api_key":"stale-plaintext-secret","remote_root_folder_id":99,"poll_interval_seconds":60,"sync_upload":true,"sync_download":true,"user_agent":"test","selected_folder_ids":[12345]}
         """
         try legacyJSON.write(to: url, atomically: true, encoding: .utf8)
 
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
         #expect(loaded.apiKey == "stored-secret")
         #expect(loaded.remoteRootFolderID == 99)
-        #expect(loaded.selectedFolderIDs == [2907644])
+        #expect(loaded.selectedFolderIDs == [12345])
         #expect(KeychainStore.load(account: account, accessGroup: nil) == "stored-secret")
 
         let rewritten = try String(contentsOf: url, encoding: .utf8)

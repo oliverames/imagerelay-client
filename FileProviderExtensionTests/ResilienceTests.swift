@@ -65,17 +65,17 @@ struct ResilienceTests {
 
     @Test("Folder update request always encodes parent id")
     func folderUpdateRequestEncodesParentID() throws {
-        let request = UpdateFolderRequest(name: "Renamed", parent_id: 2_907_644)
+        let request = UpdateFolderRequest(name: "Renamed", parent_id: 12_345)
         let data = try JSONEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         #expect(object["name"] as? String == "Renamed")
-        #expect(object["parent_id"] as? Int == 2_907_644)
+        #expect(object["parent_id"] as? Int == 12_345)
     }
 
     @Test("Folder delete path matches documented Image Relay endpoint")
     func folderDeletePathUsesSingularFolderEndpoint() {
-        #expect(ImageRelayAPIPath.deleteFolder(2_907_644) == "/folder/2907644")
+        #expect(ImageRelayAPIPath.deleteFolder(12_345) == "/folder/12345")
     }
 
     @Test("Folder create conflicts resolve against existing remote folder")
@@ -96,13 +96,13 @@ struct ResilienceTests {
 
         let request = UpdateFolderRequest(
             name: Extension.remoteFolderName(forLocalName: "RAWs & XMPs"),
-            parent_id: 2_907_644
+            parent_id: 12_345
         )
         let data = try JSONEncoder().encode(request)
         let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         #expect(object["name"] as? String == "RAWs and XMPs")
-        #expect(object["parent_id"] as? Int == 2_907_644)
+        #expect(object["parent_id"] as? Int == 12_345)
     }
 
     @Test("Temporary local items are ignored before upload")
@@ -202,19 +202,26 @@ struct ResilienceTests {
     @Test("Startup throttle delays concurrent launch operations")
     func startupThrottleDelaysConcurrentCalls() async {
         let gate = StartupThrottleGate(delay: 0.15)
+        let clock = ContinuousClock()
+        let startedAt = clock.now
 
-        async let firstWait = elapsedWait(for: gate)
+        #expect(await gate.remainingDelay(at: Date()) >= 0.10)
+
+        let firstWait = Task {
+            await gate.waitIfNeeded()
+        }
+
         try? await Task.sleep(for: .milliseconds(25))
-        async let secondWait = elapsedWait(for: gate)
+        let secondWait = Task {
+            await gate.waitIfNeeded()
+        }
 
-        let waits = await (firstWait, secondWait)
-        #expect(waits.0 >= 0.10)
-        #expect(waits.1 >= 0.08)
-    }
+        await firstWait.value
+        await secondWait.value
 
-    private func elapsedWait(for gate: StartupThrottleGate) async -> TimeInterval {
-        let startedAt = Date()
-        await gate.waitIfNeeded()
-        return Date().timeIntervalSince(startedAt)
+        let elapsed = startedAt.duration(to: clock.now)
+        #expect(elapsed >= .milliseconds(100))
+        #expect(elapsed < .seconds(1))
+        #expect(await gate.remainingDelay(at: Date()) == 0)
     }
 }

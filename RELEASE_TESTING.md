@@ -25,7 +25,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 ## Folder Selection
 
 - Open Settings > Folders.
-- Select only the intended test folder, for example Oliver's Stuff.
+- Select only the intended test folder, for example Test Library.
 - Close and reopen Settings.
 - Confirm only the selected folder remains checked.
 - Trigger Sync Now from the menu bar.
@@ -53,7 +53,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
   audit logs even after cleanup.
 - Use only a real, approved source asset for live upload coverage. Current
   approved local source file:
-  `/Users/oliverames/Desktop/Social Media Manager Meme Executive Approval.png`.
+  `/Desktop/Test Asset.png`.
 - Copy the approved source asset into the selected synced folder.
 - Confirm the menu bar activity records an upload.
 - Confirm the file appears in Image Relay in the expected folder.
@@ -164,6 +164,6 @@ Use this checklist with a signed release build from GitHub Releases, not a local
 - Live account coverage is by real-asset usage only. Do NOT fabricate test
   files/folders on the server; the old synthetic `RUN_LIVE_SYNC` matrix was
   removed. Verify live sync only with the approved source asset named above,
-  inside `Oliver's Stuff`, then clean it up manually.
+  inside `Test Library`, then clean it up manually.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
