@@ -22,6 +22,33 @@ struct PaginationTests {
         #expect(next == nil)
     }
 
+    @Test("Accepts a next element decorated with extra parameters")
+    func nextElementWithExtraParameters() {
+        // RFC 8288 allows additional target attributes after rel.
+        let header = "<https://api.imagerelay.com/api/v2/folders.json?page=3>; rel=\"next\"; title=\"Next page\""
+        let next = Pagination.nextURL(fromLinkHeader: header)
+        #expect(next?.absoluteString == "https://api.imagerelay.com/api/v2/folders.json?page=3")
+    }
+
+    @Test("Accepts unquoted rel=next")
+    func unquotedRelNext() {
+        let header = "<https://api.imagerelay.com/api/v2/folders.json?page=2>; rel=next"
+        let next = Pagination.nextURL(fromLinkHeader: header)
+        #expect(next?.absoluteString == "https://api.imagerelay.com/api/v2/folders.json?page=2")
+    }
+
+    @Test("A malformed next element does not shadow a valid later one")
+    func malformedNextDoesNotShadowValidOne() {
+        // An empty target (<>) yields no URL; parsing must continue to the
+        // following element instead of returning nil early.
+        let header = """
+        <>; rel="next", \
+        <https://api.imagerelay.com/api/v2/folders.json?page=5>; rel="next"
+        """
+        let next = Pagination.nextURL(fromLinkHeader: header)
+        #expect(next?.absoluteString == "https://api.imagerelay.com/api/v2/folders.json?page=5")
+    }
+
     @Test("Parse JSON pagination object")
     func parseJSONPagination() throws {
         let json = """

@@ -670,6 +670,25 @@ struct SyncDatabaseTests {
         #expect(try db.pendingRemoteDeletions().isEmpty)
     }
 
+    @Test("Pending remote deletion count matches row count without materializing rows")
+    func pendingRemoteDeletionCountMatchesRows() throws {
+        let db = try makeDB()
+        #expect(try db.pendingRemoteDeletionCount() == 0)
+
+        for fileID in 1...3 {
+            _ = try db.notePendingRemoteDeletion(
+                identifier: ItemIdentifier.file(fileID).rawValue,
+                itemName: "missing-\(fileID).pdf",
+                itemType: .file,
+                parentIdentifier: ItemIdentifier.folder(10).rawValue
+            )
+        }
+        #expect(try db.pendingRemoteDeletionCount() == 3)
+        let counted = try db.pendingRemoteDeletionCount()
+        let listed = try db.pendingRemoteDeletions(limit: 100).count
+        #expect(counted == listed)
+    }
+
     @Test("Quick check reports healthy in-memory database")
     func quickCheckReportsHealthyDatabase() throws {
         let db = try makeDB()

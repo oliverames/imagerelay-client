@@ -57,4 +57,30 @@ struct ThrottleStateStoreTests {
         #expect(state.lastObserved429At != nil)
         #expect(state.consecutiveFailures == 0)
     }
+
+    @Test("Concurrent store instances over one file keep every increment")
+    func concurrentInstancesKeepIncrements() async throws {
+        // Host services each build their own ThrottleStateStore over the same
+        // shared-container file; the coordinated read-modify-write must not
+        // clobber increments the way independent load/save pairs did.
+        let directory = try tempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let url = ThrottleStateStore.fileURL(in: directory)
+        let iterationsPerStore = 25
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    let store = ThrottleStateStore(url: url)
+                    for _ in 0..<iterationsPerStore {
+                        store.recordRateLimit()
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        let state = ThrottleStateStore(url: url).load()
+        #expect(state.consecutiveFailures == iterationsPerStore * 2)
+    }
 }
