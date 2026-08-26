@@ -95,6 +95,8 @@ that satisfies the same requirement; both patterns appear in shipped code.
 
 **Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end. Confirmation requires two misses AND an age floor (60s of elapsed evidence via `deletionEvidenceConfirmed`), and misses older than 24h restart their count, so same-window passes and unrelated later misses can never compound into a false deletion.
 
+**Finder trash deletes remotely.** `modifyItem` with a `.trashContainer` parent performs the real server DELETE immediately (no trash, no undo). Deliberate behavior confirmed by owner decision 2026-08-25 -- do not "fix" it.
+
 **Quick-link hygiene** (added 2026-06-10 after a colleague flagged this
 client's quick-links on restricted-use assets in the admin audit list; the
 API key was disabled over it):

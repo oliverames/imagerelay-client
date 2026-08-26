@@ -95,6 +95,8 @@ that satisfies the same requirement; both patterns appear in shipped code.
 
 **Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end. Confirmation requires two misses AND an age floor (60s of elapsed evidence via `deletionEvidenceConfirmed`), and misses older than 24h restart their count, so same-window passes and unrelated later misses can never compound into a false deletion.
 
+**Finder trash deletes remotely.** `modifyItem` with a `.trashContainer` parent performs the real server DELETE immediately (no trash, no undo). Deliberate behavior confirmed by owner decision 2026-08-25 -- do not "fix" it.
+
 ## Known State
 
 - **Live testing scope**: Signed Developer ID builds have been smoke-tested against the live Image Relay account only inside the selected `Test Library` folder (`12345`). The stable `1.4.3` / build `46` release was published on 2026-06-10 after release-candidate checks, Developer ID notarization, GitHub release publishing, published-DMG SHA verification, and a smoke install. The last full live sync matrix remains the `1.4.0` / build `43` matrix in `Test Library` from 2026-06-02. Keep future release testing constrained to that folder unless explicitly asked otherwise.

@@ -124,8 +124,10 @@ extension tests pass on macOS; iOS simulator build succeeds.
    app-group config exists on this machine to learn the tenant, and the check
    that matters is a real interactive sign-in. Recommended once, at the next
    release-candidate run.
-7. **B6 Trash-deletes-remote UX**: awaiting product decision (presented to the
-   owner 2026-08-25).
+7. **B6 Trash-deletes-remote UX**: resolved by owner decision 2026-08-25 --
+   keep current behavior (Finder delete = immediate permanent server delete).
+   Documented in all three instruction mirrors so future reviews do not
+   re-flag it.
 
 ## Refuted by skeptics
 
