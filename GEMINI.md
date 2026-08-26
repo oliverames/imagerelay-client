@@ -134,13 +134,17 @@ API key was disabled over it):
 - **Live testing scope**: When exercising live sync with real assets, keep it
   inside the selected `Test Library` folder (`12345`) unless explicitly
   asked otherwise.
-- **Current release**: `1.4.3` / build `46` was published on 2026-06-10
+- **Current release**: `1.4.4` / build `47` was published on 2026-08-26
   (release-candidate checks, Developer ID notarization, GitHub release,
-  published-DMG SHA verification, smoke install on this Mac). It contains the
-  quick-link lifecycle fixes, long-duration rate-limit hardening, the login
-  regression fix, and the OAuth UI removal. The last full live sync matrix
-  remains the `1.4.0` / build `43` matrix in `Test Library` (`12345`) from
-  2026-06-02.
+  published-DMG SHA verification, Gatekeeper and staple checks on the
+  downloaded DMG, and Sparkle appcast signature verification against the
+  shipped `SUPublicEDKey`). No smoke install was run for this release, so the
+  installed-app path is unverified for `1.4.4`. It carries the 2026-08-25
+  adversarial-review fixes: the pagination-cap deletion-detection guard, real
+  iOS sign-out, the metadata multi-select crash fix, download temp-file leak
+  plugs, the poller start/stop race fix, atomic throttle-store writes, and
+  resend-safe retry scoping. The last full live sync matrix remains the
+  `1.4.0` / build `43` matrix in `Test Library` (`12345`) from 2026-06-02.
 - **Homebrew tap missing**: `scripts/sync-cask-to-tap.sh` targets
   `oliverames/homebrew-tap`, which does not exist on GitHub. The in-repo cask
   is updated, but publishing to a public tap requires creating that repo

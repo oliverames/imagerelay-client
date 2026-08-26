@@ -22,7 +22,7 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-f5a542?style=flat-square" alt="MIT License">
   </a>
-  <img src="https://img.shields.io/badge/status-1.4.3-f5a542?style=flat-square" alt="1.4.3">
+  <img src="https://img.shields.io/badge/status-1.4.4-f5a542?style=flat-square" alt="1.4.4">
   <img src="https://img.shields.io/badge/platform-macOS%2026-f5a542?style=flat-square&logo=apple&logoColor=white" alt="macOS 26">
   <a href="https://www.buymeacoffee.com/oliverames">
     <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-support-f5a542?style=flat-square&logo=buy-me-a-coffee&logoColor=white" alt="Buy Me a Coffee">
@@ -38,7 +38,7 @@ Explore the features, visual workflow, and architecture of the client on our pre
 
 A native macOS app that mounts your Image Relay DAM as a first-class Finder location. Files appear as dataless placeholders — open one and it downloads on demand; save a file into the Finder location and it uploads automatically. No browser, no manual sync, no separate folder to manage.
 
-> **1.4 stable**: `1.4.3` is packaged, notarized, and published through the in-app Sparkle feed and the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest). This release focuses on smoother setup, clearer sync issue recovery, interrupted-upload retry behavior, Keychain prompt-storm prevention, broader API coverage, rate-limit hardening, credential recovery, and better release automation.
+> **1.4 stable**: `1.4.4` is packaged, notarized, and published through the in-app Sparkle feed and the [latest GitHub release](https://github.com/oliverames/imagerelay-client/releases/latest). This release is a stability pass: it fixes a deletion-detection data-loss risk behind the pagination cap, makes iOS sign-out actually clear credentials, fixes a metadata multi-select crash, plugs download temp-file leaks, closes a poller start/stop race, makes the shared throttle store atomic across processes, and scopes automatic retries to requests that are safe to resend.
 
 ## Why This Exists
 
@@ -202,7 +202,7 @@ swift test --package-path ImageRelayKit
 scripts/run-release-candidate-checks.sh
 
 # Build a Developer ID signed, notarized release DMG
-scripts/build-developer-id-release.sh --version 1.4.3 --smoke-install
+scripts/build-developer-id-release.sh --version 1.4.4 --smoke-install
 ```
 
 ## Known Limitations

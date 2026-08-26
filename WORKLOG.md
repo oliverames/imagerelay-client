@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-08-26 - 1.4.4 release (build 47)
+
+**What changed**: Cut and published `1.4.4` / build `47`, the stability release carrying the 2026-08-25 adversarial-review fixes plus the single-file-type upload auto-resolution, the GitHub Actions runtime updates, and the public-release hardening from 2026-07-13. Bumped `MARKETING_VERSION` to `1.4.4` and `CURRENT_PROJECT_VERSION` to `47`, regenerated the Xcode project, and corrected a stale documented test count (299) to the real 311 across the three instruction mirrors and the README.
+
+The first release-candidate run failed, and the failure was real enough to stop the release: `getAllPages pages a wrapper-keyed response when it fills per_page` expected 101 folders across 2 requests and saw 100 across 1. Root cause was test infrastructure, not the product. `ConfigurationTests` wrote `MockURLProtocol.requestHandler`, the static owned by `APIClientTests`, and Swift Testing's `.serialized` trait only orders tests inside a single suite. The two suites therefore ran concurrently, and Configuration swapped the handler out mid-pagination, so the second page request reached a foreign handler and the loop terminated early. Confirmed by running `APIClientTests` alone (37/37 passed). Fixed by giving the suite its own `ConfigurationMockURLProtocol`, which is the pattern `ImageRelayAPITests` and `CollectionsPaginationTests` already follow; `ConfigurationTests` was the only file reaching across.
+
+**Verification**: `scripts/run-release-candidate-checks.sh 1.4.4` passed after the fix, with 311 tests (231 ImageRelayKit + 80 FileProviderExtension), zero failures, plus the macOS and iOS Simulator builds. `scripts/build-developer-id-release.sh --version 1.4.4` produced a Developer ID signed DMG; app and DMG notarization both Accepted and stapled. Verified the mounted pre-publication payload as `1.4.4` / `47`. After publishing, re-downloaded the DMG, checksum file, and appcast from GitHub into a scratch directory and confirmed: SHA-256 matches the published checksum file (`shasum -c` OK, `0429fe09...e0e2a`), `codesign --verify --strict` valid, `spctl --assess` accepted as "Notarized Developer ID", `stapler validate` worked, and `releases/latest/download/appcast.xml` serves `1.4.4` / `47` so existing installs will see it. Also verified the appcast's Ed25519 signature against the `SUPublicEDKey` the app ships; note that Sparkle signs the raw file bytes, not their SHA-256 digest, so verifying against the digest gives a false "invalid".
+
+**Decisions made**:
+- Patch bump rather than minor. The 32 commits since `v1.4.3` are fixes, hardening, and docs, with no new features and no breaking changes.
+- Skipped `--smoke-install` at Oliver's direction, so `/Applications/Image Relay.app` still holds the previous build and the installed-app path is unverified for `1.4.4`. Post-publication verification covered the downloaded artifact instead.
+- Split the version bump and the test-isolation fix into separate commits; they are unrelated scopes.
+
+**Left off at**: Release published at https://github.com/oliverames/imagerelay-client/releases/tag/v1.4.4 with the DMG, its SHA-256 file, and the appcast attached, marked latest. `Casks/image-relay.rb` updated to 1.4.4 and committed.
+
+**Open questions**: The cask still cannot be published: `scripts/sync-cask-to-tap.sh` targets `oliverames/homebrew-tap`, which does not exist. Creating or retiring that repo remains Oliver's call. Carried open items also unchanged: the live OAuth sign-in smoke test (needs interactive sign-in), and rotating the App Store Connect API key used for notarization.
+
+---
+
 ## 2026-08-25 - Comprehensive adversarial bug-fixing pass
 
 **What changed**: Repo-wide multi-reviewer review (Kit core networking/storage, both File Provider extensions, host apps/services, cross-file consistency/docs) with independent skeptic verification of every finding; full ledger in `docs/audits/2026-08-25-adversarial-review.md`. Fixed 31 confirmed findings: pagination cap now fails instead of silently truncating into deletion detection; OAuth refresh-lock timeout no longer refreshes unlocked nor deletes a foreign lock; keychain delete-on-empty makes iOS sign-out real (with a corrupt-config guard so a failed read can't cascade into deleting live credentials); metadata multi-select dictionary crash fixed; temp-file download leaks plugged on both platforms; poller start/stop race closed; limiter waits propagate cancellation; throttle store read-modify-write made atomic under `NSFileCoordinator`; assorted error-surfacing and UI-state repairs; doc mirrors reconciled with shipped code (iOS keychain group, target count, app-group prefix, README diagram).
