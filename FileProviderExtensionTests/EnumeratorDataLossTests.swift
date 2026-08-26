@@ -27,7 +27,8 @@ struct EnumeratorDataLossTests {
         rootFolderID: Int = 1000,
         selectedFolderID: Int = 12345,
         descendantFolderID: Int = 22222,
-        descendantFileID: Int = 33333
+        descendantFileID: Int = 33333,
+        deletionConfirmationAge: TimeInterval = Enumerator.defaultDeletionConfirmationAge
     ) throws -> Fixture {
         let db = SyncDatabase.makeInMemory()
 
@@ -96,7 +97,8 @@ struct EnumeratorDataLossTests {
             containerIdentifier: .rootContainer,
             api: api,
             db: db,
-            config: config
+            config: config,
+            deletionConfirmationAge: deletionConfirmationAge
         )
 
         return Fixture(
@@ -326,11 +328,14 @@ struct EnumeratorDataLossTests {
             maxRetries: 0,
             maxRetryDelay: 0
         )
+        // Age floor disabled so this test isolates the miss-count half of the
+        // gate; the time half is covered by the aged-evidence tests below.
         let enumerator = Enumerator(
             containerIdentifier: .rootContainer,
             api: api,
             db: db,
-            config: config
+            config: config,
+            deletionConfirmationAge: 0
         )
 
         EnumeratorMockURLProtocol.requestHandler = { request in
@@ -358,9 +363,131 @@ struct EnumeratorDataLossTests {
         #expect(try db.item(for: staleIdentifier) == nil)
     }
 
+    @Test("Aged deletion evidence confirms on the next miss")
+    func agedDeletionEvidenceConfirmsOnNextMiss() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let staleFolderID = 55556
+        let staleIdentifier = ItemIdentifier.folder(staleFolderID).rawValue
+        try db.upsertItem(TrackedItem(
+            identifier: staleIdentifier,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            remoteID: staleFolderID,
+            itemType: .folder,
+            name: "Stale Aged",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+        // Pre-seed evidence from two minutes ago: past the default age floor.
+        _ = try db.notePendingRemoteDeletion(
+            identifier: staleIdentifier,
+            itemName: "Stale Aged",
+            itemType: .folder,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            now: Date().addingTimeInterval(-120)
+        )
+
+        let (enumerator, _) = try makeBareEnumerator(db: db)
+
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("[]".utf8))
+        }
+
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        let observer = FakeChangeObserver()
+        await observer.runEnumerateChanges(on: enumerator, from: initialAnchor)
+        let reported = Set(observer.deletedIdentifiers.map(\.rawValue))
+        #expect(reported.contains(staleIdentifier),
+                "Aged evidence past the confirmation floor should confirm on this miss")
+        #expect(try db.item(for: staleIdentifier) == nil)
+    }
+
+    @Test("Back-to-back passes cannot confirm a fresh remote deletion")
+    func backToBackPassesCannotConfirmFreshDeletion() async throws {
+        // The poller fans out root-container AND working-set passes in one
+        // shot; both may hit the same stale API state seconds apart. Count
+        // alone would call that independent proof — the age floor must hold.
+        let db = SyncDatabase.makeInMemory()
+        let staleFolderID = 55557
+        let staleIdentifier = ItemIdentifier.folder(staleFolderID).rawValue
+        try db.upsertItem(TrackedItem(
+            identifier: staleIdentifier,
+            parentIdentifier: NSFileProviderItemIdentifier.rootContainer.rawValue,
+            remoteID: staleFolderID,
+            itemType: .folder,
+            name: "Stale Fresh",
+            size: 0,
+            contentVersion: "v1",
+            metadataVersion: "m1"
+        ))
+
+        let (enumerator, _) = try makeBareEnumerator(db: db)
+
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, Data("[]".utf8))
+        }
+
+        let initialAnchor = NSFileProviderSyncAnchor(SyncAnchor().data)
+        for pass in 1...2 {
+            let observer = FakeChangeObserver()
+            await observer.runEnumerateChanges(on: enumerator, from: initialAnchor)
+            let reported = Set(observer.deletedIdentifiers.map(\.rawValue))
+            #expect(!reported.contains(staleIdentifier),
+                    "Pass \(pass) within the age floor must not report deletion")
+            #expect(try db.item(for: staleIdentifier) != nil,
+                    "Pass \(pass) within the age floor must keep the tracked row")
+        }
+        #expect(try db.pendingRemoteDeletions().first?.missCount == 2,
+                "Both passes recorded evidence; only time separates them from confirmation")
+    }
+
+    /// Minimal root-container enumerator over an empty-selection config, for
+    /// tests that drive the deletion gate directly.
+    private func makeBareEnumerator(db: SyncDatabase, deletionConfirmationAge: TimeInterval = Enumerator.defaultDeletionConfirmationAge) throws -> (Enumerator, SyncDatabase) {
+        let config = AppConfiguration(
+            apiKey: "test-key",
+            remoteRootFolderID: 1000,
+            defaultFileTypeID: 1,
+            pollIntervalSeconds: 60,
+            syncUpload: true,
+            syncDownload: true,
+            userAgent: "TestAgent/1.0",
+            selectedFolderIDs: []
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(
+            baseURL: baseURL,
+            apiKey: "test-key",
+            userAgent: "TestAgent/1.0",
+            sessionConfiguration: sessionConfig,
+            rateLimiter: RateLimiter(maxRequests: 1000, period: 1.0),
+            maxRetries: 0,
+            maxRetryDelay: 0
+        )
+        let enumerator = Enumerator(
+            containerIdentifier: .rootContainer,
+            api: api,
+            db: db,
+            config: config,
+            deletionConfirmationAge: deletionConfirmationAge
+        )
+        return (enumerator, db)
+    }
+
     @Test("Full enumeration preserves deletion evidence for the change pass")
     func fullEnumerationDoesNotConsumeDeletionEvidence() async throws {
-        let fx = try makeFixture()
+        // Age floor disabled: this test isolates evidence preservation across
+        // enumeration types, not the confirmation timing.
+        let fx = try makeFixture(deletionConfirmationAge: 0)
         let staleFolderID = 55555
         let staleIdentifier = ItemIdentifier.folder(staleFolderID).rawValue
         try fx.db.upsertItem(TrackedItem(

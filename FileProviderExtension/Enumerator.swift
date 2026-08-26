@@ -4,25 +4,35 @@ import ImageRelayKit
 import os.log
 
 final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable {
+    /// Confirmation requires elapsed time, not just pass count: two
+    /// back-to-back enumerations seconds apart can both be served from one
+    /// stale API response, and count-only confirmation would treat that as
+    /// independent evidence. Legitimate deletions confirm on the first pass
+    /// after this age is reached.
+    static let defaultDeletionConfirmationAge: TimeInterval = 60
+
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.fileprovider", category: "Enumerator")
     private let containerIdentifier: NSFileProviderItemIdentifier
     private let api: APIClient
     private let db: SyncDatabase
     private let config: AppConfiguration
     private let startupThrottleGate: StartupThrottleGate
+    private let deletionConfirmationAge: TimeInterval
 
     init(
         containerIdentifier: NSFileProviderItemIdentifier,
         api: APIClient,
         db: SyncDatabase,
         config: AppConfiguration,
-        startupThrottleGate: StartupThrottleGate = StartupThrottleGate(delay: 0)
+        startupThrottleGate: StartupThrottleGate = StartupThrottleGate(delay: 0),
+        deletionConfirmationAge: TimeInterval = Enumerator.defaultDeletionConfirmationAge
     ) {
         self.containerIdentifier = containerIdentifier
         self.api = api
         self.db = db
         self.config = config
         self.startupThrottleGate = startupThrottleGate
+        self.deletionConfirmationAge = deletionConfirmationAge
         super.init()
     }
 
@@ -214,11 +224,12 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                     itemType: tracked.itemType,
                     parentIdentifier: tracked.parentIdentifier
                 )
-                guard pending.missCount >= Self.requiredDeletionConfirmationMisses else {
-                    logger.warning("Remote deletion pending confirmation (\(pending.missCount, privacy: .public)/\(Self.requiredDeletionConfirmationMisses, privacy: .public)): \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+                guard deletionEvidenceConfirmed(
+                    pending: pending,
+                    context: "Container"
+                ) else {
                     continue
                 }
-                logger.info("Remote deletion confirmed after \(pending.missCount, privacy: .public) misses: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
                 for identifier in localSubtree {
                     deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
                 }
@@ -275,15 +286,16 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
                 itemType: tracked.itemType,
                 parentIdentifier: tracked.parentIdentifier
             )
-            guard pending.missCount >= Self.requiredDeletionConfirmationMisses else {
-                logger.warning("Working-set remote deletion pending confirmation (\(pending.missCount, privacy: .public)/\(Self.requiredDeletionConfirmationMisses, privacy: .public)): \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
+            guard deletionEvidenceConfirmed(
+                pending: pending,
+                context: "Working-set"
+            ) else {
                 continue
             }
             let localSubtree = try localSubtreeIdentifiers(rootedAt: tracked.identifier)
             for identifier in localSubtree where queuedDeletions.insert(identifier).inserted {
                 deletedIdentifiers.append(NSFileProviderItemIdentifier(identifier))
             }
-            logger.info("Working-set remote deletion confirmed after \(pending.missCount, privacy: .public) misses: \(tracked.name, privacy: .public) (\(tracked.identifier, privacy: .public))")
         }
 
         return (items, deletedIdentifiers)
@@ -542,6 +554,26 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
 private extension Enumerator {
     static let requiredDeletionConfirmationMisses = 2
+
+    /// Records-then-decides shared by the container and working-set diffs:
+    /// confirmation needs both the miss count and evidence age. The age floor
+    /// keeps same-window passes (one stale replica, a poller fanning out root
+    /// plus working set in one shot) from compounding into independent proof,
+    /// and pairs with the freshness reset in `SyncDatabase` so two unrelated
+    /// transient misses weeks apart also cannot confirm.
+    func deletionEvidenceConfirmed(pending: PendingRemoteDeletion, context: String) -> Bool {
+        guard pending.missCount >= Self.requiredDeletionConfirmationMisses else {
+            logger.warning("\(context, privacy: .public) remote deletion pending confirmation (\(pending.missCount, privacy: .public)/\(Self.requiredDeletionConfirmationMisses, privacy: .public)): \(pending.itemName, privacy: .public) (\(pending.identifier, privacy: .public))")
+            return false
+        }
+        let evidenceAge = Date().timeIntervalSince(pending.firstSeenAt)
+        guard evidenceAge >= deletionConfirmationAge else {
+            logger.warning("\(context, privacy: .public) misses reached \(pending.missCount, privacy: .public) but evidence is only \(Int(evidenceAge), privacy: .public)s old; an aged pass must confirm: \(pending.itemName, privacy: .public) (\(pending.identifier, privacy: .public))")
+            return false
+        }
+        logger.info("\(context, privacy: .public) remote deletion confirmed after \(pending.missCount, privacy: .public) miss(es) spanning \(Int(evidenceAge), privacy: .public)s: \(pending.itemName, privacy: .public) (\(pending.identifier, privacy: .public))")
+        return true
+    }
 }
 
 private struct ItemSyncSnapshot {
