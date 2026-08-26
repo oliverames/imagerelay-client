@@ -1,5 +1,39 @@
+import Foundation
 import Testing
 @testable import ImageRelayKit
+
+// Owned by this suite alone. `.serialized` only orders tests inside one suite,
+// so sharing another suite's protocol stub lets a concurrent suite swap the
+// handler mid-request. Each suite that stubs URLProtocol keeps its own type.
+final class ConfigurationMockURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        requestHandler != nil
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
 
 // Serialized so tests don't race on the shared Keychain account "api-key".
 @Suite("Configuration", .serialized)
@@ -625,10 +659,10 @@ struct ConfigurationTests {
         )
         try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
 
-        MockURLProtocol.requestHandler = { _ in
+        ConfigurationMockURLProtocol.requestHandler = { _ in
             throw NSError(domain: "test", code: -1)
         }
-        defer { MockURLProtocol.requestHandler = nil }
+        defer { ConfigurationMockURLProtocol.requestHandler = nil }
 
         let result = try await AppConfiguration.loadAndRefresh(
             from: url,
@@ -673,7 +707,7 @@ struct ConfigurationTests {
 
         var capturedRequestBody: Data?
         var capturedRequestURL: URL?
-        MockURLProtocol.requestHandler = { request in
+        ConfigurationMockURLProtocol.requestHandler = { request in
             capturedRequestURL = request.url
             if let body = request.httpBody {
                 capturedRequestBody = body
@@ -697,10 +731,10 @@ struct ConfigurationTests {
             )!
             return (response, mockResponseData)
         }
-        defer { MockURLProtocol.requestHandler = nil }
+        defer { ConfigurationMockURLProtocol.requestHandler = nil }
 
         let testConfig = URLSessionConfiguration.ephemeral
-        testConfig.protocolClasses = [MockURLProtocol.self]
+        testConfig.protocolClasses = [ConfigurationMockURLProtocol.self]
 
         let result = try await AppConfiguration.loadAndRefresh(
             from: url,
