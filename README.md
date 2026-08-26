@@ -188,8 +188,8 @@ open ImageRelayClient.xcodeproj
 `ImageRelayKit` is a local Swift Package; Xcode resolves GRDB and Sparkle automatically.
 
 ```sh
-# Run the unit test suite (currently 299 tests)
-# 221 ImageRelayKitTests + 78 FileProviderExtensionTests
+# Run the unit test suite (currently 311 tests)
+# 231 ImageRelayKitTests + 80 FileProviderExtensionTests
 xcodebuild test \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
