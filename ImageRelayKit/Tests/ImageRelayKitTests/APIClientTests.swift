@@ -634,6 +634,81 @@ struct APIClientTests {
         #expect(requestCount == 2)
     }
 
+    @Test("GET requests are retried on transient network errors")
+    func getRetriedOnNetworkError() async throws {
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if requestCount == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, #"[]"#.data(using: .utf8)!)
+        }
+
+        let client = makeClient(maxRetries: 2, maxRetryDelay: 0)
+        let folders: [RemoteFolder] = try await client.get("/folders.json")
+
+        #expect(folders.isEmpty)
+        #expect(requestCount == 2)
+    }
+
+    @Test("POST requests are not retried on network errors")
+    func postNotRetriedOnNetworkError() async {
+        // A lost response may mean the server already processed the POST;
+        // re-sending could mint a duplicate upload job or quick link.
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { _ in
+            requestCount += 1
+            throw URLError(.networkConnectionLost)
+        }
+        defer { MockURLProtocol.requestHandler = nil }
+
+        let client = makeClient(maxRetries: 3, maxRetryDelay: 0)
+        do {
+            try await client.post("/upload_jobs.json", body: ["name": "test"])
+            Issue.record("Expected error")
+        } catch let error as APIError {
+            guard case .networkError = error else {
+                Issue.record("Expected networkError, got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+        #expect(requestCount == 1)
+    }
+
+    @Test("Chunk uploads are retried on transient network errors despite being POSTs")
+    func chunkUploadRetriedOnNetworkError() async throws {
+        var requestCount = 0
+        MockURLProtocol.requestHandler = { request in
+            requestCount += 1
+            if requestCount == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: 200,
+                httpVersion: nil, headerFields: nil
+            )!
+            return (response, #"{"ok":true}"#.data(using: .utf8)!)
+        }
+
+        let client = makeClient(maxRetries: 2, maxRetryDelay: 0)
+        let result = try await client.uploadChunked(
+            fileData: Data(repeating: 1, count: 6),
+            pathBuilder: { "/upload_jobs/1/files/2/chunks/\($0)" },
+            chunkSize: 5,
+            responseType: ChunkAck.self
+        )
+
+        #expect(result.lastResponse?.ok == true)
+        #expect(requestCount == 3)
+    }
+
     @Test("Download reports 429 outcomes to the rate limiter")
     func downloadReportsRateLimitOutcome() async throws {
         MockURLProtocol.requestHandler = { request in

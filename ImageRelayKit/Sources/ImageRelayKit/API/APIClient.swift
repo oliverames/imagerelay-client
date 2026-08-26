@@ -265,6 +265,9 @@ public actor APIClient {
         try await upload(data: data, to: path, query: [:], contentType: contentType)
     }
 
+    // Chunk and thumbnail uploads overwrite by path (same bytes, same target),
+    // so a lost-response retry cannot duplicate anything — unlike job/link
+    // creation POSTs. They declare that here.
     public func upload(
         data: Data,
         to path: String,
@@ -274,7 +277,7 @@ public actor APIClient {
         var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        let _: EmptyResponse = try await execute(request)
+        let _: EmptyResponse = try await execute(request, transportRetriesAllowed: true)
     }
 
     public func upload<T: Decodable & Sendable>(
@@ -286,7 +289,7 @@ public actor APIClient {
         var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        return try await execute(request)
+        return try await execute(request, transportRetriesAllowed: true)
     }
 
     public func uploadIfPresent<T: Decodable & Sendable>(
@@ -298,7 +301,7 @@ public actor APIClient {
         var request = try buildRequest(method: "POST", path: path, query: query)
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        let (responseData, _) = try await executeRaw(request)
+        let (responseData, _) = try await executeRaw(request, transportRetriesAllowed: true)
         guard !responseData.isEmpty else { return nil }
         do {
             return try JSONDecoder.imageRelay.decode(T.self, from: responseData)
@@ -464,8 +467,8 @@ public actor APIClient {
         return request
     }
 
-    private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, _) = try await executeRaw(request)
+    private func execute<T: Decodable>(_ request: URLRequest, transportRetriesAllowed: Bool = false) async throws -> T {
+        let (data, _) = try await executeRaw(request, transportRetriesAllowed: transportRetriesAllowed)
         if T.self == EmptyResponse.self {
             return EmptyResponse() as! T
         }
@@ -476,7 +479,10 @@ public actor APIClient {
         }
     }
 
-    private func executeRaw(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    private func executeRaw(
+        _ request: URLRequest,
+        transportRetriesAllowed: Bool = false
+    ) async throws -> (Data, HTTPURLResponse) {
         var lastError: (any Error)?
         let method = request.httpMethod ?? "GET"
         let path = request.url?.path ?? ""
@@ -522,10 +528,12 @@ public actor APIClient {
                 logger.warning("\(method) \(path) network error: \(error.localizedDescription)")
                 let apiError = APIError.networkError(underlying: error)
                 // A transport retry re-sends the request. For non-idempotent
-                // methods (POST uploads, quick-link mints, folder creates) the
-                // first attempt may already have taken effect server-side, so
-                // re-sending could create duplicate artifacts. Fail instead.
-                guard Self.isIdempotentMethod(method) else {
+                // methods (POST uploads of jobs/links/folders) the first
+                // attempt may already have taken effect server-side, so
+                // re-sending could create duplicate artifacts — fail instead.
+                // Requests that overwrite by path (chunk and thumbnail uploads)
+                // are exempt via transportRetriesAllowed.
+                guard Self.isIdempotentMethod(method) || transportRetriesAllowed else {
                     throw apiError
                 }
                 lastError = apiError
