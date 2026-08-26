@@ -689,6 +689,51 @@ struct SyncDatabaseTests {
         #expect(counted == listed)
     }
 
+    @Test("Stale pending-deletion evidence restarts its confirmation cycle")
+    func stalePendingDeletionRestartsCycle() throws {
+        let db = try makeDB()
+        let identifier = ItemIdentifier.file(77).rawValue
+        let parent = ItemIdentifier.folder(10).rawValue
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+
+        _ = try db.notePendingRemoteDeletion(
+            identifier: identifier, itemName: "old.pdf", itemType: .file,
+            parentIdentifier: parent, now: t0
+        )
+        // A miss just past the freshness window starts a new cycle instead of
+        // compounding onto week-old evidence.
+        var pending = try db.notePendingRemoteDeletion(
+            identifier: identifier, itemName: "old.pdf", itemType: .file,
+            parentIdentifier: parent,
+            now: t0.addingTimeInterval(SyncDatabase.pendingMissFreshnessWindow + 60)
+        )
+        #expect(pending.missCount == 1)
+        let cycleStart = pending.firstSeenAt
+        #expect(cycleStart == t0.addingTimeInterval(SyncDatabase.pendingMissFreshnessWindow + 60))
+
+        // Fresh follow-up misses accumulate normally from the new baseline.
+        pending = try db.notePendingRemoteDeletion(
+            identifier: identifier, itemName: "old.pdf", itemType: .file,
+            parentIdentifier: parent, now: cycleStart.addingTimeInterval(30)
+        )
+        #expect(pending.missCount == 2)
+        #expect(pending.firstSeenAt == cycleStart)
+
+        // Misses inside the freshness window keep the original first-seen
+        // timestamp, which is what the enumerator's age floor measures.
+        let otherID = ItemIdentifier.file(78).rawValue
+        _ = try db.notePendingRemoteDeletion(
+            identifier: otherID, itemName: "new.pdf", itemType: .file,
+            parentIdentifier: parent, now: t0
+        )
+        let accumulated = try db.notePendingRemoteDeletion(
+            identifier: otherID, itemName: "new.pdf", itemType: .file,
+            parentIdentifier: parent, now: t0.addingTimeInterval(10)
+        )
+        #expect(accumulated.missCount == 2)
+        #expect(accumulated.firstSeenAt == t0)
+    }
+
     @Test("Quick check reports healthy in-memory database")
     func quickCheckReportsHealthyDatabase() throws {
         let db = try makeDB()

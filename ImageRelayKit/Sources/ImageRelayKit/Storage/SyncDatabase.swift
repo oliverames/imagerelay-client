@@ -541,6 +541,12 @@ public final class SyncDatabase: Sendable {
 
     // MARK: - Pending Remote Deletions
 
+    /// Misses older than this no longer count as consecutive evidence; a new
+    /// miss after the window starts a fresh confirmation cycle (fresh count,
+    /// fresh first-seen timestamp). Without this, two unrelated transient
+    /// misses weeks apart would satisfy a count-only confirmation gate.
+    public static let pendingMissFreshnessWindow: TimeInterval = 24 * 60 * 60
+
     @discardableResult
     public func notePendingRemoteDeletion(
         identifier: String,
@@ -554,8 +560,14 @@ public final class SyncDatabase: Sendable {
                 existing.itemName = itemName
                 existing.itemType = itemType
                 existing.parentIdentifier = parentIdentifier
+                let isStaleEvidence = now.timeIntervalSince(existing.lastSeenAt) > Self.pendingMissFreshnessWindow
+                if isStaleEvidence {
+                    existing.missCount = 1
+                    existing.firstSeenAt = now
+                } else {
+                    existing.missCount += 1
+                }
                 existing.lastSeenAt = now
-                existing.missCount += 1
                 try existing.update(db)
                 return existing
             }
