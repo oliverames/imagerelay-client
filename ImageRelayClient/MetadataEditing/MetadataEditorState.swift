@@ -365,10 +365,14 @@ final class MetadataEditorState {
         // Custom fields: per-field updates, skipping mixed-blank (don't-touch).
         var customFieldUpdates: [FileMetadataUpdate.CustomFieldUpdate] = []
         let fieldsByKey = Dictionary(
-            uniqueKeysWithValues: details
+            details
                 .flatMap(\.customFields)
-                .map { ($0.stableID, $0) }
-                // Last write wins; we just need a representative field for id/name.
+                .map { ($0.stableID, $0) },
+            uniquingKeysWith: { _, latest in latest }
+            // Last write wins; we just need a representative field for id/name.
+            // uniquingKeysWith is required: multi-selected files routinely share
+            // field definitions, and uniqueKeysWithValues would trap on the
+            // duplicate keys.
         )
         for (key, field) in fieldsByKey {
             let draft = customFieldDrafts[key] ?? ""

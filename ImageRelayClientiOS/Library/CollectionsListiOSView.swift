@@ -11,6 +11,8 @@ struct CollectionsListiOSView: View {
         Group {
             if case .failed(let message) = state.phase {
                 failedView(message: message)
+            } else if case .loaded = state.phase, state.collections.isEmpty {
+                ContentUnavailableView("No collections", systemImage: "square.stack.3d.up")
             } else if state.collections.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

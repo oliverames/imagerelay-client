@@ -15,6 +15,7 @@ final class UploadLinksService {
 
     enum ServiceError: LocalizedError {
         case notConfigured
+        case unexpectedResponse
         case missingFolder
         case invalidName
 
@@ -22,6 +23,8 @@ final class UploadLinksService {
             switch self {
             case .notConfigured:
                 return "Image Relay is not configured. Open Settings → General to add your API key."
+            case .unexpectedResponse:
+                return "Image Relay returned an unexpected response."
             case .missingFolder:
                 return "Choose a target folder before creating the upload link."
             case .invalidName:
@@ -58,7 +61,7 @@ final class UploadLinksService {
         if let link = response.uploadLink ?? response.upload_link {
             return link
         }
-        throw ServiceError.notConfigured
+        throw ServiceError.unexpectedResponse
     }
 
     func delete(id: Int) async throws {

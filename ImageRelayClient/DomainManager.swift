@@ -110,20 +110,25 @@ final class DomainManager {
         refreshStatus()
     }
 
-    func refreshStatus() {
+    /// Reloads configuration from disk and refreshes published status. Returns the
+    /// freshly loaded config so callers (poll loops) don't need a second
+    /// Keychain-hitting load per iteration.
+    @discardableResult
+    func refreshStatus() -> AppConfiguration {
         let config = loadConfiguration()
         syncUploadEnabled = config.syncUpload
         syncDownloadEnabled = config.syncDownload
         showAdvancedInformation = config.showAdvancedInformation
         syncDisconnected = config.fileProviderDisconnected
 
-        guard let db = ensureDatabase() else { return }
+        guard let db = ensureDatabase() else { return config }
         syncProgress = (try? db.getProgress()) ?? .idle
         pauseState = (try? db.getPauseState()) ?? .default
         failedUploadCount = (try? db.unresolvedFailureCount()) ?? 0
         openOperationCount = (try? db.openSyncOperationCount()) ?? 0
-        pendingRemoteDeletionCount = (try? db.pendingRemoteDeletions(limit: 1_000).count) ?? 0
+        pendingRemoteDeletionCount = (try? db.pendingRemoteDeletionCount()) ?? 0
         recentActivity = (try? db.recentActivity(limit: 5)) ?? []
+        return config
     }
 
     func refreshRegistrationStatus() async {
@@ -343,8 +348,7 @@ final class DomainManager {
                 return
             }
 
-            refreshStatus()
-            let config = loadConfiguration()
+            let config = refreshStatus()
             guard isDomainActive, config.syncDownload, !pauseState.isActive else { continue }
             guard !config.fileProviderDisconnected else { continue }
 
@@ -360,8 +364,9 @@ final class DomainManager {
     private func webhookRelayLoop() async {
         var consecutiveFailures = 0
         while !Task.isCancelled {
-            refreshStatus()
-            let config = loadConfiguration()
+            // One load per iteration: reuse what refreshStatus just read
+            // instead of hitting the Keychain twice.
+            let config = refreshStatus()
             let interval = max(5, config.webhookRelayIntervalSeconds)
 
             guard let relayURL = config.webhookRelayURL,
@@ -479,11 +484,15 @@ final class DomainManager {
             remotePollingTask = nil
             webhookRelayTask?.cancel()
             webhookRelayTask = nil
-            updateConfiguration { config in
+            let saved = updateConfiguration { config in
                 config.fileProviderDisconnected = true
             }
-            syncDisconnected = true
-            lastError = nil
+            // Only claim "Sync Stopped" when the flag actually persisted;
+            // otherwise the next launch would report connected again.
+            syncDisconnected = saved
+            if saved {
+                lastError = nil
+            }
             refreshStatus()
         } catch {
             lastError = error.localizedDescription
@@ -499,13 +508,15 @@ final class DomainManager {
 
         do {
             try await manager.reconnect()
-            updateConfiguration { config in
+            let saved = updateConfiguration { config in
                 config.fileProviderDisconnected = false
             }
-            syncDisconnected = false
-            lastError = nil
-            startRemotePolling()
-            startWebhookRelayPolling()
+            if saved {
+                syncDisconnected = false
+                lastError = nil
+                startRemotePolling()
+                startWebhookRelayPolling()
+            }
             await signalSync()
             refreshStatus()
         } catch {
@@ -731,12 +742,22 @@ final class DomainManager {
         try? config.save(to: configURL)
     }
 
-    private func updateConfiguration(_ mutate: (inout AppConfiguration) -> Void) {
-        guard let container = AppConfiguration.containerURL() else { return }
+    @discardableResult
+    private func updateConfiguration(_ mutate: (inout AppConfiguration) -> Void) -> Bool {
+        guard let container = AppConfiguration.containerURL() else { return false }
         let url = AppConfiguration.fileURL(in: container)
         var config = (try? AppConfiguration.load(from: url)) ?? .default
         mutate(&config)
-        try? config.save(to: url)
+        do {
+            try config.save(to: url)
+            return true
+        } catch {
+            // A failed persist would silently diverge UI state from disk state
+            // on the next launch, so surface it instead of swallowing.
+            lastError = "Could not save settings: \(error.localizedDescription)"
+            logger.error("Failed to persist configuration: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
     }
 }
 

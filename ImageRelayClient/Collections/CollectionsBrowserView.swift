@@ -196,7 +196,11 @@ private struct CollectionDetailView: View {
                 state.pendingRemoveCollection = nil
             }
         } message: { col in
-            Text("This is a public collection. The Image Relay API has no direct removal endpoint, so removing this file will recreate the collection. All existing public shared links and cover images will be permanently broken, and the new collection will be private by default.")
+            if col.isPublic {
+                Text("This is a public collection. The Image Relay API has no direct removal endpoint, so removing this file will recreate the collection. All existing public shared links and cover images will be permanently broken, and the new collection will be private by default. The description is not carried over to the recreated collection.")
+            } else {
+                Text("The Image Relay API has no direct removal endpoint, so removing this file will recreate the collection. The description and cover image are not carried over, and anything referencing the current collection ID will need to be updated.")
+            }
         }
     }
 

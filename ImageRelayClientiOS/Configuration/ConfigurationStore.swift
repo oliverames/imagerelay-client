@@ -101,9 +101,23 @@ final class ConfigurationStore {
 
     private func load() -> AppConfiguration {
         guard let container = AppConfiguration.containerURL() else { return .default }
-        var loaded = (try? AppConfiguration.load(from: AppConfiguration.fileURL(in: container))) ?? .default
-        loaded.syncUpload = false
-        loaded.userAgent = AppConfiguration.normalizedIOSUserAgent(loaded.userAgent)
-        return loaded
+        let url = AppConfiguration.fileURL(in: container)
+        if var loaded = try? AppConfiguration.load(from: url) {
+            loaded.syncUpload = false
+            loaded.userAgent = AppConfiguration.normalizedIOSUserAgent(loaded.userAgent)
+            return loaded
+        }
+        // Corrupt or unreadable config.json: start from defaults but carry over
+        // the stored Keychain credential. Without this, a transient read
+        // failure followed by any save would persist an empty-key snapshot and,
+        // under the empty-means-no-credential rule in AppConfiguration.save,
+        // permanently delete the live API key.
+        var fallback = AppConfiguration.default
+        if let stored = KeychainStore.load(account: AppConfiguration.keychainAccount), !stored.isEmpty {
+            fallback.apiKey = stored
+        }
+        fallback.syncUpload = false
+        fallback.userAgent = AppConfiguration.currentIOSUserAgent
+        return fallback
     }
 }

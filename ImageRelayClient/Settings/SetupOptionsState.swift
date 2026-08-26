@@ -98,7 +98,7 @@ final class SetupOptionsState {
            let url = URL(string: "https://\(tenant).imagerelay.com/api/v2") {
             baseURL = url
         } else {
-            baseURL = URL(string: "https://api.imagerelay.com/api/v2")!
+            baseURL = AppConfiguration.defaultBaseURL
         }
 
         return APIClient(

@@ -82,8 +82,13 @@ final class CollectionsService {
     /// operations succeed is the original collection deleted. If a network error,
     /// timeout, or rate limit occurs during population, the original collection remains
     /// completely untouched.
+    ///
+    /// Known limitation: Image Relay's create endpoint carries only a name, so the
+    /// replacement collection loses the original's description and cover image.
+    /// This returns the recreated collection as the server sees it rather than
+    /// re-injecting stale local fields.
     @discardableResult
-    func removeItem(fileID: Int, from collection: Collection) async throws -> Collection? {
+    func removeItem(fileID: Int, from collection: Collection) async throws -> Collection {
         let currentItems = try await items(in: collection)
         let remainingIDs = currentItems.map(\.fileID).filter { $0 != fileID }
 
@@ -101,7 +106,7 @@ final class CollectionsService {
         return Collection(
             id: recreated.id,
             name: recreated.name,
-            description: collection.description, // Preserve description
+            description: recreated.description,
             itemCount: remainingIDs.count,
             createdOn: recreated.createdOn,
             updatedOn: recreated.updatedOn,
@@ -227,30 +232,22 @@ final class CollectionsState {
 
     func removeItem(fileID: Int, from collection: Collection) async {
         do {
-            if let updatedCollection = try await service.removeItem(fileID: fileID, from: collection) {
-                // Update in-memory collections array
-                if let index = collections.firstIndex(where: { $0.id == collection.id }) {
-                    collections[index] = updatedCollection
-                }
-                
-                // Swap the items dictionary cache
-                let remainingItems = itemsByCollectionID[collection.id]?.filter { $0.fileID != fileID } ?? []
-                itemsByCollectionID[updatedCollection.id] = remainingItems
-                if updatedCollection.id != collection.id {
-                    itemsByCollectionID.removeValue(forKey: collection.id)
-                    itemsErrorByCollectionID.removeValue(forKey: collection.id)
-                }
+            let updatedCollection = try await service.removeItem(fileID: fileID, from: collection)
+            // Update in-memory collections array
+            if let index = collections.firstIndex(where: { $0.id == collection.id }) {
+                collections[index] = updatedCollection
+            }
 
-                if selectedID == collection.id {
-                    selectedID = updatedCollection.id
-                }
-            } else {
-                collections.removeAll { $0.id == collection.id }
+            // Swap the items dictionary cache
+            let remainingItems = itemsByCollectionID[collection.id]?.filter { $0.fileID != fileID } ?? []
+            itemsByCollectionID[updatedCollection.id] = remainingItems
+            if updatedCollection.id != collection.id {
                 itemsByCollectionID.removeValue(forKey: collection.id)
                 itemsErrorByCollectionID.removeValue(forKey: collection.id)
-                if selectedID == collection.id {
-                    selectedID = collections.first?.id
-                }
+            }
+
+            if selectedID == collection.id {
+                selectedID = updatedCollection.id
             }
         } catch {
             logger.warning("Remove item from collection failed: \(error.localizedDescription)")

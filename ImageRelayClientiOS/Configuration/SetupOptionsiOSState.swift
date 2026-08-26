@@ -34,7 +34,7 @@ final class SetupOptionsiOSState {
         phase = .loading
         do {
             let client = APIClient(
-                baseURL: URL(string: "https://api.imagerelay.com/api/v2")!,
+                baseURL: AppConfiguration.defaultBaseURL,
                 apiKey: trimmed,
                 userAgent: AppConfiguration.currentIOSUserAgent,
                 rateLimiter: AppConfiguration.sharedOrPerProcessRateLimiter(),

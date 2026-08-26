@@ -15,11 +15,14 @@ final class WebhooksService {
 
     enum ServiceError: LocalizedError {
         case notConfigured
+        case unexpectedResponse
 
         var errorDescription: String? {
             switch self {
             case .notConfigured:
                 return "Image Relay is not configured. Open Settings → General to add your API key."
+            case .unexpectedResponse:
+                return "Image Relay returned an unexpected response."
             }
         }
     }
@@ -43,7 +46,7 @@ final class WebhooksService {
         if let webhook = response.webhook {
             return webhook
         }
-        throw ServiceError.notConfigured
+        throw ServiceError.unexpectedResponse
     }
 
     func delete(id: Int) async throws {
@@ -104,6 +107,9 @@ final class WebhooksState {
     var phase: LoadPhase = .idle
     var webhooks: [Webhook] = []
     var supportedWebhooks: [SupportedWebhook] = []
+    /// Row-action failures (delete/revoke) shown as a banner instead of
+    /// replacing a successfully loaded list with the full-window error view.
+    var actionError: String? = nil
 
     // Create form drafts
     var draftURL: String = ""
@@ -169,12 +175,14 @@ final class WebhooksState {
     }
 
     func delete(_ webhook: Webhook) async {
+        actionError = nil
         do {
             try await service.delete(id: webhook.id)
             webhooks.removeAll { $0.id == webhook.id }
         } catch {
             logger.warning("Webhook delete failed: \(error.localizedDescription)")
-            phase = .failed(error.localizedDescription)
+            // Keep the loaded list visible; surface the failure as a banner.
+            actionError = "Could not delete webhook: \(error.localizedDescription)"
         }
     }
 

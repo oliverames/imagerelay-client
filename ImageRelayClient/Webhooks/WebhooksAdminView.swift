@@ -76,7 +76,7 @@ struct WebhooksAdminView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        case .failed(let message):
+        case .failed(let message) where state.webhooks.isEmpty:
             VStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title)
@@ -118,11 +118,29 @@ struct WebhooksAdminView: View {
             .padding(20)
 
         default:
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(state.webhooks) { webhook in
-                        WebhookRow(webhook: webhook, onDelete: { pendingDelete = webhook })
-                        Divider()
+            // A loaded (or previously loaded) list always stays visible;
+            // row-action failures appear as a banner instead of wiping it.
+            VStack(spacing: 0) {
+                if let actionError = state.actionError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text(actionError)
+                            .font(.callout)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        Button("Dismiss") { state.actionError = nil }
+                            .buttonStyle(.borderless)
+                    }
+                    .padding(12)
+                    .background(.orange.opacity(0.12))
+                }
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(state.webhooks) { webhook in
+                            WebhookRow(webhook: webhook, onDelete: { pendingDelete = webhook })
+                            Divider()
+                        }
                     }
                 }
             }
