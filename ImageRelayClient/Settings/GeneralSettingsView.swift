@@ -2,9 +2,11 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 import ImageRelayKit
+import os.log
 
 struct GeneralSettingsView: View {
     @Environment(DomainManager.self) private var domainManager
+    private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "GeneralSettings")
     @State private var authMethod: AuthMethod = .apiKey
     @State private var apiKey = ""
     @State private var oauthTenant = ""
@@ -325,12 +327,25 @@ struct GeneralSettingsView: View {
     private func saveConfig() {
         guard let container, !hasValidationError else { return }
         var config = loadStoredConfiguration()
-        config.authMethod = authMethod
-        config.apiKey = apiKey
-        config.oauthTenant = oauthTenant
-        config.oauthClientID = oauthClientID
-        config.oauthClientSecret = oauthClientSecret
-        config.oauthRedirectURI = oauthRedirectURI
+        // When this build hides OAuth editing, a stored live-OAuth session must
+        // survive Settings close-out untouched on the credential fields;
+        // otherwise the forced .apiKey view state would persist an
+        // empty-key configuration over it.
+        #if ENABLE_OAUTH_CONFIG_UI
+        let storedIsLiveOAuth = false
+        #else
+        let storedIsLiveOAuth = config.authMethod == .oauth && config.oauthTokens != nil
+        #endif
+        if !storedIsLiveOAuth {
+            config.authMethod = authMethod
+            config.apiKey = apiKey
+            config.oauthTenant = oauthTenant
+            config.oauthClientID = oauthClientID
+            config.oauthClientSecret = oauthClientSecret
+            config.oauthRedirectURI = oauthRedirectURI
+        } else {
+            logger.info("Preserving stored OAuth credentials across Settings save-on-disappear")
+        }
         let trimmedRoot = remoteRootFolderID.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedRoot.isEmpty || trimmedRoot.caseInsensitiveCompare("root") == .orderedSame {
             config.remoteRootFolderID = nil
