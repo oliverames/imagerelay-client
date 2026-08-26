@@ -108,17 +108,17 @@ public struct OAuthClient: Sendable {
         redirectURI: String,
         codeVerifier: String? = nil
     ) async throws -> OAuthTokens {
-        var queryItems = [
-            URLQueryItem(name: "client_id", value: clientID),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "client_secret", value: clientSecret),
-            URLQueryItem(name: "code", value: code),
-            URLQueryItem(name: "grant_type", value: "authorization_code")
+        var parameters = [
+            "grant_type": "authorization_code",
+            "client_id": clientID,
+            "client_secret": clientSecret,
+            "redirect_uri": redirectURI,
+            "code": code
         ]
         if let codeVerifier, !codeVerifier.isEmpty {
-            queryItems.append(URLQueryItem(name: "code_verifier", value: codeVerifier))
+            parameters["code_verifier"] = codeVerifier
         }
-        return try await tokenRequest(queryItems: queryItems)
+        return try await tokenRequest(parameters: parameters)
     }
 
     public func refresh(
@@ -127,21 +127,25 @@ public struct OAuthClient: Sendable {
         clientSecret: String,
         redirectURI: String
     ) async throws -> OAuthTokens {
-        try await tokenRequest(queryItems: [
-            URLQueryItem(name: "client_id", value: clientID),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "client_secret", value: clientSecret),
-            URLQueryItem(name: "refresh_token", value: refreshToken),
-            URLQueryItem(name: "grant_type", value: "refresh_token"),
+        try await tokenRequest(parameters: [
+            "grant_type": "refresh_token",
+            "client_id": clientID,
+            "client_secret": clientSecret,
+            "redirect_uri": redirectURI,
+            "refresh_token": refreshToken
         ])
     }
 
-    private func tokenRequest(queryItems: [URLQueryItem]) async throws -> OAuthTokens {
+    /// Token-endpoint requests carry all parameters in an
+    /// `application/x-www-form-urlencoded` body. RFC 6749 §2.3.1 forbids
+    /// transmitting client credentials in the request URI ("The parameters can
+    /// only be transmitted in the request-body and MUST NOT be included in the
+    /// request URI"), which the previous query-string form violated.
+    private func tokenRequest(parameters: [String: String]) async throws -> OAuthTokens {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "\(tenant).imagerelay.com"
         components.path = "/oauth/token"
-        components.queryItems = queryItems
         guard let url = components.url else {
             throw APIError.invalidURL(path: "/oauth/token")
         }
@@ -150,6 +154,13 @@ public struct OAuthClient: Sendable {
         request.httpMethod = "POST"
         request.setValue(AppConfiguration.currentServiceUserAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        // Sorted so the body is deterministic for tests and logging.
+        let body = parameters
+            .sorted { $0.key < $1.key }
+            .map { "\(Self.formEncode($0.key))=\(Self.formEncode($0.value))" }
+            .joined(separator: "&")
+        request.httpBody = Data(body.utf8)
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -162,5 +173,14 @@ public struct OAuthClient: Sendable {
 
         let decoded = try JSONDecoder.imageRelay.decode(OAuthTokenResponse.self, from: data)
         return decoded.tokens(tenant: tenant)
+    }
+
+    /// Percent-encodes down to RFC 3986 unreserved characters, the safe subset
+    /// for `application/x-www-form-urlencoded` values (`+`, `&`, `=` in secrets
+    /// must not survive raw).
+    private static func formEncode(_ value: String) -> String {
+        value.addingPercentEncoding(
+            withAllowedCharacters: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        ) ?? value
     }
 }

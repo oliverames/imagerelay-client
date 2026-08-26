@@ -671,11 +671,23 @@ struct ConfigurationTests {
         }
         """.data(using: .utf8)!
 
-        var requestBodyQueryItems: [URLQueryItem]?
+        var capturedRequestBody: Data?
+        var capturedRequestURL: URL?
         MockURLProtocol.requestHandler = { request in
-            if let url = request.url,
-               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-                requestBodyQueryItems = components.queryItems
+            capturedRequestURL = request.url
+            if let body = request.httpBody {
+                capturedRequestBody = body
+            } else if let stream = request.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var data = Data()
+                var buffer = [UInt8](repeating: 0, count: 4_096)
+                while stream.hasBytesAvailable {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    if count <= 0 { break }
+                    data.append(buffer, count: count)
+                }
+                capturedRequestBody = data
             }
             let response = HTTPURLResponse(
                 url: request.url!,
@@ -701,9 +713,22 @@ struct ConfigurationTests {
         #expect(result.oauthTokens?.refreshToken == "new-refresh-token")
         #expect(result.oauthTokens?.expiresAt != nil)
 
-        #expect(requestBodyQueryItems?.contains(where: { $0.name == "grant_type" && $0.value == "refresh_token" }) == true)
-        #expect(requestBodyQueryItems?.contains(where: { $0.name == "refresh_token" && $0.value == "old-refresh" }) == true)
-        #expect(requestBodyQueryItems?.contains(where: { $0.name == "client_id" && $0.value == "cid" }) == true)
-        #expect(requestBodyQueryItems?.contains(where: { $0.name == "client_secret" && $0.value == "csec" }) == true)
+        // RFC 6749 §2.3.1: credentials travel in the form-encoded request body,
+        // never in the URI.
+        let body = try #require(capturedRequestBody)
+        let pairs = try #require(try? URLComponents(
+            string: "https://token.invalid/?\(String(decoding: body, as: UTF8.self))"
+        )?.queryItems)
+        func value(_ name: String) -> String? {
+            pairs.first { $0.name == name }?.value
+        }
+        #expect(value("grant_type") == "refresh_token")
+        #expect(value("refresh_token") == "old-refresh")
+        #expect(value("client_id") == "cid")
+        #expect(value("client_secret") == "csec")
+
+        let query = try #require(capturedRequestURL.map { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems })
+        // No credentials (or anything else) may ride along in the URI.
+        #expect((query ?? []).isEmpty)
     }
 }
