@@ -98,6 +98,35 @@ Follow-up improvements after the main pass shipped, each research-backed:
 Verification after the second pass: 230 ImageRelayKit tests + 78 File Provider
 extension tests pass on macOS; iOS simulator build succeeds.
 
+## Deferred items — resolution (same day, third wave)
+
+1. **A9** — implemented in the second pass (see above).
+2. **B3 / incidental — deletion gate**: now time-based. Confirmation requires
+   two misses AND 60s of elapsed evidence (`Enumerator.deletionEvidenceConfirmed`,
+   `deletionConfirmationAge` injectable), and `SyncDatabase` resets a pending
+   row whose last miss is older than 24h (fresh count + fresh first-seen), so
+   neither same-window passes nor unrelated later misses can compound into a
+   false deletion. Three new tests cover both halves plus the reset.
+3. **C11 latent Settings OAuth downgrade**: fixed. With `ENABLE_OAUTH_CONFIG_UI`
+   off, save-on-disappear now leaves a stored live-OAuth configuration's
+   credential fields untouched instead of persisting the forced `.apiKey` view
+   state over it; non-credential settings still save.
+4. **CredentialCache lock span**: evaluated and intentionally kept. The wide
+   lock is the single-flight that prevents Keychain prompt storms (a documented
+   hard rule) and prevents an in-flight load from publishing past
+   `invalidate()`. Rationale documented in-code.
+5. **iOS per-operation `loadAndRefresh`**: fixed with `ConfigRefreshThrottle`.
+   All three iOS call sites now refresh only when 60s elapsed or config.json's
+   mtime moved, eliminating per-download Keychain reads and near-expiry OAuth
+   lock-file serialization while keeping settings changes immediate and the
+   extension stateless across restarts.
+6. **Live OAuth sign-in smoke test**: still open, blocked on a human. No local
+   app-group config exists on this machine to learn the tenant, and the check
+   that matters is a real interactive sign-in. Recommended once, at the next
+   release-candidate run.
+7. **B6 Trash-deletes-remote UX**: awaiting product decision (presented to the
+   owner 2026-08-25).
+
 ## Refuted by skeptics
 
 - **B4 — `GET /folders/{id}` without `.json`**: flagged as a probable wrong path silently swallowed by `try?`. Refuted: WORKLOG.md and API_COMPATIBILITY.md document the bare detail endpoint as deliberate, and its failure mode degrades gracefully to child-listing polling. No change.

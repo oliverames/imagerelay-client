@@ -10,12 +10,13 @@ A follow-up same-day pass moved OAuth token-endpoint credentials out of the URL 
 
 **Decisions made**:
 - OAuth wire-format change shipped rather than parked: RFC 6749 §2.3.1 prohibits query-string client credentials outright, and the flagged-off OAuth UI means no default-build users can regress. First live OAuth sign-in after adoption still deserves a manual smoke test (parked item).
-- Deletion-gate hardening (time-based confirmation instead of two misses regardless of spacing) left for a dedicated design pass: it changes sync semantics and several tests.
 - Finder "Move to Trash" permanently deleting the remote asset is deliberate per code comments but flagged for product sign-off.
 
-**Left off at**: Four fix commits plus docs pushed to `main` (2026-08-25). Parked items recorded in the audit file: OAuth live sign-in smoke test, time-based deletion confirmation, Trash UX decision, latent Settings OAuth-downgrade path, CredentialCache lock span, iOS per-fetchContents loadAndRefresh serialization.
+A third same-day wave cleared the remaining deferred items: the deletion gate now requires two misses AND 60 seconds of elapsed evidence with a 24h freshness reset on stale rows (three new tests); macOS Settings save-on-disappear no longer downgrades a stored live-OAuth configuration to an empty-key API-key config; the iOS extension's per-operation `loadAndRefresh` is throttled to once per 60s or config.json mtime change (`ConfigRefreshThrottle`, new file, xcodegen regenerated) so download bursts stop hitting the Keychain and the OAuth refresh lock each time; `CredentialCache`'s wide lock was evaluated and intentionally kept — it is the single-flight that prevents Keychain prompt storms, with the rationale now documented in-code. The live OAuth sign-in smoke test remains open (blocked: needs interactive sign-in; no local tenant config exists on this machine), and the Trash-UX decision was presented to Oliver.
 
-**Open questions**: None new beyond the parked list above.
+**Left off at**: All three waves committed and pushed to `main` (2026-08-25). Remaining open items are human-only: OAuth sign-in smoke test at next release candidate, Trash-deletes-remote product decision.
+
+**Open questions**: Trash UX (B6) awaiting Oliver's call; nothing else new.
 
 ---
 
