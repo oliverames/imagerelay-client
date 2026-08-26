@@ -93,7 +93,7 @@ that satisfies the same requirement; both patterns appear in shipped code.
 
 **Enumeration vs. changes**: `enumerateItems` does a fresh full load -- never report deletions here. `enumerateChanges` does incremental updates -- this is the only place to call `observer.didDeleteItems(withIdentifiers:)`.
 
-**Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end.
+**Deletion detection pattern** in `Enumerator.fetchItems()`: build `remoteIdentifiers` set while processing API results, then diff against `db.children(of: containerIdentifier.rawValue)` at the end. Confirmation requires two misses AND an age floor (60s of elapsed evidence via `deletionEvidenceConfirmed`), and misses older than 24h restart their count, so same-window passes and unrelated later misses can never compound into a false deletion.
 
 **Quick-link hygiene** (added 2026-06-10 after a colleague flagged this
 client's quick-links on restricted-use assets in the admin audit list; the

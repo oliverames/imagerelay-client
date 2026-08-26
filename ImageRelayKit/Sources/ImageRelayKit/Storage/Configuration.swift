@@ -695,6 +695,12 @@ public final class CredentialCache: @unchecked Sendable {
         self.keychainAccessGroup = keychainAccessGroup
     }
 
+    /// Single-flight credential refresh. The lock deliberately spans the stat,
+    /// the cache check, AND the full config/Keychain load: concurrent cold-path
+    /// callers must not stampede SecItem in parallel, which is exactly the
+    /// Keychain prompt-storm behavior this cache exists to prevent. Narrowing
+    /// the span would also let a load racing `invalidate()` publish a stale
+    /// credential after the invalidation.
     public func getCredential() -> AuthCredential {
         lock.withLock {
             let currentModDate = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? Date.distantPast
