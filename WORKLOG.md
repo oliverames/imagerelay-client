@@ -1,5 +1,24 @@
 # Worklog
 
+## 2026-08-25 - Comprehensive adversarial bug-fixing pass
+
+**What changed**: Repo-wide multi-reviewer review (Kit core networking/storage, both File Provider extensions, host apps/services, cross-file consistency/docs) with independent skeptic verification of every finding; full ledger in `docs/audits/2026-08-25-adversarial-review.md`. Fixed 31 confirmed findings: pagination cap now fails instead of silently truncating into deletion detection; OAuth refresh-lock timeout no longer refreshes unlocked nor deletes a foreign lock; keychain delete-on-empty makes iOS sign-out real (with a corrupt-config guard so a failed read can't cascade into deleting live credentials); metadata multi-select dictionary crash fixed; temp-file download leaks plugged on both platforms; poller start/stop race closed; limiter waits propagate cancellation; throttle store read-modify-write made atomic under `NSFileCoordinator`; assorted error-surfacing and UI-state repairs; doc mirrors reconciled with shipped code (iOS keychain group, target count, app-group prefix, README diagram).
+
+A follow-up same-day pass moved OAuth token-endpoint credentials out of the URL query string into an `application/x-www-form-urlencoded` body per RFC 6749 §2.3.1 ("MUST NOT be included in the request URI"), safe to ship now because the OAuth UI is feature-flagged off in default builds. Self-review of the new method-aware retry gate caught that chunk uploads travel as POST despite the documented PUT shape, so the gate gained an explicit `transportRetriesAllowed` opt-in for path-overwrite uploads (chunks, thumbnails); job/link/folder creation POSTs stay fail-fast against duplicate-mint races.
+
+**Verification**: macOS test suite 230 ImageRelayKit tests (25 suites) + 78 File Provider extension tests (9 suites), all passing; unsigned iOS simulator build succeeded before and after each stage; nine new tests pin the changed contracts (limiter cancellation, empty-key deletion, GET/POST/chunk retry semantics, decorated Link-header parsing, SQL deletion count, concurrent throttle-store increments, OAuth body-not-URI credential placement).
+
+**Decisions made**:
+- OAuth wire-format change shipped rather than parked: RFC 6749 §2.3.1 prohibits query-string client credentials outright, and the flagged-off OAuth UI means no default-build users can regress. First live OAuth sign-in after adoption still deserves a manual smoke test (parked item).
+- Deletion-gate hardening (time-based confirmation instead of two misses regardless of spacing) left for a dedicated design pass: it changes sync semantics and several tests.
+- Finder "Move to Trash" permanently deleting the remote asset is deliberate per code comments but flagged for product sign-off.
+
+**Left off at**: Four fix commits plus docs pushed to `main` (2026-08-25). Parked items recorded in the audit file: OAuth live sign-in smoke test, time-based deletion confirmation, Trash UX decision, latent Settings OAuth-downgrade path, CredentialCache lock span, iOS per-fetchContents loadAndRefresh serialization.
+
+**Open questions**: None new beyond the parked list above.
+
+---
+
 ## 2026-07-13 - Public release hardening and CI flake fix
 
 **What changed**: Reworked the startup-throttle test to measure a shared wall-clock deadline instead of individual task scheduling, eliminating the intermittent CI failure. Added an MIT license, contribution and security guidance, non-affiliation and trademark language, and corrected the README to stop advertising a Homebrew tap that no longer exists. Replaced account-specific folder names, IDs, and local absolute paths in tracked documentation and fixtures with neutral examples. Removed the AWS documentation access-key example from the current tree and added a narrow gitleaks fingerprint exemption for the already-sanitized historical false positive.

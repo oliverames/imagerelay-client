@@ -68,6 +68,36 @@ a reason below.
 | B5 | Seven macOS completion-handler sites used the private `UncheckedBox` wrapper rather than the documented `nonisolated(unsafe)` capture — convention drift, zero behavioral difference (verified equivalent). Migrating would churn 19 sites/signatures for no behavioral gain | Documented `UncheckedBox` in all three mirrors as the accepted alternative pattern |
 | D8 | Untracked gitignored `.wrangler` residue of the decommissioned webhook worker lingered locally | Moved to Trash |
 
+## Second pass (same day)
+
+Follow-up improvements after the main pass shipped, each research-backed:
+
+1. **A9 implemented — OAuth credentials moved out of the URI.** RFC 6749
+   §2.3.1 ([rfc-editor.org/rfc/rfc6749](https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1))
+   states token-endpoint client credentials "can only be transmitted in the
+   request-body and MUST NOT be included in the request URI"; the old
+   query-string form violated this directly. Originally parked pending live
+   verification, then un-parked because the OAuth UI is behind
+   `ENABLE_OAUTH_CONFIG_UI` (no default-build exposure) and the pinned tests
+   are in-repo. `OAuthClient.tokenRequest` now sends a deterministic,
+   percent-encoded (RFC 3986 unreserved set) form body; the refresh test pins
+   body placement and an empty URL query. A manual OAuth sign-in smoke test is
+   still recommended at the next release-candidate run.
+2. **A3 refined — chunk uploads keep transport retries.** Self-review found
+   chunk uploads travel as POST (`upload(data:to:)`), so blanket method gating
+   would have stripped their resilience against mid-upload connection drops.
+   Chunks and thumbnails overwrite by path (same bytes, same target), so they
+   now opt back in via `transportRetriesAllowed`; job/link/folder creation
+   POSTs remain fail-fast. New tests pin GET-retry / POST-fail-fast /
+   chunk-retry behavior.
+3. **Regression locks added** for pass-one fixes: decorated/unquoted/shadowed
+   Link-header parsing (PaginationTests ×3), `pendingRemoteDeletionCount`
+   parity with row listings (SyncDatabaseTests), concurrent cross-instance
+   throttle-store increments surviving exactly (ThrottleStateStoreTests).
+
+Verification after the second pass: 230 ImageRelayKit tests + 78 File Provider
+extension tests pass on macOS; iOS simulator build succeeds.
+
 ## Refuted by skeptics
 
 - **B4 — `GET /folders/{id}` without `.json`**: flagged as a probable wrong path silently swallowed by `try?`. Refuted: WORKLOG.md and API_COMPATIBILITY.md document the bare detail endpoint as deliberate, and its failure mode degrades gracefully to child-listing polling. No change.
