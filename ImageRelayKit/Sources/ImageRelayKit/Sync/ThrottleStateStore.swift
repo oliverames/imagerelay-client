@@ -64,17 +64,66 @@ public final class ThrottleStateStore: @unchecked Sendable {
     }
 
     public func recordRateLimit(now: Date = Date()) {
-        var state = load()
-        state.lastObserved429At = now
-        state.consecutiveFailures += 1
-        try? save(state)
+        mutate { state in
+            state.lastObserved429At = now
+            state.consecutiveFailures += 1
+        }
     }
 
     public func recordSuccess() {
-        var state = load()
-        guard state.consecutiveFailures > 0 || state.lastObserved429At != nil else { return }
-        state.consecutiveFailures = 0
-        try? save(state)
+        mutate { state in
+            guard state.consecutiveFailures > 0 || state.lastObserved429At != nil else { return }
+            state.consecutiveFailures = 0
+        }
+    }
+
+    /// Read-modify-write performed as a single coordinated write so concurrent
+    /// instances (every host service builds its own store over the same shared
+    /// file) cannot clobber each other's increments. Mirrors
+    /// `SharedRateLimiter.updateState`.
+    private func mutate(_ update: (inout PersistedThrottleState) -> Void) {
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        var coordinatedWriteSucceeded = false
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(writingItemAt: url, options: [], error: &coordinationError) { coordinatedURL in
+            var state = Self.readStateDirect(from: coordinatedURL)
+            update(&state)
+            coordinatedWriteSucceeded = Self.writeStateDirect(state, to: coordinatedURL)
+        }
+
+        guard !coordinatedWriteSucceeded else { return }
+        var state = Self.readStateDirect(from: url)
+        update(&state)
+        _ = Self.writeStateDirect(state, to: url)
+    }
+
+    private static func readStateDirect(from url: URL) -> PersistedThrottleState {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let state = try? JSONDecoder().decode(PersistedThrottleState.self, from: data) else {
+            return PersistedThrottleState.default
+        }
+        return state
+    }
+
+    @discardableResult
+    private static func writeStateDirect(_ state: PersistedThrottleState, to url: URL) -> Bool {
+        guard let data = try? JSONEncoder().encode(state) else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: url, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
     }
 
     public func save(_ state: PersistedThrottleState) throws {

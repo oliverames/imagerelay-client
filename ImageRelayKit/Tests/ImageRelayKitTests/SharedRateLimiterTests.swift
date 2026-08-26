@@ -84,7 +84,7 @@ struct SharedRateLimiterTests {
         defer { try? FileManager.default.removeItem(at: url) }
         let limiter = SharedRateLimiter(url: url, maxRequests: 3, period: 0.5)
         let start = Date()
-        for _ in 0..<5 { await limiter.acquire() }
+        for _ in 0..<5 { try await limiter.acquire() }
         let elapsed = Date().timeIntervalSince(start)
         // 5 acquires at 3 RPS over 0.5s budget means at least one window must roll over.
         #expect(elapsed >= 0.4)
@@ -107,7 +107,7 @@ struct SharedRateLimiterTests {
         await withTaskGroup(of: Void.self) { group in
             for limiter in limiters {
                 group.addTask {
-                    await limiter.acquire()
+                    try? await limiter.acquire()
                 }
             }
         }
@@ -179,7 +179,7 @@ struct SharedRateLimiterTests {
         await limiter.writeState(stale)
 
         let start = Date()
-        await limiter.acquire()
+        try await limiter.acquire()
         let elapsed = Date().timeIntervalSince(start)
         #expect(elapsed < 0.5, "Expired probe lock should be stealable immediately")
 
@@ -200,11 +200,11 @@ struct SharedRateLimiterTests {
         )
         await limiter.writeState(SharedRateLimiterState(rampPhase: 4))
 
-        await limiter.acquire()
+        try await limiter.acquire()
 
         let flag = CompletionFlag()
         let secondAcquire = Task {
-            await limiter.acquire()
+            try await limiter.acquire()
             await flag.markCompleted()
         }
         defer { secondAcquire.cancel() }
@@ -240,12 +240,12 @@ struct SharedRateLimiterTests {
         )
         await first.writeState(SharedRateLimiterState(rampPhase: 4))
 
-        await first.acquire()
+        try await first.acquire()
         await first.recordRateLimit()
 
         let flag = CompletionFlag()
         let queuedProbe = Task {
-            await second.acquire()
+            try await second.acquire()
             await flag.markCompleted()
         }
         defer { queuedProbe.cancel() }
@@ -270,7 +270,7 @@ struct SharedRateLimiterTests {
             processIdentifier: "process-A"
         )
         await limiter.writeState(SharedRateLimiterState(rampPhase: 4))
-        await limiter.acquire()
+        try await limiter.acquire()
 
         let heldToken = await limiter.readState().probeToken
         await limiter.writeState(SharedRateLimiterState(
@@ -281,7 +281,7 @@ struct SharedRateLimiterTests {
 
         let flag = CompletionFlag()
         let nextAcquire = Task {
-            await limiter.acquire()
+            try await limiter.acquire()
             await flag.markCompleted()
         }
         defer { nextAcquire.cancel() }

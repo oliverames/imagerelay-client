@@ -26,7 +26,7 @@ extension Error {
             return NSFileProviderError(.noSuchItem)
         case .rateLimited, .dailyLimitReached, .serverError, .networkError:
             return NSFileProviderError(.serverUnreachable)
-        case .forbidden, .decodingError, .invalidResponse, .invalidURL:
+        case .forbidden, .decodingError, .invalidResponse, .invalidURL, .paginationLimitExceeded:
             return fileProviderCannotSynchronize(
                 apiError.userMessage,
                 recoverySuggestion: "Check Image Relay permissions and app settings, then try again."

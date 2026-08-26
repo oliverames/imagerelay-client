@@ -574,9 +574,11 @@ public final class SyncDatabase: Sendable {
         }
     }
 
-    public func clearPendingRemoteDeletion(identifier: String) throws {
-        try writer.write { db in
-            _ = try PendingRemoteDeletion.deleteOne(db, key: identifier)
+    /// Count-only variant of `pendingRemoteDeletions` for status polling; avoids
+    /// materializing up to the full table just to take a tally.
+    public func pendingRemoteDeletionCount() throws -> Int {
+        try writer.read { db in
+            try PendingRemoteDeletion.fetchCount(db)
         }
     }
 

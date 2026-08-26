@@ -78,8 +78,11 @@ struct ConfigurationTests {
         #expect(json?["api_key"] == nil)
     }
 
-    @Test("Saving API key auth with an empty in-memory key preserves existing Keychain item")
-    func emptyAPIKeySavePreservesExistingKeychainItem() throws {
+    @Test("Saving API key auth with an empty in-memory key deletes the Keychain item")
+    func emptyAPIKeySaveDeletesKeychainItem() throws {
+        // An empty apiKey means "no credential" regardless of authMethod, so
+        // sign-out actually signs out (the old preserve-branch let iOS sign-out
+        // resurrect the stored key on next launch).
         let account = testKeychainAccount()
         cleanKeychain(account: account)
         let url = tempURL()
@@ -96,10 +99,10 @@ struct ConfigurationTests {
 
         try config.save(to: url, keychainAccount: account, keychainAccessGroup: nil)
 
+        #expect(KeychainStore.load(account: account, accessGroup: nil) == nil)
         let loaded = try AppConfiguration.load(from: url, keychainAccount: account, keychainAccessGroup: nil)
-        #expect(loaded.apiKey == "stored-secret")
+        #expect(loaded.apiKey == "")
         #expect(loaded.defaultFileTypeID == 456)
-        #expect(KeychainStore.load(account: account, accessGroup: nil) == "stored-secret")
     }
 
     @Test("Saving OAuth auth clears stale API key")

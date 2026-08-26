@@ -49,14 +49,24 @@ public enum Pagination {
         let links = header.components(separatedBy: ",")
         for link in links {
             let parts = link.components(separatedBy: ";")
-            guard parts.count == 2 else { continue }
-            let rel = parts[1].trimmingCharacters(in: .whitespaces)
-            guard rel == "rel=\"next\"" else { continue }
-            var urlString = parts[0].trimmingCharacters(in: .whitespaces)
+            guard let target = parts.first else { continue }
+            // The rel parameter may share its element with other parameters
+            // (e.g. `; rel="next"; title="..."`), so scan every parameter
+            // instead of requiring exactly two segments.
+            let isNext = parts.dropFirst().contains { parameter in
+                let normalized = parameter.trimmingCharacters(in: .whitespaces)
+                    .lowercased()
+                return normalized == "rel=\"next\"" || normalized == "rel=next"
+            }
+            guard isNext else { continue }
+            var urlString = target.trimmingCharacters(in: .whitespaces)
             if urlString.hasPrefix("<") && urlString.hasSuffix(">") {
                 urlString = String(urlString.dropFirst().dropLast())
             }
-            return URL(string: urlString)
+            // A malformed next element must not shadow a valid later one.
+            if let url = URL(string: urlString) {
+                return url
+            }
         }
         return nil
     }

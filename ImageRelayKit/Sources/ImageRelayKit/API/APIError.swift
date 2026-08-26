@@ -14,6 +14,10 @@ public enum APIError: Error, LocalizedError, Sendable {
     case decodingError(underlying: any Error)
     case invalidResponse
     case invalidURL(path: String)
+    /// A paginated listing hit the client's page cap. Thrown rather than
+    /// silently truncated because a truncated listing feeds deletion detection,
+    /// where missing items look like remote deletions.
+    case paginationLimitExceeded(path: String)
 
     public var isRetryable: Bool {
         switch self {
@@ -56,6 +60,8 @@ public enum APIError: Error, LocalizedError, Sendable {
             return "Received an invalid response from Image Relay."
         case .invalidURL(let path):
             return "Could not build a valid URL for path: \(path)"
+        case .paginationLimitExceeded:
+            return "This folder is too large to list completely. The listing was stopped at the client's page limit instead of showing a partial result."
         }
     }
 

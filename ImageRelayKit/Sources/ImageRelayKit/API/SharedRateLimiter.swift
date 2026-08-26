@@ -153,9 +153,9 @@ public actor SharedRateLimiter: AsyncRateLimiting {
         container.appendingPathComponent("rate-limiter-state.json")
     }
 
-    public func acquire() async {
+    public func acquire() async throws {
         while true {
-            try? Task.checkCancellation()
+            try Task.checkCancellation()
 
             let now = Date().timeIntervalSince1970
             let attempt = updateState { state in
@@ -231,7 +231,7 @@ public actor SharedRateLimiter: AsyncRateLimiting {
             if attempt.acquired {
                 return
             }
-            try? await Task.sleep(for: .seconds(attempt.sleepFor))
+            try await Task.sleep(for: .seconds(attempt.sleepFor))
         }
     }
 

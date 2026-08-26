@@ -119,8 +119,11 @@ public actor APIClient {
 
         while true {
             if page > 100 {
-                logger.error("getAllPages: Max page limit reached (100) for path \(path, privacy: .public). Breaking to prevent infinite loop.")
-                break
+                // Throwing beats silently truncating: callers (including File
+                // Provider deletion detection) treat a complete-looking listing
+                // as authoritative, so missing items would look deleted.
+                logger.error("getAllPages: Max page limit reached (100) for path \(path, privacy: .public). Failing instead of returning a truncated listing.")
+                throw APIError.paginationLimitExceeded(path: path)
             }
             currentQuery["page"] = "\(page)"
             let request = try buildRequest(method: "GET", path: path, query: currentQuery)
@@ -184,12 +187,15 @@ public actor APIClient {
         countsAgainstRateLimit: Bool = true
     ) async throws {
         if countsAgainstRateLimit {
-            await rateLimiter.acquire()
+            try await rateLimiter.acquire()
         }
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         let (tempURL, response) = try await session.download(for: request)
+        // URLSession leaves its download temp file in place on every error path,
+        // so clean it up here; after a successful move the file is already gone.
+        defer { try? FileManager.default.removeItem(at: tempURL) }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -220,7 +226,7 @@ public actor APIClient {
         countsAgainstRateLimit: Bool = true
     ) async throws -> (data: Data, response: HTTPURLResponse) {
         if countsAgainstRateLimit {
-            await rateLimiter.acquire()
+            try await rateLimiter.acquire()
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -490,7 +496,15 @@ public actor APIClient {
                 } else {
                     logger.debug("Retrying \(method) \(path) in \(delay) s (attempt \(attempt))")
                 }
-                try await Task.sleep(for: .seconds(delay))
+                do {
+                    try await Task.sleep(for: .seconds(delay))
+                } catch {
+                    // Cancellation must not strand the rate-limit-in-flight counter.
+                    if case .rateLimited = lastError as? APIError {
+                        try? telemetry?.endRateLimitWait()
+                    }
+                    throw error
+                }
                 if case .rateLimited = lastError as? APIError {
                     try? telemetry?.endRateLimitWait()
                 }
@@ -498,7 +512,7 @@ public actor APIClient {
                 logger.debug("\(method) \(path)")
             }
 
-            await rateLimiter.acquire()
+            try await rateLimiter.acquire()
 
             let data: Data
             let response: URLResponse
@@ -506,7 +520,15 @@ public actor APIClient {
                 (data, response) = try await session.data(for: request)
             } catch {
                 logger.warning("\(method) \(path) network error: \(error.localizedDescription)")
-                lastError = APIError.networkError(underlying: error)
+                let apiError = APIError.networkError(underlying: error)
+                // A transport retry re-sends the request. For non-idempotent
+                // methods (POST uploads, quick-link mints, folder creates) the
+                // first attempt may already have taken effect server-side, so
+                // re-sending could create duplicate artifacts. Fail instead.
+                guard Self.isIdempotentMethod(method) else {
+                    throw apiError
+                }
+                lastError = apiError
                 continue
             }
 
@@ -540,6 +562,17 @@ public actor APIClient {
         }
 
         throw lastError ?? APIError.invalidResponse
+    }
+
+    /// Methods whose re-execution cannot create duplicate server-side artifacts
+    /// when the original request actually landed. POST is excluded on purpose.
+    static func isIdempotentMethod(_ method: String) -> Bool {
+        switch method {
+        case "GET", "HEAD", "PUT", "DELETE":
+            return true
+        default:
+            return false
+        }
     }
 
     static func retryDelay(

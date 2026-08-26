@@ -35,18 +35,12 @@ public enum KeychainStore {
         if NSClassFromString("XCTest") != nil {
             return true
         }
+        // Structured XCTest markers only. Deliberately NOT a substring scan of
+        // ProcessInfo.arguments: argv[0] is the executable path, so any install
+        // location containing "test" would silently divert production secrets
+        // into the in-memory store.
         let env = ProcessInfo.processInfo.environment
-        if env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil {
-            return true
-        }
-        let args = ProcessInfo.processInfo.arguments
-        for arg in args {
-            let lower = arg.lowercased()
-            if lower.contains("test") || lower.contains("xctest") {
-                return true
-            }
-        }
-        return false
+        return env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil
     }()
 
     /// Saves or replaces `value` for `account`. Returns true on success.

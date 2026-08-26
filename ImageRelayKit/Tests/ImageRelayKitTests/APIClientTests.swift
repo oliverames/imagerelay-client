@@ -36,7 +36,7 @@ private actor RecordingRateLimiter: AsyncRateLimiting {
     private var successCount = 0
     private var retryAfterHints: [TimeInterval?] = []
 
-    func acquire() async {
+    func acquire() async throws {
         acquireCount += 1
     }
 

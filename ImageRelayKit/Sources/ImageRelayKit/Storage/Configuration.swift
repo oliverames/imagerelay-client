@@ -285,7 +285,7 @@ public struct AppConfiguration: Codable, Sendable {
            let url = URL(string: "https://\(oauthTenant).imagerelay.com/api/v2") {
             return url
         }
-        return URL(string: "https://api.imagerelay.com/api/v2")!
+        return Self.defaultBaseURL
     }
 
     public static let `default` = AppConfiguration(
@@ -325,9 +325,13 @@ public struct AppConfiguration: Codable, Sendable {
     }
 
     func save(to url: URL, keychainAccount: String, keychainAccessGroup: String?) throws {
-        if apiKey.isEmpty, authMethod == .oauth {
+        // An empty apiKey means "no API-key credential", regardless of
+        // authMethod. Deleting whenever it is empty keeps sign-out honest on
+        // iOS (which is always .apiKey) and prevents a stale stored key from
+        // resurrecting itself on next launch.
+        if apiKey.isEmpty {
             try KeychainStore.deleteRequired(account: keychainAccount, accessGroup: keychainAccessGroup)
-        } else if !apiKey.isEmpty {
+        } else {
             try KeychainStore.saveRequired(apiKey, account: keychainAccount, accessGroup: keychainAccessGroup)
         }
         if let oauthTokens {
@@ -435,26 +439,35 @@ public struct AppConfiguration: Codable, Sendable {
         let lockURL = url.deletingPathExtension().appendingPathExtension("lock")
         let maxWaitTime: TimeInterval = 10.0
         let startTime = Date()
-        
-        while true {
+        var didAcquireLock = false
+
+        while !didAcquireLock {
             do {
                 try Data().write(to: lockURL, options: .withoutOverwriting)
-                break
+                didAcquireLock = true
             } catch {
                 if let attribs = try? FileManager.default.attributesOfItem(atPath: lockURL.path),
                    let modDate = attribs[.modificationDate] as? Date,
                    Date().timeIntervalSince(modDate) > 30 {
                     try? FileManager.default.removeItem(at: lockURL)
                 }
-                
+
                 if Date().timeIntervalSince(startTime) > maxWaitTime {
                     break
                 }
-                
+
                 try await Task.sleep(for: .milliseconds(200))
             }
         }
-        
+
+        guard didAcquireLock else {
+            // Another process holds the lock and is mid-refresh. Refreshing in
+            // parallel with rotating refresh tokens revokes the loser's token
+            // set, so return the on-disk state instead — and never delete a
+            // lock this process does not own.
+            return try load(from: url, keychainAccount: keychainAccount, keychainAccessGroup: keychainAccessGroup)
+        }
+
         defer {
             try? FileManager.default.removeItem(at: lockURL)
         }
@@ -643,6 +656,9 @@ public struct AppConfiguration: Codable, Sendable {
 
     /// Shared app group identifier used by both the host app and File Provider extension.
     public static let appGroupIdentifier = "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
+
+    /// Default Image Relay API endpoint shared by the hosts and setup flows.
+    public static let defaultBaseURL = URL(string: "https://api.imagerelay.com/api/v2")!
 
     /// Resolves the shared container URL for the app group, or nil if the entitlement is missing.
     public static func containerURL() -> URL? {

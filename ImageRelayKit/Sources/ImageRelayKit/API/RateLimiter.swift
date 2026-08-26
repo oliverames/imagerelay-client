@@ -3,8 +3,9 @@ import Foundation
 /// Async rate-limiter abstraction. The default in-process `RateLimiter` and the
 /// cross-process `SharedRateLimiter` both conform; `APIClient` accepts either.
 public protocol AsyncRateLimiting: Sendable {
-    /// Block until the caller may issue a request.
-    func acquire() async
+    /// Block until the caller may issue a request. Throws `CancellationError`
+    /// when the waiting task is cancelled.
+    func acquire() async throws
     /// Called by `APIClient` after a 429 response so the limiter can tighten its
     /// budget. `retryAfter` carries a server-provided cooldown hint when one
     /// exists — a parsed `Retry-After` header or a daily-limit reset interval.
@@ -33,7 +34,7 @@ public actor RateLimiter: AsyncRateLimiting {
         self.period = .seconds(period)
     }
 
-    public func acquire() async {
+    public func acquire() async throws {
         while true {
             let now = ContinuousClock.now
             timestamps.removeAll { now - $0 >= period }
@@ -46,7 +47,7 @@ public actor RateLimiter: AsyncRateLimiting {
             let oldest = timestamps[0]
             let waitTime = period - (now - oldest)
             if waitTime > .zero {
-                try? await Task.sleep(for: waitTime + .milliseconds(10))
+                try await Task.sleep(for: waitTime + .milliseconds(10))
             }
         }
     }

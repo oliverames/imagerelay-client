@@ -17,7 +17,8 @@ public struct SyncAnchor: Sendable {
 
     public init?(data: Data) {
         guard data.count == MemoryLayout<UInt64>.size else { return nil }
-        let value = data.withUnsafeBytes { $0.load(as: UInt64.self) }
+        // loadUnaligned: Data's backing storage carries no alignment guarantee.
+        let value = data.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }
         self.version = UInt64(bigEndian: value)
     }
 }

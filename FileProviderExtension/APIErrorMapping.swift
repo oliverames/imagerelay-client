@@ -34,7 +34,7 @@ extension Error {
                 localizedDescription,
                 recoverySuggestion: "Image Relay rejected the request. Try again after checking the item in Image Relay."
             )
-        case .forbidden, .decodingError, .invalidResponse, .invalidURL:
+        case .forbidden, .decodingError, .invalidResponse, .invalidURL, .paginationLimitExceeded:
             return fileProviderCannotSynchronize(
                 apiError.userMessage,
                 recoverySuggestion: "Check Image Relay permissions and app settings, then try again."

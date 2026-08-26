@@ -32,8 +32,9 @@ public struct SyncPauseState: Codable, Sendable {
         case .thirtyMinutes: return Date().addingTimeInterval(30 * 60)
         case .oneHour: return Date().addingTimeInterval(60 * 60)
         case .untilTomorrow9AM:
-            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
-            return Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow)
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+            return tomorrow.flatMap { Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: $0) }
+                ?? Date().addingTimeInterval(24 * 60 * 60)
         case .indefinite: return nil
         }
     }
