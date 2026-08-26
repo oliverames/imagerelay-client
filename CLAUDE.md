@@ -14,7 +14,7 @@ Native Image Relay DAM client. Swift 6, SwiftUI, File Provider API
 
 ```
 ImageRelayClient.xcodeproj    # XcodeGen-generated; tracked in git
-Project.yml                   # XcodeGen source of truth (4 targets)
+Project.yml                   # XcodeGen source of truth (5 targets incl. tests)
 ImageRelayKit/                # Local Swift package (macOS 15 + iOS 18)
 FileProviderExtension/        # macOS NSFileProviderReplicatedExtension
 ImageRelayClient/             # macOS host (MenuBarExtra + Settings + admin)
@@ -54,10 +54,10 @@ xcodebuild build \
 
 ## Key Constants
 
-- App Group: `group.com.oliverames.imagerelay-client`
+- App Group: `PV3W52NDZ3.group.com.oliverames.imagerelay-client` (team-prefixed, as used by code and entitlements)
 - Bundle prefix: `com.oliverames.imagerelay-client`
 - Team ID: `PV3W52NDZ3`
-- Shared container path: `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client")`
+- Shared container path: `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier /* "PV3W52NDZ3.group.com.oliverames.imagerelay-client" */)`
 
 ## Architecture Notes
 
@@ -86,6 +86,10 @@ xcodebuild build \
 nonisolated(unsafe) let completionHandler = completionHandler
 Task { completionHandler(...) }
 ```
+
+The macOS extension equivalently captures handlers in its private
+`UncheckedBox` (`@unchecked Sendable`) wrapper -- an accepted alternative
+that satisfies the same requirement; both patterns appear in shipped code.
 
 **Enumeration vs. changes**: `enumerateItems` does a fresh full load -- never report deletions here. `enumerateChanges` does incremental updates -- this is the only place to call `observer.didDeleteItems(withIdentifiers:)`.
 
@@ -151,7 +155,7 @@ API key was disabled over it):
   cleanup. Do not redeploy this worker or create an Image Relay webhook
   subscription; change notifications stay poll-based. The 1Password item
   "Image Relay Webhook Relay Token" (former worker secret `RELAY_TOKEN`)
-  is now dead and can be deleted after confirmation. The
+  was deleted 2026-06-25. The
   `Cloudflare/imagerelay-webhook-relay/` source directory was removed from
   the working tree on 2026-06-25 (retained in git history).
 - **Release workflow**: GitHub publishing is unblocked. The release runbook (build via `scripts/build-developer-id-release.sh`, published-release verification, and the live-verification guardrails) lives in the `ames-dev-workflows:project-release-runbooks` skill (imagerelay-client runbook); invoke it for any release-candidate work.
@@ -202,10 +206,13 @@ the iOS app provides its own SwiftUI views in
 
 **Domain identifiers differ.** macOS:
 `com.oliverames.imagerelay-client.domain`. iOS:
-`com.oliverames.imagerelay-client.ios.domain`. Both use the same App
-Group `group.com.oliverames.imagerelay-client` and the same Keychain
-access group `PV3W52NDZ3.com.oliverames.imagerelay-client`, so the
-`AppConfiguration` JSON + API key shape is identical, but each platform
+`com.oliverames.imagerelay-client.ios.domain`. Both share the App Group
+`PV3W52NDZ3.group.com.oliverames.imagerelay-client`, but Keychain access
+groups differ per platform: macOS keeps
+`PV3W52NDZ3.com.oliverames.imagerelay-client` while iOS uses
+`PV3W52NDZ3.com.oliverames.imagerelay-client.ios` (a valid prefix of both
+iOS bundle IDs; see `KeychainStore.sharedAccessGroup`). The
+`AppConfiguration` JSON + API key shape is identical, and each platform
 has its own per-device container and tracks the domain separately.
 
 **iOS `Project.yml` gotchas.** `deploymentTarget` is a dict (`macOS:` +

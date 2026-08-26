@@ -154,7 +154,7 @@ ImageRelayKit/          Swift Package — shared library (macOS 15+ / iOS 18+)
 ImageRelayClient/       macOS Menu Bar Host App (SwiftUI, LSUIElement)
   DomainManager         Registers/removes the File Provider domain; remote sync signaling
   MenuBarView           Live status, recent activity, pause controls, Open in Finder
-  Settings/             General, Folders, Activity, Advanced tabs (macOS 26 native Tab structure)
+  Settings/             General, Folders, Upload Links, Issues, Activity, Advanced tabs
 
 FileProviderExtension/  macOS File Provider Extension (NSFileProviderReplicatedExtension)
   Extension             All CRUD operations delegated by macOS
@@ -163,8 +163,8 @@ FileProviderExtension/  macOS File Provider Extension (NSFileProviderReplicatedE
   FileProviderItem      Adapts TrackedItem to NSFileProviderItem
 
 ImageRelayClientiOS/    iOS Host App (TabView: Files, Library, Settings)
-  FilesView             Browse mounted folders directly
-  LibraryAdminView      Manage collections, products, and webhooks on-the-go
+  FilesGatewayView      Bridges Finder-mounted File Provider content into the app
+  LibraryHomeView       Read-only library hub: collections, products, API directory
 
 FileProviderExtensioniOS/ iOS File Provider Extension (Stateless & Read-Only)
   Extension             On-demand stateless browser extension surfacing folders inside the Files App

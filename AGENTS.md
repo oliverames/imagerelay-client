@@ -14,7 +14,7 @@ Native Image Relay DAM client. Swift 6, SwiftUI, File Provider API
 
 ```
 ImageRelayClient.xcodeproj    # XcodeGen-generated; tracked in git
-Project.yml                   # XcodeGen source of truth (4 targets)
+Project.yml                   # XcodeGen source of truth (5 targets incl. tests)
 ImageRelayKit/                # Local Swift package (macOS 15 + iOS 18)
 FileProviderExtension/        # macOS NSFileProviderReplicatedExtension
 ImageRelayClient/             # macOS host (MenuBarExtra + Settings + admin)
@@ -28,11 +28,15 @@ ImageRelayClientiOS/          # iOS host (TabView: Files / Library / Settings)
 # Regenerate Xcode project after any Project.yml change
 xcodegen generate
 
-# Build macOS host (macOS 26 SDK required)
+# Build macOS host (macOS 26 SDK required). CODE_SIGNING_ALLOWED=NO is
+# required for plain dev/compile-check builds: the macOS targets use Manual
+# "Developer ID Application" signing (since the 1.4.2 release prep) and a
+# signed build wants provisioning profiles only the release script sets up.
 xcodebuild build \
   -project ImageRelayClient.xcodeproj \
   -scheme ImageRelayClient \
-  -destination 'platform=macOS'
+  -destination 'platform=macOS' \
+  CODE_SIGNING_ALLOWED=NO
 
 # Run all unit tests (currently 299:
 # 221 ImageRelayKitTests + 78 FileProviderExtensionTests)
@@ -50,10 +54,10 @@ xcodebuild build \
 
 ## Key Constants
 
-- App Group: `group.com.oliverames.imagerelay-client`
+- App Group: `PV3W52NDZ3.group.com.oliverames.imagerelay-client` (team-prefixed, as used by code and entitlements)
 - Bundle prefix: `com.oliverames.imagerelay-client`
 - Team ID: `PV3W52NDZ3`
-- Shared container path: `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.oliverames.imagerelay-client")`
+- Shared container path: `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier /* "PV3W52NDZ3.group.com.oliverames.imagerelay-client" */)`
 
 ## Architecture Notes
 
@@ -82,6 +86,10 @@ xcodebuild build \
 nonisolated(unsafe) let completionHandler = completionHandler
 Task { completionHandler(...) }
 ```
+
+The macOS extension equivalently captures handlers in its private
+`UncheckedBox` (`@unchecked Sendable`) wrapper -- an accepted alternative
+that satisfies the same requirement; both patterns appear in shipped code.
 
 **Enumeration vs. changes**: `enumerateItems` does a fresh full load -- never report deletions here. `enumerateChanges` does incremental updates -- this is the only place to call `observer.didDeleteItems(withIdentifiers:)`.
 
