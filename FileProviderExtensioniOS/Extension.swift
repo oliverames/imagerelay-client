@@ -240,6 +240,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 do {
                     try await services.api.download(quickLink.url, to: tempFile, countsAgainstRateLimit: false)
                 } catch {
+                    // Don't leave the partial download in tmp.
+                    try? FileManager.default.removeItem(at: tempFile)
                     // Best-effort delete on the failure path too — previously a
                     // failed download always orphaned the link.
                     try? await services.api.delete("/quick_links/\(quickLink.id).json")

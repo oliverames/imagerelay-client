@@ -133,25 +133,25 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             await sweepJanitor.sweep()
         }
 
-        let pollerDomain = domain
-        let pollerConfig = config
-        let pollerDB = db
-        let pollerThrottleStore = throttleStateStore
-        Task { [weak self] in
-            let poller = RemoteChangePoller(
-                domain: pollerDomain,
-                config: pollerConfig,
-                configURL: configURL,
-                db: pollerDB,
-                throttleStateStore: pollerThrottleStore
-            )
+        // Construct and publish the poller synchronously so invalidate() can
+        // never miss it: assigning from inside a Task left a window where an
+        // early invalidation read nil and left the poller running.
+        let poller = RemoteChangePoller(
+            domain: domain,
+            config: config,
+            configURL: configURL,
+            db: db,
+            throttleStateStore: throttleStateStore
+        )
+        self.poller = poller
+        Task {
             await poller.start()
-            self?.poller = poller
         }
     }
 
     func invalidate() {
         let pollerRef = poller
+        poller = nil
         let cache = partialContentQuickLinkCache
         let janitor = quickLinkJanitor
         Task {
@@ -251,6 +251,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     // Retry up to 3 times on transient network failures.
                     try await downloadWithRetry(api: api, url: quickLink.url, to: tempFile, logger: logger)
                 } catch {
+                    try? FileManager.default.removeItem(at: tempFile)
                     // The old code skipped the delete entirely on download
                     // failure, orphaning the link every time.
                     await self.quickLinkJanitor.deleteTransientQuickLink(id: quickLink.id)
@@ -376,12 +377,18 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
 
                 let tempFile = TemporaryFileURL.make(originalName: tracked.name)
-                try fetcher.writePartialContent(
-                    data: data,
-                    offset: writtenOffset,
-                    totalSize: totalSize,
-                    to: tempFile
-                )
+                do {
+                    try fetcher.writePartialContent(
+                        data: data,
+                        offset: writtenOffset,
+                        totalSize: totalSize,
+                        to: tempFile
+                    )
+                } catch {
+                    // Don't leave the partial file behind when the write fails.
+                    try? FileManager.default.removeItem(at: tempFile)
+                    throw error
+                }
                 progress.completedUnitCount = 100
 
                 let item = FileProviderItem(trackedItem: tracked, syncState: self.syncState(for: tracked), filenameStyle: self.config.filenamePresentationStyle)
