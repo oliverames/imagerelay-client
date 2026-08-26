@@ -39,8 +39,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
         Task {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
-                let configURL = AppConfiguration.fileURL(in: container)
-                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+                await ConfigRefreshThrottle.shared.refreshIfDue(container: container)
             }
             do {
                 if identifier == .rootContainer {
@@ -205,8 +204,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
 
         Task {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
-                let configURL = AppConfiguration.fileURL(in: container)
-                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+                await ConfigRefreshThrottle.shared.refreshIfDue(container: container)
             }
             do {
                 guard services.isConfigured else {

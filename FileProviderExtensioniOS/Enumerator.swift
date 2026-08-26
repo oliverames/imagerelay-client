@@ -34,8 +34,7 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
 
         Task {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConfiguration.appGroupIdentifier) {
-                let configURL = AppConfiguration.fileURL(in: container)
-                _ = try? await AppConfiguration.loadAndRefresh(from: configURL)
+                await ConfigRefreshThrottle.shared.refreshIfDue(container: container)
             }
             do {
                 guard services.isConfigured else {

@@ -24,6 +24,7 @@
 		2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E79A8CCDC204940416820E /* DomainManager.swift */; };
 		2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
 		2E30D35C36D48061B8D97767 /* LibraryAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E706C14D69EE9F9F751542DD /* LibraryAdminView.swift */; };
+		2ECC3B296C9FF2CB82778758 /* ConfigRefreshThrottle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B0E925D750E0EA1B6F685F /* ConfigRefreshThrottle.swift */; };
 		304E4872CBAF1A530C31812B /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5214AA13DEAEE7F7687D4000 /* Enumerator.swift */; };
 		312468E3E4801ED595A2E2E8 /* FilesGatewayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09905997BC489A37591154DE /* FilesGatewayView.swift */; };
 		3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F41FA6140E7852A9DBB0B4E /* FileProviderItem.swift */; };
@@ -221,6 +222,7 @@
 		EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivitySettingsView.swift; sourceTree = "<group>"; };
 		F02C915C80812BA31D41D1BE /* QuickLinkCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLinkCleanupTests.swift; sourceTree = "<group>"; };
 		F073384C166485C57856B16A /* LibraryAdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAdminService.swift; sourceTree = "<group>"; };
+		F0B0E925D750E0EA1B6F685F /* ConfigRefreshThrottle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigRefreshThrottle.swift; sourceTree = "<group>"; };
 		F43D66C196BA9E0171106E32 /* PartialContentFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialContentFetcherTests.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FileProviderExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -450,6 +452,7 @@
 			isa = PBXGroup;
 			children = (
 				1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */,
+				F0B0E925D750E0EA1B6F685F /* ConfigRefreshThrottle.swift */,
 				D43BFF79E08904BFEC78A777 /* Enumerator.swift */,
 				354821ECFF0127BC8CC280A1 /* Extension.swift */,
 				91E6A2C15BD4E7EBFA2BAA11 /* FileProviderExtensioniOS.entitlements */,
@@ -658,11 +661,11 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				7D99ADACA8F4377D63E996E2 /* ImageRelayClient */,
 				7753FDCBBDB77346A54BDEFC /* FileProviderExtension */,
 				EC24EBE7C40603ED435970EA /* FileProviderExtensionTests */,
-				426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */,
-				7D99ADACA8F4377D63E996E2 /* ImageRelayClient */,
 				D512C549A59A501AD83404A2 /* ImageRelayClientiOS */,
+				426C6EE40B1DD222E4C6D3B9 /* FileProviderExtensioniOS */,
 			);
 		};
 /* End PBXProject section */
@@ -757,6 +760,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C31A658171BDF0414EE6A18D /* APIErrorMapping.swift in Sources */,
+				2ECC3B296C9FF2CB82778758 /* ConfigRefreshThrottle.swift in Sources */,
 				F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */,
 				99358E46B6B3B0FFB44CBBCC /* Extension.swift in Sources */,
 				3474FC1EBBA1F4DB7DB23AF6 /* FileProviderItem.swift in Sources */,
