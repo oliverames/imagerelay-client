@@ -154,7 +154,7 @@ API key was disabled over it):
   is now dead and can be deleted after confirmation. The
   `Cloudflare/imagerelay-webhook-relay/` source directory was removed from
   the working tree on 2026-06-25 (retained in git history).
-- **Release workflow**: GitHub publishing is unblocked. The release runbook (build via `scripts/build-developer-id-release.sh`, published-release verification, and the live-verification guardrails) lives in the `ames-dev-workflows:imagerelay-release` skill; invoke it for any release-candidate work.
+- **Release workflow**: GitHub publishing is unblocked. The release runbook (build via `scripts/build-developer-id-release.sh`, published-release verification, and the live-verification guardrails) lives in the `ames-dev-workflows:project-release-runbooks` skill (imagerelay-client runbook); invoke it for any release-candidate work.
 - **Release script**: `scripts/build-developer-id-release.sh` requires a `mkdir -p` of the parent before the `cd` that resolves the artifact path -- fixed in Beta 5. On a clean clone `build/releases/` won't exist; the script now creates it first.
 
 ## macOS 26 SDK Gotchas
