@@ -29,9 +29,9 @@ distinguishes typed client coverage from UI exposure where that matters.
 | Upload file from URL | Typed | `ImageRelayAPI.uploadFileFromURL` covers `POST /files`. Not exposed in Finder; Finder uploads still use chunked upload jobs from local file data. |
 | File metadata terms | Covered | Metadata editor updates `/files/{id}.json`; `ImageRelayAPI.updateFileTerms` also covers the dedicated `/files/{file_id}/terms` endpoint. |
 | File tags | Covered | Metadata editor updates keyword strings through file metadata; `ImageRelayAPI.updateFileTags` also covers the dedicated `/files/{file_id}/tags` add/remove endpoint. |
-| Delete file | Covered | File Provider delete uses `/files/{id}.json`. |
-| Move file | Covered | File Provider move uses `/files/{id}/move.json` with string folder IDs. |
-| Synced file | Typed | `ImageRelayAPI.createSyncedFile` covers the documented endpoint. Not exposed in UI. |
+| Delete file | Blocked in File Provider | Global asset DELETE is not a substitute for membership-only removal. Use the web application pending a safe remove-one-membership API. |
+| Move file | Blocked in File Provider | The replacement move endpoint can discard other memberships. Actual parent changes are rejected, and unchanged parent fields issue no move request. |
+| Synced file | Typed | `ImageRelayAPI.createSyncedFile` covers the documented endpoint. Finder Add to Folders uses a confirmed additive workflow. |
 | Duplicate file | Typed | `ImageRelayAPI.duplicateFile` uses the documented `/files/{file_id}/dupicate` spelling. Verify live before exposing because the docs contain this typo. |
 | Update asset thumbnail | Typed | `ImageRelayAPI.updateAssetThumbnail` covers binary thumbnail upload with `filename` query support. Not exposed in UI. |
 | Update version | Covered | Finder rename/modify completes new versions through documented chunked version endpoints. |

@@ -44,7 +44,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
             do {
                 if identifier == .rootContainer {
                     completionHandler(
-                        FileProviderItem.container(
+                        IOSFileProviderItem.container(
                             identifier: .rootContainer,
                             filename: "Image Relay"
                         ),
@@ -54,7 +54,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
                 if identifier == .workingSet {
                     completionHandler(
-                        FileProviderItem.container(
+                        IOSFileProviderItem.container(
                             identifier: .workingSet,
                             filename: "Image Relay"
                         ),
@@ -64,7 +64,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
                 if identifier == .trashContainer {
                     completionHandler(
-                        FileProviderItem.container(
+                        IOSFileProviderItem.container(
                             identifier: .trashContainer,
                             filename: "Trash"
                         ),
@@ -89,14 +89,12 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     let parent: NSFileProviderItemIdentifier = folder.parentID
                         .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
                         ?? .rootContainer
-                    completionHandler(FileProviderItem(folder: folder, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle), nil)
+                    completionHandler(IOSFileProviderItem(folder: folder, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle), nil)
                 } else {
                     let file: RemoteFile = try await services.api.get("/files/\(id).json")
-                    let parentID = file.folderIDs.first
-                    let parent: NSFileProviderItemIdentifier = parentID
-                        .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
-                        ?? .rootContainer
-                    completionHandler(FileProviderItem(file: file, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle), nil)
+                    let item = try IOSFileProviderItem.requestedAppearance(file: file, identifier: identifier,
+                        rootFolderID: services.config.remoteRootFolderID, style: services.config.filenamePresentationStyle)
+                    completionHandler(item, nil)
                 }
             } catch {
                 completionHandler(nil, error.asFileProviderError)
@@ -219,6 +217,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 }
 
                 let fileMeta: RemoteFile = try await services.api.get("/files/\(fileID).json")
+                let item = try IOSFileProviderItem.requestedAppearance(file: fileMeta, identifier: itemIdentifier,
+                    rootFolderID: services.config.remoteRootFolderID, style: services.config.filenamePresentationStyle)
                 progress.completedUnitCount = 15
 
                 // Transient quick-link with a short server-side expiry: the iOS
@@ -250,11 +250,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 try? await services.api.delete("/quick_links/\(quickLink.id).json")
                 progress.completedUnitCount = 100
 
-                let parentID = fileMeta.folderIDs.first
-                let parent: NSFileProviderItemIdentifier = parentID
-                    .map { NSFileProviderItemIdentifier(ItemIdentifier.folder($0).rawValue) }
-                    ?? .rootContainer
-                let item = FileProviderItem(file: fileMeta, parentItemIdentifier: parent, filenameStyle: services.config.filenamePresentationStyle)
                 completionHandler(tempFile, item, nil)
             } catch {
                 logger.error("iOS fetchContents failed for \(itemIdentifier.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")

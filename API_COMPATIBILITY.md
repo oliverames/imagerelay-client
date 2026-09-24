@@ -51,9 +51,14 @@ currently uses or intentionally leaves out.
 ## Partially Supported
 
 - Synced files / multi-folder assets
-  Remote multi-folder assets are mirrored as one canonical local file plus symlink aliases.
-  The client does not create additional remote synced-file memberships through the dedicated
-  synced-file API.
+  Remote multi-folder assets have distinct local appearances, not symlinks. Existing macOS
+  identifiers remain attached to their cached parent, with additional appearances read-only for Finder content changes and renaming. Explicit
+  shared-asset actions such as Edit Metadata in Image Relay still affect every appearance.
+  iOS listings use per-folder identities and continue accepting legacy file identifiers.
+  Finder's Add to Folders action uses additive `POST /{file_id}/synced_file`, then confirms
+  requested memberships. Removing/reparenting file memberships is blocked: the documented
+  move endpoint replaces the entire folder set, with no documented conditional-write guard.
+  Global asset deletion is not used as a substitute for membership removal.
 - Remote change detection
   Implemented through polling the folder and file listing endpoints, with optional webhook
   relay polling in the host app for faster Finder refresh. The relay remains optional because
@@ -125,8 +130,8 @@ currently uses or intentionally leaves out.
 ## Not Yet Implemented
 
 - Synced files / multi-folder asset memberships
-  See "Partially Supported" below — multi-folder downloads work, but creating new
-  multi-folder memberships through the dedicated synced-file API doesn't.
+  See "Partially Supported" above. Additions and distinct folder appearances are supported;
+  membership removal/reparenting remains blocked pending a safe API contract.
 - Upload by URL
 - Duplicate file and public sharing link write management
 - Product/catalog/template/attribute/category/dimension write workflows in the UI

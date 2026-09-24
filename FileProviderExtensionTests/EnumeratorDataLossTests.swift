@@ -112,6 +112,35 @@ struct EnumeratorDataLossTests {
         )
     }
 
+    @Test("One remote asset enumerates independently in two folders")
+    func multipleFolderMemberships() async throws {
+        let db = SyncDatabase.makeInMemory()
+        let session = URLSessionConfiguration.ephemeral
+        session.protocolClasses = [EnumeratorMockURLProtocol.self]
+        let api = APIClient(baseURL: baseURL, apiKey: "fixture", userAgent: "TestAgent/1.0",
+                            sessionConfiguration: session, rateLimiter: RateLimiter(maxRequests: 1000, period: 1), maxRetries: 0)
+        let config = AppConfiguration(apiKey: "fixture", remoteRootFolderID: 1000, defaultFileTypeID: 1,
+                                      pollIntervalSeconds: 60, syncUpload: true, syncDownload: true, userAgent: "TestAgent/1.0")
+        EnumeratorMockURLProtocol.requestHandler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let payload = request.url!.path.hasSuffix("/files.json")
+                ? #"[{"id":77,"filename":"fixture.txt","size":1,"folder_ids":[101,202]}]"# : "[]"
+            return (response, Data(payload.utf8))
+        }
+        defer { EnumeratorMockURLProtocol.requestHandler = nil }
+        for folder in [101, 202, 101] {
+            let enumerator = Enumerator(containerIdentifier: NSFileProviderItemIdentifier("folder-\(folder)"),
+                                        api: api, db: db, config: config)
+            let observer = FakeEnumerationObserver()
+            await observer.runEnumerateItems(on: enumerator)
+            #expect(observer.items.count == 1)
+            #expect(observer.items.first?.itemIdentifier.rawValue == (folder == 101 ? "file-77" : "file-77-in-202"))
+            #expect(observer.items.first?.parentItemIdentifier.rawValue == "folder-\(folder)")
+        }
+        #expect(try db.children(of: "folder-101").count == 1)
+        #expect(try db.children(of: "folder-202").count == 1)
+    }
+
     @Test("404 on selected folder does NOT mass-delete its tracked descendants")
     func notFoundOnSelectedFolderProtectsDescendants() async throws {
         let fx = try makeFixture()

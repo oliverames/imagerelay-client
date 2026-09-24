@@ -175,20 +175,21 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         for file in files where !file.isDeleted {
-            let identifier = ItemIdentifier.file(file.id).rawValue
+            let identifier = try db.fileMembershipIdentifier(remoteID: file.id, parent: containerIdentifier.rawValue, folderID: folderID).rawValue
+            var membership = TrackedItem.makeFile(from: file, parent: containerIdentifier.rawValue)
+            membership.identifier = identifier
             remoteIdentifiers.insert(identifier)
             let existingItem = try db.item(for: identifier)
             visibleIdentifiers.insert(identifier)
 
             let item = FileProviderItem(
-                file: file,
-                parentItemIdentifier: containerIdentifier,
+                trackedItem: membership,
                 syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
                 filenameStyle: config.filenamePresentationStyle
             )
             items.append(item)
 
-            try db.upsertItem(.makeFile(from: file, parent: containerIdentifier.rawValue))
+            try db.upsertItem(membership)
             if existingItem == nil {
                 try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
             }
@@ -335,16 +336,17 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         }
 
         for file in files where !file.isDeleted {
-            let identifier = ItemIdentifier.file(file.id).rawValue
+            let identifier = try db.fileMembershipIdentifier(remoteID: file.id, parent: NSFileProviderItemIdentifier.rootContainer.rawValue, folderID: rootFolderID).rawValue
+            var membership = TrackedItem.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue)
+            membership.identifier = identifier
             let existingItem = try db.item(for: identifier)
             items.append(FileProviderItem(
-                file: file,
-                parentItemIdentifier: .rootContainer,
+                trackedItem: membership,
                 syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
                 filenameStyle: config.filenamePresentationStyle
             ))
 
-            try db.upsertItem(.makeFile(from: file, parent: NSFileProviderItemIdentifier.rootContainer.rawValue))
+            try db.upsertItem(membership)
             if existingItem == nil {
                 try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
             }
@@ -399,17 +401,18 @@ final class Enumerator: NSObject, NSFileProviderEnumerator, @unchecked Sendable 
         let files = try await filesTask
 
         for file in files where !file.isDeleted {
-            let fileIdentifier = ItemIdentifier.file(file.id).rawValue
+            let fileIdentifier = try db.fileMembershipIdentifier(remoteID: file.id, parent: identifier, folderID: folder.id).rawValue
+            var membership = TrackedItem.makeFile(from: file, parent: identifier)
+            membership.identifier = fileIdentifier
             let existingFile = try db.item(for: fileIdentifier)
             visibleIdentifiers.insert(fileIdentifier)
             items.append(FileProviderItem(
-                file: file,
-                parentItemIdentifier: NSFileProviderItemIdentifier(identifier),
+                trackedItem: membership,
                 syncState: syncState(for: file.name, itemType: .file, snapshot: syncSnapshot),
                 filenameStyle: config.filenamePresentationStyle
             ))
 
-            try db.upsertItem(.makeFile(from: file, parent: identifier))
+            try db.upsertItem(membership)
             if existingFile == nil {
                 try? db.logActivity(action: .discovered, itemName: file.name, itemType: .file)
             }

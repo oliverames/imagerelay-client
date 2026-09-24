@@ -8,6 +8,7 @@ struct ImageRelayClientApp: App {
     @State private var domainManager: DomainManager
     @State private var updateController: UpdateController
     @State private var metadataEditor: MetadataEditorState
+    @State private var folderMemberships = FolderMembershipState()
     @State private var collections: CollectionsState
     @State private var webhooks: WebhooksState
     @State private var products: ProductsState
@@ -149,6 +150,13 @@ struct ImageRelayClientApp: App {
         .windowResizability(.contentMinSize)
         .handlesExternalEvents(matching: ["edit-metadata"])
 
+        Window("Add to Folders", id: "folder-memberships") {
+            FolderMembershipView(state: folderMemberships)
+                .onOpenURL { url in handleIncoming(url) }
+        }
+        .defaultSize(width: 580, height: 480)
+        .handlesExternalEvents(matching: ["add-to-folders"])
+
         Window("Collections", id: "collections-browser") {
             CollectionsBrowserView(state: collections)
                 .onOpenURL { url in handleIncoming(url) }
@@ -197,6 +205,9 @@ struct ImageRelayClientApp: App {
             Task { @MainActor in
                 await metadataEditor.load(targets: targets)
             }
+        case "add-to-folders":
+            folderMemberships.setTargets(parsed.files.map(\.id))
+            Task { @MainActor in await folderMemberships.load() }
         case "add-to-collection":
             collections.pendingAddFileIDs = parsed.files.map(\.id)
             collections.pendingAddFileNames = parsed.files.map(\.name)

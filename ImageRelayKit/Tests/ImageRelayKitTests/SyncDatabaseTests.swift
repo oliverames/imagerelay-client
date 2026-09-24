@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import GRDB
 @testable import ImageRelayKit
@@ -6,6 +7,73 @@ import GRDB
 struct SyncDatabaseTests {
     func makeDB() throws -> SyncDatabase {
         try SyncDatabase(path: ":memory:")
+    }
+
+    @Test("v11 migration preserves legacy cached membership before any enumeration")
+    func migrateMembershipMapping() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent("fixture.sqlite").path
+        let fixture = try DatabaseQueue(path: path)
+        try fixture.write { db in
+            try db.execute(sql: "CREATE TABLE grdb_migrations (identifier TEXT NOT NULL PRIMARY KEY)")
+            for version in 1...10 {
+                try db.execute(sql: "INSERT INTO grdb_migrations VALUES (?)", arguments: ["v\(version)"])
+            }
+            try db.execute(sql: "CREATE TABLE tracked_items (identifier TEXT PRIMARY KEY, parentIdentifier TEXT, remoteID INTEGER, itemType TEXT)")
+            try db.execute(sql: "INSERT INTO tracked_items VALUES ('file-77', 'folder-101', 77, 'file')")
+        }
+        try fixture.close()
+        let db = try SyncDatabase(path: path)
+        #expect(try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-202", folderID: 202).rawValue == "file-77-in-202")
+        #expect(try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-101", folderID: 101).rawValue == "file-77")
+    }
+
+    @Test("Confirmed edits refresh every membership without moving its parent")
+    func refreshMemberships() throws {
+        let db = try makeDB()
+        var canonical = TrackedItem(identifier: "file-77", parentIdentifier: "folder-101", remoteID: 77,
+                                    itemType: .file, name: "old.txt", size: 1, contentVersion: "v1", metadataVersion: "m1")
+        var extra = canonical
+        extra.identifier = "file-77-in-202"
+        extra.parentIdentifier = "folder-202"
+        try db.upsertItem(canonical)
+        try db.upsertItem(extra)
+        canonical.name = "new.txt"
+        canonical.contentVersion = "v2"
+        #expect(try db.refreshFileMemberships(from: canonical) == ["folder-101", "folder-202"])
+        #expect(try db.item(for: extra.identifier)?.name == "new.txt")
+        #expect(try db.item(for: extra.identifier)?.contentVersion == "v2")
+        #expect(try db.item(for: extra.identifier)?.parentIdentifier == "folder-202")
+    }
+
+    @Test("Membership mapping preserves legacy parent and survives cache eviction")
+    func membershipMapping() throws {
+        let db = try makeDB()
+        let old = TrackedItem(identifier: "file-77", parentIdentifier: "folder-101", remoteID: 77,
+                              itemType: .file, name: "fixture.txt", size: 1, contentVersion: "v1", metadataVersion: "m1")
+        try db.upsertItem(old)
+        let extra = try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-202", folderID: 202)
+        #expect(extra.rawValue == "file-77-in-202")
+        #expect(try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-101", folderID: 101).rawValue == "file-77")
+        try db.deleteItem("file-77")
+        #expect(try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-202", folderID: 202) == extra)
+        #expect(try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-101", folderID: 101).rawValue == "file-77")
+    }
+
+    @Test("Membership rows remain independent")
+    func independentMembershipRows() throws {
+        let db = try makeDB()
+        for folder in [101, 202] {
+            let id = try db.fileMembershipIdentifier(remoteID: 77, parent: "folder-\(folder)", folderID: folder)
+            try db.upsertItem(TrackedItem(identifier: id.rawValue, parentIdentifier: "folder-\(folder)", remoteID: 77,
+                                         itemType: .file, name: "fixture.txt", size: 1, contentVersion: "v1", metadataVersion: "m1"))
+        }
+        #expect(try db.children(of: "folder-101").count == 1)
+        #expect(try db.children(of: "folder-202").count == 1)
+        try db.deleteItem("file-77-in-202")
+        #expect(try db.item(for: "file-77") != nil)
     }
 
     @Test("Insert and retrieve tracked item")

@@ -166,6 +166,19 @@ public final class SyncDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v11") { db in
+            try db.create(table: "canonical_file_memberships") { t in
+                t.primaryKey("remoteID", .integer).notNull()
+                t.column("parentIdentifier", .text).notNull()
+            }
+            // Keep File Provider's existing identifiers attached to the same parent.
+            try db.execute(sql: """
+                INSERT INTO canonical_file_memberships (remoteID, parentIdentifier)
+                SELECT remoteID, parentIdentifier FROM tracked_items
+                WHERE itemType = 'file' AND identifier = 'file-' || remoteID
+                """)
+        }
+
         try migrator.migrate(writer)
     }
 
@@ -190,6 +203,43 @@ public final class SyncDatabase: Sendable {
         try writer.write { db in
             try item.insert(db, onConflict: .replace)
             _ = try PendingRemoteDeletion.deleteOne(db, key: item.identifier)
+        }
+    }
+
+    /// Resolves a local folder appearance without changing a legacy item's parent.
+    /// The mapping outlives tracked-row eviction, so enumeration order cannot
+    /// reassign an identifier that File Provider may still reference.
+    public func fileMembershipIdentifier(remoteID: Int, parent: String, folderID: Int) throws -> ItemIdentifier {
+        try writer.write { db in
+            let legacyID = ItemIdentifier.file(remoteID).rawValue
+            let cachedParent = try String.fetchOne(db,
+                sql: "SELECT parentIdentifier FROM tracked_items WHERE identifier = ?", arguments: [legacyID])
+            try db.execute(sql: "INSERT OR IGNORE INTO canonical_file_memberships (remoteID, parentIdentifier) VALUES (?, ?)",
+                           arguments: [remoteID, cachedParent ?? parent])
+            let canonical = try String.fetchOne(db,
+                sql: "SELECT parentIdentifier FROM canonical_file_memberships WHERE remoteID = ?", arguments: [remoteID])
+            return canonical == parent ? .file(remoteID) : .membership(fileID: remoteID, folderID: folderID)
+        }
+    }
+
+    /// Updates cached appearances of a shared asset after a confirmed edit.
+    /// Membership identity and parent remain independent.
+    public func refreshFileMemberships(from item: TrackedItem) throws -> [String] {
+        guard item.itemType == .file else { return [item.parentIdentifier] }
+        return try writer.write { db in
+            var memberships = try TrackedItem.fetchAll(db,
+                sql: "SELECT * FROM tracked_items WHERE remoteID = ? AND itemType = 'file'", arguments: [item.remoteID])
+            for index in memberships.indices {
+                memberships[index].name = item.name
+                memberships[index].size = item.size
+                memberships[index].contentVersion = item.contentVersion
+                memberships[index].contentModifiedAt = item.contentModifiedAt
+                memberships[index].shortLivedThumbnailURL = item.shortLivedThumbnailURL
+                memberships[index].metadataVersion = TrackedItem.fileMetadataVersion(
+                    updatedOn: item.contentVersion, parentIdentifier: memberships[index].parentIdentifier)
+                try memberships[index].update(db)
+            }
+            return Array(Set(memberships.map(\.parentIdentifier))).sorted()
         }
     }
 
@@ -302,6 +352,7 @@ public final class SyncDatabase: Sendable {
 
     public func resetTrackedState() throws {
         try writer.write { db in
+            try db.execute(sql: "DELETE FROM canonical_file_memberships")
             try db.execute(sql: "DELETE FROM sync_anchors")
             try db.execute(sql: "DELETE FROM tracked_items")
             try db.execute(sql: "DELETE FROM pending_remote_deletions")

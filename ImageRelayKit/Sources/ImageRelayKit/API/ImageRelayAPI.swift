@@ -25,6 +25,29 @@ public struct ImageRelayAPI: Sendable {
         try await client.post("/\(fileID)/synced_file", body: SyncedFileRequest(folderIDs: folderIDs))
     }
 
+    /// Adds only missing memberships and confirms the result. Never uses the
+    /// replacement move endpoint, so concurrent additions remain untouched.
+    public func addSyncedFileMemberships(
+        fileID: Int, folderIDs: [Int],
+        beforeWrite: @Sendable () async throws -> Void = {}
+    ) async throws -> RemoteFileDetail {
+        guard fileID > 0, !folderIDs.isEmpty, folderIDs.allSatisfy({ $0 > 0 }) else {
+            throw FileMembershipError.invalidSelection
+        }
+        let requested = Set(folderIDs)
+        let before: RemoteFileDetail = try await client.get("/files/\(fileID).json")
+        guard before.id == fileID else { throw FileMembershipError.unconfirmed }
+        let missing = requested.subtracting(before.folderIDs).sorted()
+        if missing.isEmpty { return before }
+        try await beforeWrite()
+        try await createSyncedFile(fileID: fileID, folderIDs: missing)
+        let after: RemoteFileDetail = try await client.get("/files/\(fileID).json")
+        guard after.id == fileID, requested.isSubset(of: Set(after.folderIDs)) else {
+            throw FileMembershipError.unconfirmed
+        }
+        return after
+    }
+
     public func duplicateFile(fileID: Int, folderID: Int, shouldCopyMetadata: Bool) async throws {
         try await client.post(
             "/files/\(fileID)/dupicate",
@@ -235,5 +258,22 @@ public struct ImageRelayAPI: Sendable {
         _ mutation: ProductDimensionOptionMutation
     ) async throws -> ProductDimensionOption {
         try await client.post("/product_dimensions/\(dimensionID)/add_option", body: mutation)
+    }
+}
+
+public enum FileMembershipError: LocalizedError, Sendable {
+    case invalidSelection
+    case unconfirmed
+    case removalUnsupported
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidSelection:
+            return "Select a file and at least one destination folder."
+        case .unconfirmed:
+            return "Image Relay has not confirmed every requested folder membership. Refresh before retrying."
+        case .removalUnsupported:
+            return "This client cannot safely remove one folder membership without risking other folders. Use Image Relay's web app to remove or move this membership. The asset has not been deleted."
+        }
     }
 }

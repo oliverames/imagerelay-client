@@ -34,4 +34,26 @@ struct ItemIdentifierTests {
         let invalid = ItemIdentifier(rawValue: "garbage")
         #expect(invalid == nil)
     }
+    @Test("Membership identifiers preserve the remote asset and separate folder appearances")
+    func membershipIdentifiers() {
+        let first = ItemIdentifier.membership(fileID: 77, folderID: 101)
+        let second = ItemIdentifier.membership(fileID: 77, folderID: 202)
+        #expect(first != second)
+        #expect(first.rawValue == "file-77-in-101")
+        #expect(ItemIdentifier(rawValue: first.rawValue) == first)
+        #expect(first.numericID == 77)
+        #expect(first.membershipFolderID == 101)
+        #expect(first.isFile && !first.isFolder)
+        #expect(ItemIdentifier.file(77).membershipFolderID == nil)
+        #expect(ItemIdentifier(rawValue: "file-77")?.numericID == 77)
+    }
+
+    @Test("Malformed membership identifiers are rejected")
+    func malformedMemberships() {
+        for value in ["folder-77-in-101", "file-77-in-", "file-77-in-0", "file-77-in--1",
+                      "file-77-in-101-in-202", "file-x-in-101", "file-77-in-x"] {
+            #expect(ItemIdentifier(rawValue: value) == nil)
+        }
+    }
+
 }

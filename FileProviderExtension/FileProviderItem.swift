@@ -60,6 +60,10 @@ enum FileProviderAction {
     static let editMetadata = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.edit-metadata"
     )
+    static let addToFolders = NSFileProviderExtensionActionIdentifier(
+        "com.oliverames.imagerelay-client.fileprovider.action.add-to-folders"
+    )
+
     static let addToCollection = NSFileProviderExtensionActionIdentifier(
         "com.oliverames.imagerelay-client.fileprovider.action.add-to-collection"
     )
@@ -153,7 +157,8 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
         self.creationDate = nil
         self.contentModificationDate = trackedItem.contentModifiedAt
         self.lastUsedDate = nil
-        self.fileSystemFlags = [.userReadable, .userWritable]
+        self.fileSystemFlags = ItemIdentifier(rawValue: trackedItem.identifier)?.membershipFolderID != nil
+            ? [.userReadable] : [.userReadable, .userWritable]
         self.userInfo = Self.userInfo(
             remoteID: trackedItem.remoteID,
             itemType: trackedItem.itemType,
@@ -176,8 +181,11 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
             self._contentPolicy = .inherited
         } else {
             self.contentType = UTType(filenameExtension: URL(fileURLWithPath: trackedItem.name).pathExtension) ?? .data
-            self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
-                                  .allowsReparenting, .allowsTrashing, .allowsDeleting]
+            if ItemIdentifier(rawValue: trackedItem.identifier)?.membershipFolderID != nil {
+                self._capabilities = [.allowsReading]
+            } else {
+                self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming]
+            }
             self._contentPolicy = .downloadLazily
         }
         super.init()
@@ -263,8 +271,7 @@ final class FileProviderItem: NSObject, NSFileProviderItem, NSFileProviderItemDe
         self.ownerNameComponents = nil
         self.mostRecentEditorNameComponents = nil
         self.decorations = syncState.needsAttention ? [FileProviderDecoration.needsAttention] : nil
-        self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming,
-                              .allowsReparenting, .allowsTrashing, .allowsDeleting]
+        self._capabilities = [.allowsReading, .allowsWriting, .allowsRenaming]
         self._contentPolicy = .downloadLazily
         super.init()
     }

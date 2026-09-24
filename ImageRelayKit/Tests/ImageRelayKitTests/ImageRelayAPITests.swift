@@ -49,6 +49,100 @@ struct ImageRelayAPITests {
         return ImageRelayAPI(client: client)
     }
 
+    @Test("Membership additions preserve existing and concurrent folders and send only missing IDs")
+    func addMemberships() async throws {
+        var reads = 0
+        var methods: [String] = []
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            methods.append(request.httpMethod ?? "")
+            if request.httpMethod == "POST" {
+                #expect(request.url?.path == "/api/v2/101/synced_file")
+                let body = try jsonBody(request)
+                #expect(body["folder_ids"] as? [String] == ["202"])
+                return jsonResponse(request, "{}")
+            }
+            #expect(request.url?.path == "/api/v2/files/101.json")
+            reads += 1
+            return jsonResponse(request, reads == 1
+                ? #"{"id":101,"filename":"fixture.txt","size":1,"folder_ids":[101]}"#
+                : #"{"id":101,"filename":"fixture.txt","size":1,"folder_ids":[101,202,303]}"#)
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        let result = try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [202,101,202])
+        #expect(result.folderIDs == [101,202,303])
+        #expect(methods == ["GET", "POST", "GET"])
+    }
+
+    @Test("Already present memberships do not issue writes")
+    func presentMemberships() async throws {
+        var requests = 0
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            requests += 1
+            #expect(request.httpMethod == "GET")
+            return jsonResponse(request, #"{"id":101,"filename":"fixture.txt","size":1,"folder_ids":[202]}"#)
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        _ = try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [202])
+        #expect(requests == 1)
+    }
+
+    @Test("Unconfirmed membership changes are not reported as success")
+    func unconfirmedMemberships() async throws {
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            jsonResponse(request, request.httpMethod == "POST" ? "{}"
+                : #"{"id":101,"filename":"fixture.txt","size":1,"folder_ids":[101]}"#)
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        do {
+            _ = try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [202])
+            Issue.record("Missing destination should not be confirmed")
+        } catch FileMembershipError.unconfirmed { }
+    }
+
+    @Test("Invalid membership selections issue no requests")
+    func invalidMemberships() async throws {
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            Issue.record("Invalid selection must not contact API")
+            return jsonResponse(request, "{}")
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        do {
+            _ = try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [0])
+            Issue.record("Invalid selection should fail")
+        } catch FileMembershipError.invalidSelection { }
+    }
+
+    @Test("Membership authorization failures propagate without a write")
+    func membershipAuthorizationFailure() async throws {
+        var methods: [String] = []
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            methods.append(request.httpMethod ?? "")
+            return (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!, Data("{}".utf8))
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        await #expect(throws: APIError.self) {
+            try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [202])
+        }
+        #expect(methods == ["GET"])
+    }
+
+    @Test("A failed pre-write gate after the membership GET prevents POST")
+    func membershipWriteGate() async throws {
+        var methods: [String] = []
+        ImageRelayAPIMockURLProtocol.requestHandler = { request in
+            methods.append(request.httpMethod ?? "")
+            return jsonResponse(request, #"{"id":101,"filename":"fixture.txt","size":1,"folder_ids":[101]}"#)
+        }
+        defer { ImageRelayAPIMockURLProtocol.requestHandler = nil }
+        do {
+            _ = try await makeAPI().addSyncedFileMemberships(fileID: 101, folderIDs: [202], beforeWrite: {
+                throw FileMembershipError.invalidSelection
+            })
+            Issue.record("Failed gate must stop the write")
+        } catch FileMembershipError.invalidSelection { }
+        #expect(methods == ["GET"])
+    }
+
     @Test("DAM gap endpoints use documented paths and bodies")
     func damGapEndpoints() async throws {
         var seen: [String] = []

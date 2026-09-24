@@ -130,6 +130,14 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
+				<string>com.oliverames.imagerelay-client.fileprovider.action.add-to-folders</string>
+				<key>NSExtensionFileProviderActionName</key>
+				<string>Add to Folders…</string>
+			</dict>
+			<dict>
+				<key>NSExtensionFileProviderActionActivationRule</key>
+				<string>TRUEPREDICATE</string>
+				<key>NSExtensionFileProviderActionIdentifier</key>
 				<string>com.oliverames.imagerelay-client.fileprovider.action.add-to-collection</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Add to Collection…</string>

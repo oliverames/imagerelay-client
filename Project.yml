@@ -156,6 +156,9 @@ targets:
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.edit-metadata
               NSExtensionFileProviderActionName: Edit Metadata in Image Relay…
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
+            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.add-to-folders
+              NSExtensionFileProviderActionName: "Add to Folders…"
+              NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
             - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.add-to-collection
               NSExtensionFileProviderActionName: Add to Collection…
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
@@ -194,6 +197,7 @@ targets:
     platform: macOS
     sources:
       - path: FileProviderExtensionTests
+      - path: FileProviderExtensioniOS/IOSFileProviderItem.swift
       - path: FileProviderExtension
     dependencies:
       - package: ImageRelayKit

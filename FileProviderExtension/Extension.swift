@@ -28,6 +28,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         QuickLinkJanitor(api: api, db: db, logger: logger)
     }
 
+    /// Dependency-injected construction for isolated operation verification. Does
+    /// not open the app-group database, register a domain, or start background work.
+    init(domain: NSFileProviderDomain, api: APIClient, db: SyncDatabase, config: AppConfiguration) {
+        self.domain = domain
+        self.api = api
+        self.db = db
+        self.config = config
+        self.fileOperationSemaphore = AsyncSemaphore(value: config.maxConcurrentFiles)
+        self.startupThrottleGate = StartupThrottleGate(delay: 0)
+        self.throttleStateStore = nil
+        self.uploadFileTypeResolver = UploadFileTypeResolver(api: api, configuredID: config.defaultFileTypeID)
+        super.init()
+    }
+
     required init(domain: NSFileProviderDomain) {
         self.domain = domain
 
@@ -677,6 +691,13 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     handler.value(nil, [], false, NSFileProviderError(.noSuchItem))
                     return
                 }
+                if itemID.isFile && changedFields.contains(.parentItemIdentifier)
+                    && item.parentItemIdentifier.rawValue != tracked.parentIdentifier {
+                    throw FileMembershipError.removalUnsupported
+                }
+                if itemID.membershipFolderID != nil && mutatesRemote {
+                    throw fileProviderCannotSynchronize("Additional folder appearances are read-only in this client. Edit the shared asset in Image Relay's web app.")
+                }
                 failureItemName = item.filename
                 failureItemType = tracked.itemType
 
@@ -884,42 +905,11 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                     )
                 }
 
-                if changedFields.contains(.parentItemIdentifier), itemID.isFile {
-                    let oldParentID = try await self.resolveParentFolderID(NSFileProviderItemIdentifier(tracked.parentIdentifier))
-                    let newParentID = try await self.resolveParentFolderID(item.parentItemIdentifier)
-                    if operationID == nil {
-                        operationID = try db.beginSyncOperation(
-                            kind: .move,
-                            itemIdentifier: tracked.identifier,
-                            itemName: tracked.name,
-                            itemType: .file,
-                            parentIdentifier: tracked.parentIdentifier,
-                            remoteID: remoteID,
-                            phase: "Moving file"
-                        )
-                    }
-                    try await api.post(
-                        "/files/\(remoteID)/move.json",
-                        body: MoveRequest(folder_ids: [String(newParentID)])
-                    )
-                    if oldParentID != newParentID {
-                        try await self.waitForRemoteFileAbsent(remoteID: remoteID, parentFolderID: oldParentID)
-                    }
-                    let confirmed = try await self.waitForRemoteFileName(
-                        remoteID: remoteID,
-                        parentFolderID: newParentID,
-                        expectedName: item.filename
-                    )
-                    updated.name = confirmed.name
-                    updated.parentIdentifier = item.parentItemIdentifier.rawValue
-                    updated.metadataVersion = TrackedItem.fileMetadataVersion(
-                        updatedOn: updated.contentVersion,
-                        parentIdentifier: item.parentItemIdentifier.rawValue
-                    )
-                    try? db.logActivity(action: .moved, itemName: tracked.name, itemType: .file)
-                }
+                // Actual file parent changes were rejected before any remote write.
+                // A no-op parent field must never reach the replacement move API.
 
                 try db.upsertItem(updated)
+                let membershipParents = try db.refreshFileMemberships(from: updated)
                 if let operationID {
                     try? db.completeSyncOperation(operationID, remoteID: remoteID, remoteContentSize: updated.size)
                 }
@@ -927,10 +917,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 handler.value(resultItem, [], false, nil)
                 if mutatesRemote {
                     self.signalLocalMutation(
-                        affectedContainerIdentifiers: [
-                            NSFileProviderItemIdentifier(tracked.parentIdentifier),
-                            NSFileProviderItemIdentifier(updated.parentIdentifier)
-                        ],
+                        affectedContainerIdentifiers: Array(Set(membershipParents + [tracked.parentIdentifier, updated.parentIdentifier]))
+                            .map { NSFileProviderItemIdentifier($0) },
                         reason: "modified \(updated.itemType.rawValue)"
                     )
                 }
@@ -1088,6 +1076,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
                 await self.runForceReDownloadAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.editMetadata.rawValue:
                 await self.runEditMetadataAction(itemIdentifiers: itemIdentifiers, handler: handler)
+            case FileProviderAction.addToFolders.rawValue:
+                await self.runAddToCollectionAction(itemIdentifiers: itemIdentifiers, handler: handler, folders: true)
             case FileProviderAction.addToCollection.rawValue:
                 await self.runAddToCollectionAction(itemIdentifiers: itemIdentifiers, handler: handler)
             case FileProviderAction.openFolderInWeb.rawValue:
@@ -1640,15 +1630,17 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     /// or create a new one.
     private func runAddToCollectionAction(
         itemIdentifiers: [NSFileProviderItemIdentifier],
-        handler: UncheckedBox<((any Error)?) -> Void>
+        handler: UncheckedBox<((any Error)?) -> Void>,
+        folders: Bool = false
     ) async {
         let logger = self.logger
+        let actionName = folders ? "Add to Folders" : "Add to Collection"
         var resolved: [(name: String, id: Int)] = []
         for identifier in itemIdentifiers {
             guard let itemID = ItemIdentifier(rawValue: identifier.rawValue),
                   itemID.isFile,
                   let assetID = itemID.numericID else {
-                handler.value(fileProviderCannotSynchronize("Add to Collection is only available for files."))
+                handler.value(fileProviderCannotSynchronize("\(actionName) is only available for files."))
                 return
             }
             let tracked = try? db.item(for: identifier.rawValue)
@@ -1660,20 +1652,20 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         }
 
         guard let url = ActionFormatting.hostAppActionURL(
-            host: "add-to-collection",
+            host: folders ? "add-to-folders" : "add-to-collection",
             files: resolved
         ) else {
-            handler.value(fileProviderCannotSynchronize("Image Relay could not construct the Add-to-Collection URL."))
+            handler.value(fileProviderCannotSynchronize("Image Relay could not construct the \(actionName) URL."))
             return
         }
 
         let opened = await MainActor.run { NSWorkspace.shared.open(url) }
         if opened {
-            logger.info("Opened Add to Collection in host app for \(resolved.count, privacy: .public) file(s)")
+            logger.info("Opened \(actionName, privacy: .public) in host app for \(resolved.count, privacy: .public) file(s)")
             handler.value(nil)
         } else {
             logger.warning("NSWorkspace declined to open \(url.absoluteString, privacy: .public)")
-            handler.value(fileProviderCannotSynchronize("Image Relay could not launch the host app for Add to Collection."))
+            handler.value(fileProviderCannotSynchronize("Image Relay could not launch the host app for \(actionName)."))
         }
     }
 
@@ -1967,6 +1959,7 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     }
 
     private func deleteTrackedItem(itemID: ItemIdentifier, remoteID: Int, tracked: TrackedItem?) async throws {
+        if itemID.isFile { throw FileMembershipError.removalUnsupported }
         do {
             if itemID.isFile {
                 let parentFolderID: Int?
