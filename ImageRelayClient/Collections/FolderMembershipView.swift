@@ -79,7 +79,8 @@ final class FolderMembershipState {
         let (client, config, db) = try context()
         guard sameAccount(initial, config) else { throw MembershipContextError.changed }
         guard config.syncUpload else { throw MembershipContextError.disabled }
-        if let pause = try db.getPauseState(), pause.isActive {
+        let pause = try db.getPauseState()
+        if pause.isActive {
             throw MembershipContextError.paused(pause.description)
         }
         return client

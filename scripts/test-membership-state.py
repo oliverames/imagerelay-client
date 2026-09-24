@@ -52,7 +52,7 @@ struct APIClient {
 struct SyncDatabase {
     init(url: URL) throws {}
     static func databaseURL(in container: URL) -> URL { container }
-    @MainActor func getPauseState() throws -> Pause? { Fixture.paused ? Pause(isActive: true, description: "Paused") : nil }
+    @MainActor func getPauseState() throws -> Pause { Pause(isActive: Fixture.paused, description: "Paused") }
 }
 struct ImageRelayAPI {
     let client: APIClient
