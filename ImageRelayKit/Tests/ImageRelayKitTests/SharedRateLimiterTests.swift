@@ -213,7 +213,19 @@ struct SharedRateLimiterTests {
         #expect(await flag.isCompleted == false)
 
         await limiter.recordSuccess()
-        try await Task.sleep(for: .milliseconds(150))
+        // Wait for the task itself, not a 150 ms scheduling assumption. Keep
+        // the deadline below the 5-second lease so expiry cannot mask a
+        // failure to release the probe after recording its outcome.
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await secondAcquire.value }
+            group.addTask {
+                try await Task.sleep(for: .seconds(2))
+                secondAcquire.cancel()
+                throw ProbeCompletionTimeout()
+            }
+            defer { group.cancelAll() }
+            try await group.next()
+        }
         #expect(await flag.isCompleted == true)
         await limiter.recordSuccess()
     }
@@ -348,3 +360,5 @@ private actor CompletionFlag {
         completed = true
     }
 }
+
+private struct ProbeCompletionTimeout: Error {}
