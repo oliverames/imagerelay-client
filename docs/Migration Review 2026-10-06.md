@@ -30,9 +30,11 @@ The universal Mac Release archive and Developer ID export succeeded. The task's 
 
 All four iOS app/extension checks across archive and IPA passed strict signatures, exact active certificate, assigned profiles, shared group and permitted entitlements. The IPA SHA-256 is `0b11b9ac398d039b28521a63943642e3468e0072d0683a675a4c826a995063ef`.
 
-All seven code objects in the Mac export passed strict signatures in both architectures, using the exact active Developer ID certificate, hardened runtime and secure timestamps. App, File Provider, App Group, shared Keychain, document group and embedded profiles match the migration. The archive retains four ad hoc Sparkle helpers. Export re-signs them correctly, so distribution must use the verified export. Its bundle manifest SHA-256 is `456aced78dd94d23954a968aba9c47cd9351281b4ad677a7aea917735717ab4c`.
+All seven code objects in the Mac export passed strict signatures in both architectures, using the exact active Developer ID certificate, hardened runtime and secure timestamps. App, File Provider, App Group, shared Keychain, document group and embedded profiles match the migration. The archive retains four ad hoc Sparkle helpers. Export re-signs them correctly, so distribution must use the verified export. Its pre-notarization bundle manifest SHA-256 is `456aced78dd94d23954a968aba9c47cd9351281b4ad677a7aea917735717ab4c`.
 
-Further app test suites remain outside this migration task at Oliver's direction. Mac notarization was explicitly approved and submitted on October 6 as `4a725c94-e9e7-4624-be2b-1a4fd7ee40f3`. Apple validation is in progress.
+Further app test suites remain outside this migration task at Oliver's direction. Mac notarization was explicitly approved and submitted on October 6 as `4a725c94-e9e7-4624-be2b-1a4fd7ee40f3`. Apple accepted the package. Ticket attachment and validation, deep strict signature verification and Gatekeeper assessment all passed. Gatekeeper reports `Notarized Developer ID`.
+
+The final package is `Image Relay Mac App 2026-10-06.zip`, SHA-256 `e2cfc16a06526b7a09032f818babbed3a8819827d1cd6acdbe576e340b5592f3`. This package contains the attached ticket.
 
 Later runtime acceptance must deliberately select installation and callback routing, updater delivery and a synthetic test account/library. Existing domains, placeholders, pending uploads and remote files remain untouched. The release wrapper's smoke-install and domain-reset paths were not run.
 
