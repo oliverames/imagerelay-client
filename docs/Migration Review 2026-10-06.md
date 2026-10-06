@@ -32,7 +32,7 @@ All four iOS app/extension checks across archive and IPA passed strict signature
 
 All seven code objects in the Mac export passed strict signatures in both architectures, using the exact active Developer ID certificate, hardened runtime and secure timestamps. App, File Provider, App Group, shared Keychain, document group and embedded profiles match the migration. The archive retains four ad hoc Sparkle helpers. Export re-signs them correctly, so distribution must use the verified export. Its bundle manifest SHA-256 is `456aced78dd94d23954a968aba9c47cd9351281b4ad677a7aea917735717ab4c`.
 
-Further app test suites remain outside this migration task at Oliver's direction. Mac notarization remains a subsequent packaging step.
+Further app test suites remain outside this migration task at Oliver's direction. Mac notarization was explicitly approved and submitted on October 6 as `4a725c94-e9e7-4624-be2b-1a4fd7ee40f3`. Apple validation is in progress.
 
 Later runtime acceptance must deliberately select installation and callback routing, updater delivery and a synthetic test account/library. Existing domains, placeholders, pending uploads and remote files remain untouched. The release wrapper's smoke-install and domain-reset paths were not run.
 
