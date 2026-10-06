@@ -36,6 +36,12 @@ Further app test suites remain outside this migration task at Oliver's direction
 
 The final package is `Image Relay Mac App 2026-10-06.zip`, SHA-256 `e2cfc16a06526b7a09032f818babbed3a8819827d1cd6acdbe576e340b5592f3`. This package contains the attached ticket.
 
-Later runtime acceptance must deliberately select installation and callback routing, updater delivery and a synthetic test account/library. Existing domains, placeholders, pending uploads and remote files remain untouched. The release wrapper's smoke-install and domain-reset paths were not run.
+Later runtime acceptance must deliberately select callback routing, updater delivery and a synthetic test account/library. Existing domains, placeholders, pending uploads and remote files remain untouched. The release wrapper's smoke-install and domain-reset paths were not run.
 
-Remaining work is tracked in [issue 38](https://github.com/oliverames/imagerelay-client/issues/38). The existing credential-rotation [issue 35](https://github.com/oliverames/imagerelay-client/issues/35) stays open until the active credential path is verified end to end. No app was installed or launched, and no live File Provider domain or Photos data was accessed.
+Remaining work is tracked in [issue 38](https://github.com/oliverames/imagerelay-client/issues/38). The existing credential-rotation [issue 35](https://github.com/oliverames/imagerelay-client/issues/35) stays open until the active credential path is verified end to end. No app was launched, and no live File Provider domain or Photos data was accessed.
+
+## Mac Installation Completion
+
+On October 6, 2026 at 22:22 UTC, version 1.4.4 (47) was installed at `/Applications/Image Relay.app` on the migration Mac. This exact target path was previously unused. The installed bundle passed strict deep signature verification, ticket validation and Gatekeeper assessment as Notarized Developer ID with active team `84M4ZF255G`. Its source ZIP matched the recorded final package hash.
+
+No app was launched, existing installation path replaced, or app data read or changed. Installation does not establish runtime behavior or automatic update delivery. Further app test suites remain waived at Oliver's direction. Public release remains separate.
