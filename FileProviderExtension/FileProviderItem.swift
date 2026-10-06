@@ -19,56 +19,56 @@ struct FileProviderItemSyncState: Sendable {
 
 enum FileProviderDecoration {
     static let needsAttention = NSFileProviderItemDecorationIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention"
+        "com.amesconsulting.imagerelay.fileprovider.decoration.needs-attention"
     )
 }
 
 enum FileProviderAction {
     static let refreshFromImageRelay = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.refresh"
+        "com.amesconsulting.imagerelay.fileprovider.action.refresh"
     )
     static let copyPublicLink = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-public-link"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-public-link"
     )
     static let copyDownloadLink = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-download-link"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-download-link"
     )
     static let copyImageRelayID = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-id"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-id"
     )
     static let copyFolderShareLink = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-folder-share-link"
     )
     static let copyMetadata = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-metadata"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-metadata"
     )
     static let copyDiagnostics = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-diagnostics"
     )
     static let copyLongLivedLink = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link"
+        "com.amesconsulting.imagerelay.fileprovider.action.copy-long-lived-link"
     )
     static let exportPublicLinkAsQR = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.export-qr"
+        "com.amesconsulting.imagerelay.fileprovider.action.export-qr"
     )
     static let newMailWithPublicLink = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.new-mail-link"
+        "com.amesconsulting.imagerelay.fileprovider.action.new-mail-link"
     )
     static let forceReDownload = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.force-redownload"
+        "com.amesconsulting.imagerelay.fileprovider.action.force-redownload"
     )
     static let editMetadata = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.edit-metadata"
+        "com.amesconsulting.imagerelay.fileprovider.action.edit-metadata"
     )
     static let addToFolders = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.add-to-folders"
+        "com.amesconsulting.imagerelay.fileprovider.action.add-to-folders"
     )
 
     static let addToCollection = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.add-to-collection"
+        "com.amesconsulting.imagerelay.fileprovider.action.add-to-collection"
     )
     static let openFolderInWeb = NSFileProviderExtensionActionIdentifier(
-        "com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web"
+        "com.amesconsulting.imagerelay.fileprovider.action.open-folder-in-web"
     )
 }
 

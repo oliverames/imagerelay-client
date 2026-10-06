@@ -628,21 +628,21 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					426C6EE40B1DD222E4C6D3B9 = {
-						DevelopmentTeam = PV3W52NDZ3;
+						DevelopmentTeam = 84M4ZF255G;
 						ProvisioningStyle = Automatic;
 					};
 					7753FDCBBDB77346A54BDEFC = {
-						DevelopmentTeam = PV3W52NDZ3;
+						DevelopmentTeam = 84M4ZF255G;
 					};
 					7D99ADACA8F4377D63E996E2 = {
-						DevelopmentTeam = PV3W52NDZ3;
+						DevelopmentTeam = 84M4ZF255G;
 					};
 					D512C549A59A501AD83404A2 = {
-						DevelopmentTeam = PV3W52NDZ3;
+						DevelopmentTeam = 84M4ZF255G;
 						ProvisioningStyle = Automatic;
 					};
 					EC24EBE7C40603ED435970EA = {
-						DevelopmentTeam = PV3W52NDZ3;
+						DevelopmentTeam = 84M4ZF255G;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -875,7 +875,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 47;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = PV3W52NDZ3;
+				DEVELOPMENT_TEAM = 84M4ZF255G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -918,7 +918,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.fileprovider;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -936,7 +936,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay;
 				PRODUCT_NAME = "Image Relay";
 				SDKROOT = macosx;
 			};
@@ -978,7 +978,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 47;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = PV3W52NDZ3;
+				DEVELOPMENT_TEAM = 84M4ZF255G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1016,8 +1016,8 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider";
-				PROVISIONING_PROFILE_SPECIFIER = "ImageRelayClient FileProviderExtension Developer ID";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.fileprovider;
+				PROVISIONING_PROFILE_SPECIFIER = "Image Relay File Provider Active Developer ID";
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -1038,7 +1038,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.fileprovider.tests;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -1057,7 +1057,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.ios;
 				PRODUCT_NAME = "Image Relay";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -1081,7 +1081,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.fileprovider.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.fileprovider.tests;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -1100,7 +1100,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.ios;
 				PRODUCT_NAME = "Image Relay";
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
@@ -1120,7 +1120,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios.fileprovider";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.ios.fileprovider;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1139,7 +1139,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client.ios.fileprovider";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay.ios.fileprovider;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1161,9 +1161,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.oliverames.imagerelay-client";
+				PRODUCT_BUNDLE_IDENTIFIER = com.amesconsulting.imagerelay;
 				PRODUCT_NAME = "Image Relay";
-				PROVISIONING_PROFILE_SPECIFIER = "ImageRelayClient Developer ID";
+				PROVISIONING_PROFILE_SPECIFIER = "Image Relay Active Developer ID";
 				SDKROOT = macosx;
 			};
 			name = Release;

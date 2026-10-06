@@ -20,12 +20,12 @@ public struct KeychainStoreError: LocalizedError, Sendable {
 /// signing won't authorise an arbitrary group on device).
 public enum KeychainStore {
     #if os(macOS)
-    public static let sharedAccessGroup = "PV3W52NDZ3.com.oliverames.imagerelay-client"
+    public static let sharedAccessGroup = "84M4ZF255G.com.amesconsulting.imagerelay"
     #else
-    public static let sharedAccessGroup = "PV3W52NDZ3.com.oliverames.imagerelay-client.ios"
+    public static let sharedAccessGroup = "84M4ZF255G.com.amesconsulting.imagerelay.ios"
     #endif
 
-    private static let service = "com.oliverames.imagerelay-client"
+    private static let service = "com.amesconsulting.imagerelay"
 
     // Thread-safe in-memory storage fallback for unit testing to prevent Keychain popup storms
     private static let testLock = NSRecursiveLock()

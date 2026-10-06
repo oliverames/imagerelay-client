@@ -8,7 +8,7 @@ import os.log
 /// after the user changes their API key just signals enumeration.
 @Observable @MainActor
 final class FileProviderDomainController {
-    static let identifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.ios.domain")
+    static let identifier = NSFileProviderDomainIdentifier("com.amesconsulting.imagerelay.ios.domain")
     static let displayName = "Image Relay"
 
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client.ios", category: "FileProviderDomain")

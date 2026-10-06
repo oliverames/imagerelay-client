@@ -34,7 +34,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.refresh</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.refresh</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Refresh from Image Relay</string>
 			</dict>
@@ -42,7 +42,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-public-link</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-public-link</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Public Link</string>
 			</dict>
@@ -50,7 +50,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-download-link</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-download-link</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Download Link</string>
 			</dict>
@@ -58,7 +58,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-id</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-id</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Image Relay ID</string>
 			</dict>
@@ -66,7 +66,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-folder-share-link</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Folder Share Link</string>
 			</dict>
@@ -74,7 +74,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-metadata</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-metadata</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Metadata</string>
 			</dict>
@@ -82,7 +82,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-diagnostics</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Diagnostic Info</string>
 			</dict>
@@ -90,7 +90,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.copy-long-lived-link</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Copy Long-Lived Public Link</string>
 			</dict>
@@ -98,7 +98,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.export-qr</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.export-qr</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Export Public Link as QR Code</string>
 			</dict>
@@ -106,7 +106,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.new-mail-link</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.new-mail-link</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>New Mail with Public Link</string>
 			</dict>
@@ -114,7 +114,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.force-redownload</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.force-redownload</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Force Re-download</string>
 			</dict>
@@ -122,7 +122,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.edit-metadata</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.edit-metadata</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Edit Metadata in Image Relay…</string>
 			</dict>
@@ -130,7 +130,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.add-to-folders</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.add-to-folders</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Add to Folders…</string>
 			</dict>
@@ -138,7 +138,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.add-to-collection</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.add-to-collection</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Add to Collection…</string>
 			</dict>
@@ -146,7 +146,7 @@
 				<key>NSExtensionFileProviderActionActivationRule</key>
 				<string>TRUEPREDICATE</string>
 				<key>NSExtensionFileProviderActionIdentifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.action.open-folder-in-web</string>
 				<key>NSExtensionFileProviderActionName</key>
 				<string>Open Folder in Image Relay Web</string>
 			</dict>
@@ -154,7 +154,7 @@
 		<key>NSExtensionFileProviderAllowsUserControlledEviction</key>
 		<true/>
 		<key>NSExtensionFileProviderDocumentGroup</key>
-		<string>$(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client</string>
+		<string>group.com.amesconsulting.imagerelay</string>
 		<key>NSExtensionFileProviderDownloadPipelineDepth</key>
 		<integer>4</integer>
 		<key>NSExtensionFileProviderMetadataOnlyUploadPipelineDepth</key>
@@ -173,7 +173,7 @@
 				<key>Category</key>
 				<string>Sharing</string>
 				<key>Identifier</key>
-				<string>com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention</string>
+				<string>com.amesconsulting.imagerelay.fileprovider.decoration.needs-attention</string>
 				<key>Label</key>
 				<string>Needs attention</string>
 			</dict>

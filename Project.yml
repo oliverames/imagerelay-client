@@ -4,7 +4,7 @@ options:
   deploymentTarget:
     macOS: "26.0"
     iOS: "18.0"
-  bundleIdPrefix: com.oliverames
+  bundleIdPrefix: com.amesconsulting
   groupSortPosition: top
 
 packages:
@@ -17,7 +17,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: PV3W52NDZ3
+    DEVELOPMENT_TEAM: 84M4ZF255G
     MARKETING_VERSION: "1.4.4"
     CURRENT_PROJECT_VERSION: "47"
     ENABLE_HARDENED_RUNTIME: YES
@@ -71,16 +71,16 @@ targets:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         com.apple.security.application-groups:
-          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          - group.com.amesconsulting.imagerelay
         com.apple.security.scripting-targets:
           com.apple.finder:
             - com.apple.finder.idle
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+          - $(AppIdentifierPrefix)com.amesconsulting.imagerelay
     settings:
       base:
         PRODUCT_NAME: "Image Relay"
-        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client
+        PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: ImageRelayClient/Info.plist
@@ -89,7 +89,7 @@ targets:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
-          PROVISIONING_PROFILE_SPECIFIER: "ImageRelayClient Developer ID"
+          PROVISIONING_PROFILE_SPECIFIER: "Image Relay Active Developer ID"
 
   FileProviderExtension:
     type: app-extension
@@ -104,14 +104,14 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.application-groups:
-          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          - group.com.amesconsulting.imagerelay
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client
+          - $(AppIdentifierPrefix)com.amesconsulting.imagerelay
     info:
       path: FileProviderExtension/Info.plist
       properties:
         NSExtension:
-          NSExtensionFileProviderDocumentGroup: $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          NSExtensionFileProviderDocumentGroup: group.com.amesconsulting.imagerelay
           NSExtensionFileProviderSupportsEnumeration: true
           NSExtensionFileProviderUploadPipelineDepth: 4
           NSExtensionFileProviderDownloadPipelineDepth: 4
@@ -120,53 +120,53 @@ targets:
           NSExtensionPointIdentifier: com.apple.fileprovider-nonui
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).Extension
           NSExtensionFileProviderActions:
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.refresh
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.refresh
               NSExtensionFileProviderActionName: Refresh from Image Relay
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-public-link
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-public-link
               NSExtensionFileProviderActionName: Copy Public Link
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-download-link
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-download-link
               NSExtensionFileProviderActionName: Copy Download Link
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-id
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-id
               NSExtensionFileProviderActionName: Copy Image Relay ID
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-folder-share-link
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-folder-share-link
               NSExtensionFileProviderActionName: Copy Folder Share Link
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-metadata
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-metadata
               NSExtensionFileProviderActionName: Copy Metadata
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-diagnostics
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-diagnostics
               NSExtensionFileProviderActionName: Copy Diagnostic Info
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.copy-long-lived-link
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.copy-long-lived-link
               NSExtensionFileProviderActionName: Copy Long-Lived Public Link
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.export-qr
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.export-qr
               NSExtensionFileProviderActionName: Export Public Link as QR Code
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.new-mail-link
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.new-mail-link
               NSExtensionFileProviderActionName: New Mail with Public Link
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.force-redownload
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.force-redownload
               NSExtensionFileProviderActionName: Force Re-download
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.edit-metadata
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.edit-metadata
               NSExtensionFileProviderActionName: Edit Metadata in Image Relay…
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.add-to-folders
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.add-to-folders
               NSExtensionFileProviderActionName: "Add to Folders…"
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.add-to-collection
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.add-to-collection
               NSExtensionFileProviderActionName: Add to Collection…
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
-            - NSExtensionFileProviderActionIdentifier: com.oliverames.imagerelay-client.fileprovider.action.open-folder-in-web
+            - NSExtensionFileProviderActionIdentifier: com.amesconsulting.imagerelay.fileprovider.action.open-folder-in-web
               NSExtensionFileProviderActionName: Open Folder in Image Relay Web
               NSExtensionFileProviderActionActivationRule: TRUEPREDICATE
           NSFileProviderDecorations:
-            - Identifier: com.oliverames.imagerelay-client.fileprovider.decoration.needs-attention
+            - Identifier: com.amesconsulting.imagerelay.fileprovider.decoration.needs-attention
               Label: Needs attention
               Category: Sharing
         CFBundleIcons:
@@ -176,13 +176,13 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.fileprovider
+        PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.fileprovider
         MACOSX_DEPLOYMENT_TARGET: "26.0"
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
-          PROVISIONING_PROFILE_SPECIFIER: "ImageRelayClient FileProviderExtension Developer ID"
+          PROVISIONING_PROFILE_SPECIFIER: "Image Relay File Provider Active Developer ID"
 
   FileProviderExtensionTests:
     # Standalone unit-test bundle for FileProviderExtension classes. We compile
@@ -203,7 +203,7 @@ targets:
       - package: ImageRelayKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.fileprovider.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.fileprovider.tests
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic
@@ -229,9 +229,9 @@ targets:
       path: ImageRelayClientiOS/ImageRelayClientiOS.entitlements
       properties:
         com.apple.security.application-groups:
-          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          - group.com.amesconsulting.imagerelay
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client.ios
+          - $(AppIdentifierPrefix)com.amesconsulting.imagerelay.ios
     info:
       path: ImageRelayClientiOS/Info.plist
       properties:
@@ -252,7 +252,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: "Image Relay"
-        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.ios
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
@@ -274,14 +274,14 @@ targets:
       path: FileProviderExtensioniOS/FileProviderExtensioniOS.entitlements
       properties:
         com.apple.security.application-groups:
-          - $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          - group.com.amesconsulting.imagerelay
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.oliverames.imagerelay-client.ios
+          - $(AppIdentifierPrefix)com.amesconsulting.imagerelay.ios
     info:
       path: FileProviderExtensioniOS/Info.plist
       properties:
         NSExtension:
-          NSExtensionFileProviderDocumentGroup: $(TeamIdentifierPrefix)group.com.oliverames.imagerelay-client
+          NSExtensionFileProviderDocumentGroup: group.com.amesconsulting.imagerelay
           NSExtensionFileProviderSupportsEnumeration: true
           NSExtensionFileProviderSupportsPickingFolders: true
           NSExtensionPointIdentifier: com.apple.fileprovider-nonui
@@ -291,7 +291,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.oliverames.imagerelay-client.ios.fileprovider
+        PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.ios.fileprovider
         IPHONEOS_DEPLOYMENT_TARGET: "18.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO

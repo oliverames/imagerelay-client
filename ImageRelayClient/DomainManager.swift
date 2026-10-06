@@ -7,7 +7,7 @@ import os.log
 final class DomainManager {
     private let logger = Logger(subsystem: "com.oliverames.imagerelay-client", category: "DomainManager")
     static let appGroupIdentifier = AppConfiguration.appGroupIdentifier
-    static let domainIdentifier = NSFileProviderDomainIdentifier("com.oliverames.imagerelay-client.domain")
+    static let domainIdentifier = NSFileProviderDomainIdentifier("com.amesconsulting.imagerelay.domain")
     static let domainDisplayName = "Image Relay"
     private static let fileProviderDomainSchemaVersion = 2
     private static let domainSchemaVersionFilename = "file-provider-domain-schema-version"

@@ -35,14 +35,14 @@ class BundleProfileSpec:
 
 SPECS = (
     BundleProfileSpec(
-        bundle_identifier="com.oliverames.imagerelay-client",
+        bundle_identifier="com.amesconsulting.imagerelay",
         bundle_name="ImageRelayClient",
-        profile_name="ImageRelayClient Developer ID",
+        profile_name="Image Relay Active Developer ID",
     ),
     BundleProfileSpec(
-        bundle_identifier="com.oliverames.imagerelay-client.fileprovider",
+        bundle_identifier="com.amesconsulting.imagerelay.fileprovider",
         bundle_name="ImageRelayClient FileProviderExtension",
-        profile_name="ImageRelayClient FileProviderExtension Developer ID",
+        profile_name="Image Relay File Provider Active Developer ID",
     ),
 )
 

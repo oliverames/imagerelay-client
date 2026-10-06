@@ -19,7 +19,7 @@ final class MetadataEditingService {
     )
     private let appGroupIdentifier = AppConfiguration.appGroupIdentifier
     private let domainIdentifier = NSFileProviderDomainIdentifier(
-        "com.oliverames.imagerelay-client.domain"
+        "com.amesconsulting.imagerelay.domain"
     )
 
     enum ServiceError: LocalizedError {

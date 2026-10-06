@@ -5,12 +5,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/ImageRelayClient.xcodeproj"
 SCHEME="ImageRelayClient"
-TEAM_ID="PV3W52NDZ3"
-APP_BUNDLE_ID="com.oliverames.imagerelay-client"
-APPEX_BUNDLE_ID="com.oliverames.imagerelay-client.fileprovider"
-DMG_SIGNING_ID="com.oliverames.imagerelay-client.dmg"
-APP_PROFILE_NAME="ImageRelayClient Developer ID"
-APPEX_PROFILE_NAME="ImageRelayClient FileProviderExtension Developer ID"
+TEAM_ID="84M4ZF255G"
+APP_BUNDLE_ID="com.amesconsulting.imagerelay"
+APPEX_BUNDLE_ID="com.amesconsulting.imagerelay.fileprovider"
+DMG_SIGNING_ID="com.amesconsulting.imagerelay.dmg"
+APP_PROFILE_NAME="Image Relay Active Developer ID"
+APPEX_PROFILE_NAME="Image Relay File Provider Active Developer ID"
 APP_BUNDLE_NAME="Image Relay.app"
 LEGACY_APP_BUNDLE_NAME="ImageRelayClient.app"
 APP_EXECUTABLE_NAME="Image Relay"
@@ -285,9 +285,9 @@ PY
 }
 
 echo "Fetching App Store Connect key from 1Password..."
-op document get --vault Development 'App Store Connect AuthKey (.p8)' --out-file "$KEY_PATH" >/dev/null
-ASC_KEY_ID="$(op read 'op://Development/App Store Connect API Key/credential')"
-ASC_ISSUER_ID="$(op read 'op://Development/App Store Connect API Key/Issuer ID')"
+op document get --vault Development 'q3g76ptnkk3xwyl65asrzaeptq' --out-file "$KEY_PATH" >/dev/null
+ASC_KEY_ID="$(op read 'op://Development/pz7y5i5laaavzo6akfa52sb7ky/credential')"
+ASC_ISSUER_ID="$(op read 'op://Development/pz7y5i5laaavzo6akfa52sb7ky/Issuer ID')"
 ASC_PROFILE_INSTALL_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
 
 echo "Ensuring Developer ID bundle IDs and provisioning profiles exist..."
@@ -435,7 +435,7 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   LEGACY_APP_PROCESS_PATTERN='/Applications/ImageRelayClient.app/Contents/MacOS/ImageRelayClient'
 
   if pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1 || pgrep -f "$LEGACY_APP_PROCESS_PATTERN" >/dev/null 2>&1; then
-    osascript -e 'tell application id "com.oliverames.imagerelay-client" to quit' >/dev/null 2>&1 || true
+    osascript -e 'tell application id "com.amesconsulting.imagerelay" to quit' >/dev/null 2>&1 || true
     for _ in {1..10}; do
       if ! pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1 && ! pgrep -f "$LEGACY_APP_PROCESS_PATTERN" >/dev/null 2>&1; then
         break
@@ -507,7 +507,7 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
     local fileprovider_log
     fileprovider_log="$(/usr/bin/log show --start "$SMOKE_LOG_START" --style compact \
       --predicate 'process == "fileproviderd"' 2>/dev/null || true)"
-    grep -Eq 'com\.oliverames\.imagerelay-client\.fileprovider.*(began providing|fetch-event-stream|new enumerator|done executing|providing)' <<<"$fileprovider_log"
+    grep -Eq 'com\.amesconsulting\.imagerelay\.fileprovider.*(began providing|fetch-event-stream|new enumerator|done executing|providing)' <<<"$fileprovider_log"
   }
 
   SMOKE_LOG_START="$(date '+%Y-%m-%d %H:%M:%S')"
@@ -527,7 +527,7 @@ if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
 
   if ! has_file_provider_launch_evidence; then
     echo "File Provider extension process was not long-lived after normal launch; exercising clean-domain smoke path..."
-    osascript -e 'tell application id "com.oliverames.imagerelay-client" to quit' >/dev/null 2>&1 || true
+    osascript -e 'tell application id "com.amesconsulting.imagerelay" to quit' >/dev/null 2>&1 || true
     for _ in {1..10}; do
       if ! pgrep -f "$APP_PROCESS_PATTERN" >/dev/null 2>&1; then
         break

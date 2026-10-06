@@ -4,10 +4,10 @@ public struct AppConfiguration: Codable, Sendable {
     private static let fallbackAppVersion = "1.4.0"
     public static let userAgentContactURL = "https://github.com/oliverames/imagerelay-client"
     private static let versionedBundleIdentifiers: Set<String> = [
-        "com.oliverames.imagerelay-client",
-        "com.oliverames.imagerelay-client.fileprovider",
-        "com.oliverames.imagerelay-client.ios",
-        "com.oliverames.imagerelay-client.ios.fileprovider"
+        "com.amesconsulting.imagerelay",
+        "com.amesconsulting.imagerelay.fileprovider",
+        "com.amesconsulting.imagerelay.ios",
+        "com.amesconsulting.imagerelay.ios.fileprovider"
     ]
 
     private static var currentAppVersion: String {
@@ -655,7 +655,7 @@ public struct AppConfiguration: Codable, Sendable {
     // MARK: - App Group
 
     /// Shared app group identifier used by both the host app and File Provider extension.
-    public static let appGroupIdentifier = "PV3W52NDZ3.group.com.oliverames.imagerelay-client"
+    public static let appGroupIdentifier = "group.com.amesconsulting.imagerelay"
 
     /// Default Image Relay API endpoint shared by the hosts and setup flows.
     public static let defaultBaseURL = URL(string: "https://api.imagerelay.com/api/v2")!
