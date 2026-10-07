@@ -209,6 +209,12 @@ scripts/build-developer-id-release.sh --version 1.4.4 --smoke-install
 
 Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). Please include a diagnostics export when reporting sync behavior; see [Contributing](CONTRIBUTING.md), [Support](SUPPORT.md), [Privacy](PRIVACY.md), [Security](SECURITY.md), and the [release testing checklist](RELEASE_TESTING.md) for what is collected and redacted.
 
+## Linear release reporting
+
+See [Release Reporting](Release%20Reporting.md) for the delivery checks, scoped
+credential reference, AME commit references, and reporting-only retries. Linear
+records a verified delivery after the existing publisher completes.
+
 ## License and trademarks
 
 The source code is available under the [MIT License](LICENSE). Image Relay and its logos are trademarks of Canto, Inc. Those names and marks are not included in the MIT license. This independent project is not affiliated with, endorsed by, or sponsored by Canto or Image Relay.
