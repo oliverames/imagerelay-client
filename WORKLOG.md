@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-10-07 - GitHub Issue Review Closeout
+
+**What changed**: Reviewed all 4 open issues against source at `cb47f7933984` and their complete issue history. No issue qualified for closure.
+
+**Decisions made**: Close completed implementations even when device acceptance remains, and close testing-only tasks under Oliver's explicit instruction. Keep unresolved defects, missing implementation, release work, and owner decisions open.
+
+**Left off at**: Resolved this session: issue assignment and state reconciliation. GitHub was independently re-read on October 7, 2026 at 10:20 AM EDT. All 25 repository issues include Oliver as an assignee, with 4 open. Source paths and cited lines were checked. No runtime tests, deployment, or application changes were performed. This is one part of the account-wide review.
+
+**Open questions**: Still open: [#33](https://github.com/oliverames/imagerelay-client/issues/33), [#35](https://github.com/oliverames/imagerelay-client/issues/35), [#36](https://github.com/oliverames/imagerelay-client/issues/36), [#38](https://github.com/oliverames/imagerelay-client/issues/38). Other previously recorded operational follow-ups retain their dated status. No new issue was needed for this review.
+
+---
+
 ## 2026-10-07 - README Refresh Closeout
 
 **What changed**: Corrects build requirements, transfer behavior, and read-only iOS extension scope.
