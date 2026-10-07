@@ -229,3 +229,9 @@ The source code is available under the [MIT License](LICENSE). Image Relay and i
     &bull; <a href="https://bsky.app/profile/oliverames.bsky.social">Bluesky</a>
   </sub>
 </p>
+
+## Linear release reporting
+
+See [Release Reporting](Release%20Reporting.md) for the delivery checks, scoped
+credential reference, AME commit references, and reporting-only retries. Linear
+records a verified delivery after the existing publisher completes.
