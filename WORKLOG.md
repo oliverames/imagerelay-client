@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-10-07 - Account Migration Closeout
+
+**What changed**: Recorded migration status as of October 6 at `03cd8af`. Four app/File Provider identities, approved shared access, profiles, fresh domain configuration and record `6819812564` named Image Relay Client completed. Dependency download failures resolved. Signed Mac/iOS exports, all extension/code-object checks, Mac notarization, ticket, Gatekeeper and fresh Mac installation completed.
+
+**Decisions made**: Fresh settings are approved. Oliver must verify the candidate before release, feed publication or customer cutover. Further automated app suites are waived. Related Ping Warden and Skylight Bridge migrations are paused.
+
+**Left off at**: Configuration and local packaging are complete. This checkout was clean and matched its locally recorded upstream before this documentation entry. No app, build or release ran during closeout.
+
+**Open questions**: Still open in [#38](https://github.com/oliverames/imagerelay-client/issues/38): Complete iOS processing and acceptance using a deliberately selected synthetic account/library. Verify authentication, fresh File Provider domains, callback routing and updater delivery. Do not unregister existing domains or disturb pending writes. Credential rotation remains open until its active path is verified. Unrelated open worklog items retain their existing status.
+
+---
+
 ## 2026-08-26 - 1.4.4 release (build 47)
 
 **What changed**: Cut and published `1.4.4` / build `47`, the stability release carrying the 2026-08-25 adversarial-review fixes plus the single-file-type upload auto-resolution, the GitHub Actions runtime updates, and the public-release hardening from 2026-07-13. Bumped `MARKETING_VERSION` to `1.4.4` and `CURRENT_PROJECT_VERSION` to `47`, regenerated the Xcode project, and corrected a stale documented test count (299) to the real 311 across the three instruction mirrors and the README.
