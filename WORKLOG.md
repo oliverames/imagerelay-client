@@ -1,5 +1,17 @@
 # Worklog
 
+## 2026-10-07 - README Refresh Closeout
+
+**What changed**: Corrects build requirements, transfer behavior, and read-only iOS extension scope.
+
+**Decisions made**: Keep setup and status claims tied to current source or explicitly dated evidence. This entry records the multi-repository README maintenance session.
+
+**Left off at**: Resolved this session: README review and publication at `cb47f79`. Relative links, examples and applicable counts were checked. Verification covered documentation. No fresh runtime acceptance is claimed.
+
+**Open questions**: No new question from the README refresh. Prior iOS, File Provider, callback and credential-rotation acceptance in [#38](https://github.com/oliverames/imagerelay-client/issues/38) was not revalidated.
+
+---
+
 ## 2026-10-07 - Account Migration Closeout
 
 **What changed**: Recorded migration status as of October 6 at `03cd8af`. Four app/File Provider identities, approved shared access, profiles, fresh domain configuration and record `6819812564` named Image Relay Client completed. Dependency download failures resolved. Signed Mac/iOS exports, all extension/code-object checks, Mac notarization, ticket, Gatekeeper and fresh Mac installation completed.
