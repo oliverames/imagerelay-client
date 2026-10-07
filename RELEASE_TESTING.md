@@ -167,3 +167,7 @@ Use this checklist with a signed release build from GitHub Releases, not a local
   inside `Test Library`, then clean it up manually.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
+
+## Linear release reporting
+
+See [Release Reporting](Release%20Reporting.md) for verified delivery gates, credentials, dry runs, and reporting-only retries.

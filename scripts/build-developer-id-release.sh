@@ -282,6 +282,10 @@ xml = f'''<?xml version="1.0" encoding="utf-8"?>
 '''
 pathlib.Path(appcast_path).write_text(xml)
 PY
+  # Feed signatures protect metadata as well as the update archive. Reuse the
+  # existing temporary signing key without exposing its value in arguments.
+  "$sign_update_tool" --ed-key-file "$SPARKLE_KEY_PATH" --disable-signing-warning "$appcast_path"
+  "$sign_update_tool" --verify --ed-key-file "$SPARKLE_KEY_PATH" "$appcast_path"
 }
 
 echo "Fetching App Store Connect key from 1Password..."
@@ -426,6 +430,17 @@ spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH" 2
 
 echo "Generating Sparkle appcast..."
 write_appcast "$DMG_PATH" "$APPCAST_PATH"
+python3 - "$ROOT_DIR" "$VERSION" "$ARTIFACT_DIR" <<'PYVERIFY'
+import importlib.util
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "scripts"))
+spec = importlib.util.spec_from_file_location("publisher", root / "scripts/publish-release.py")
+publisher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(publisher)
+publisher.validate_artifacts(sys.argv[2], Path(sys.argv[3]))
+PYVERIFY
 
 if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   echo "Running smoke install from notarized DMG..."
@@ -579,7 +594,7 @@ fi
 CASK_UPDATED=0
 if is_prerelease_version "$VERSION"; then
   echo "Skipping Cask update for pre-release version: $VERSION"
-  echo "(Pre-releases are distributed via Sparkle appcast, not Homebrew.)"
+  echo "(Publish prereleases as GitHub downloads; the stable Sparkle feed and Homebrew remain unchanged.)"
 elif [[ -x "$ROOT_DIR/scripts/update-cask.sh" ]]; then
   if "$ROOT_DIR/scripts/update-cask.sh" --version "$VERSION" --dmg "$DMG_PATH"; then
     CASK_UPDATED=1
@@ -604,3 +619,7 @@ Casks/image-relay.rb updated for this stable release. Commit it and run
 scripts/sync-cask-to-tap.sh to publish to the public Homebrew tap.
 EOF
 fi
+
+# Packaging does not mean delivery. Publication and Linear reporting are explicit.
+echo "Publish the prepared artifacts with scripts/publish-release.py after pushing the built source tag."
+echo "Use scripts/report_linear_release.py only to retry reporting an already delivered release."
