@@ -205,6 +205,10 @@ scripts/build-developer-id-release.sh --version 1.4.4 --smoke-install
 - **Multi-folder assets** appear independently in each folder. On macOS, the existing local file keeps its identity and additional appearances are read-only for Finder content changes and renaming. Explicit shared-asset actions, including Edit Metadata in Image Relay, remain available and affect every appearance. Finder’s **Add to Folders…** action adds selected assets, including completed uploads, to more folders without removing existing memberships. iOS remains read-only. Removing or moving a file membership must be done in Image Relay’s web app because the API does not document a safe conditional removal operation. The client does not delete the global asset as a substitute.
 - **File rename cost** can be higher than a metadata-only rename. Image Relay exposes file names through version completion, so a Finder rename uploads the current bytes as a new version while preserving the remote file ID.
 
+## Project history and follow-ups
+
+[WORKLOG](WORKLOG.md) keeps the current follow-ups and links the complete dated implementation and release archive. Its status summary distinguishes source changes from runtime and distribution acceptance.
+
 ## Contributing & Issues
 
 Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/oliverames/imagerelay-client/issues). Please include a diagnostics export when reporting sync behavior; see [Contributing](CONTRIBUTING.md), [Support](SUPPORT.md), [Privacy](PRIVACY.md), [Security](SECURITY.md), and the [release testing checklist](RELEASE_TESTING.md) for what is collected and redacted.
