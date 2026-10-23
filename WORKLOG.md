@@ -33,6 +33,15 @@ The archive preserves an old machine-local memory link that is unavailable in th
 
 Add dated outcomes here with source, verification and remaining limits. Keep historical release receipts and failed attempts intact.
 
+### 2026-10-23 - Security and cleanup review
+
+- The macOS `Info.plist` now sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction`, matching Ping Warden and Skylight Bridge. The release script has signed the whole appcast since October 7 and `publish-release.py` verifies it against the shipped key, so enforcement starts with the next build made from this source. The local `build/releases/1.4.5` app predates the change. The published 1.4.4 feed is unsigned, which is harmless because 1.4.4 does not enforce signing.
+- An OAuth callback no longer passes the state check when no sign-in is pending; a missing callback state used to equal the cleared stored state.
+- `FinderSelectionReader` no longer traps on an empty Finder selection (`1...0`).
+- Removed unused code: the file-move wait helper and its error case, `MoveRequest`, the unused permission-group decoder, the folder-move record writers that only clone-based moves used, and two unused script imports. CI now skips documentation, cask and Worker-only changes.
+- Flagged, not changed: Finder's scripting definition has no `com.apple.finder.idle` access group, and the signed 1.4.4 app lacks `com.apple.security.automation.apple-events` and `NSAppleEventsUsageDescription`. Reading the Finder selection therefore probably never succeeds, and Edit Metadata falls back to the file picker. A fix needs an entitlement decision and a signed runtime test.
+- Verification: unsigned macOS `xcodebuild build` succeeded; `swift test` in ImageRelayKit passed 243 tests in 25 suites; the release-script unit tests passed. The update path, OAuth sign-in and Finder selection were not exercised at runtime.
+
 <details>
 <summary>Historical section links</summary>
 
