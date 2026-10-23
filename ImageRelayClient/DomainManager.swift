@@ -636,7 +636,10 @@ final class DomainManager {
 
         let configURL = AppConfiguration.fileURL(in: container)
         var config = (try? AppConfiguration.load(from: configURL)) ?? .default
-        guard callback.state == config.oauthState else {
+        // A callback with no state must not match a config with no pending
+        // login: nil == nil would let any opened callback URL sign this Mac
+        // into whichever account issued the code.
+        guard let expectedState = config.oauthState, callback.state == expectedState else {
             config.oauthCodeVerifier = nil
             config.oauthState = nil
             try? config.save(to: configURL)
