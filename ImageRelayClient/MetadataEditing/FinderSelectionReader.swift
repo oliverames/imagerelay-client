@@ -69,7 +69,8 @@ struct FinderSelectionReader {
         }
 
         var urls: [URL] = []
-        for index in 1...max(descriptor.numberOfItems, 0) {
+        // An empty selection returns an empty list; `1...0` would trap.
+        for index in stride(from: 1, through: descriptor.numberOfItems, by: 1) {
             guard let item = descriptor.atIndex(index) else { continue }
             guard let path = item.stringValue, !path.isEmpty else { continue }
             urls.append(URL(fileURLWithPath: path))
