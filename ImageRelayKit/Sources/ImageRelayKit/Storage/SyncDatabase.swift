@@ -1196,32 +1196,9 @@ public final class SyncDatabase: Sendable {
 
     // MARK: - Folder Move Crash Tracking
 
-    /// Records that a folder move is in progress, so a crash recovery check on the next
-    /// extension init can detect and warn about a potentially orphaned folder.
-    public func recordFolderMoveInProgress(originalID: Int, newID: Int) throws {
-        let payload = FolderMovePayload(originalID: originalID, newID: newID, startedAt: Date())
-        let data = try Self.folderMoveEncoder.encode(payload)
-        let json = String(decoding: data, as: UTF8.self)
-        try writer.write { db in
-            try db.execute(
-                sql: """
-                INSERT INTO settings (key, value)
-                VALUES ('folder_move_in_progress', ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                """,
-                arguments: [json]
-            )
-        }
-    }
-
-    /// Clears the in-progress move record after a successful folder move.
-    public func clearFolderMoveInProgress() throws {
-        try writer.write { db in
-            try db.execute(
-                sql: "DELETE FROM settings WHERE key = 'folder_move_in_progress'"
-            )
-        }
-    }
+    // Only the clone-based folder moves of older betas wrote this record.
+    // Current moves update the folder in place, so the extension just warns
+    // when an interrupted old move left one behind.
 
     /// Returns the in-progress move payload if one was left behind (e.g. after a crash),
     /// or nil if no move was in progress. Callers should log a warning if non-nil.
@@ -1237,14 +1214,8 @@ public final class SyncDatabase: Sendable {
         return try? Self.folderMoveDecoder.decode(FolderMovePayload.self, from: data)
     }
 
-    // The encoder/decoder use `.secondsSince1970` so payloads remain wire-compatible
-    // with the previous hand-rolled JSON ({"startedAt": <unix epoch seconds>}).
-    private static let folderMoveEncoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .secondsSince1970
-        return e
-    }()
-
+    // `.secondsSince1970` matches the hand-rolled JSON older betas wrote
+    // ({"startedAt": <unix epoch seconds>}).
     private static let folderMoveDecoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .secondsSince1970

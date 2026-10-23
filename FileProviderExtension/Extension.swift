@@ -2033,21 +2033,6 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
         throw ExtensionError.remoteDeleteNotConfirmed
     }
 
-    private func waitForRemoteFileAbsent(remoteID: Int, parentFolderID: Int) async throws {
-        let maxAttempts = 24
-        for attempt in 1...maxAttempts {
-            if try await remoteFile(remoteID: remoteID, parentFolderID: parentFolderID) == nil {
-                return
-            }
-
-            guard attempt < maxAttempts else { break }
-            logger.debug("Waiting for remote file \(remoteID, privacy: .public) to leave folder \(parentFolderID, privacy: .public)")
-            try await Task.sleep(for: .seconds(5))
-        }
-
-        throw ExtensionError.remoteMoveNotConfirmed
-    }
-
     @discardableResult
     private func waitForRemoteFolder(
         remoteID: Int,
@@ -2600,10 +2585,6 @@ struct UpdateFolderRequest: Encodable, Sendable {
     let parent_id: Int
 }
 
-private struct MoveRequest: Encodable, Sendable {
-    let folder_ids: [String]
-}
-
 private enum ExtensionError: LocalizedError {
     case missingRootFolderID
     case invalidParentIdentifier(String)
@@ -2614,7 +2595,6 @@ private enum ExtensionError: LocalizedError {
     case versionMissingUUID
     case remoteDeleteNotConfirmed
     case remoteFolderNotConfirmed
-    case remoteMoveNotConfirmed
     case remoteVersionNotConfirmed
 
     var errorDescription: String? {
@@ -2637,8 +2617,6 @@ private enum ExtensionError: LocalizedError {
             return "Image Relay still listed the file after several delete attempts. Try again after processing finishes."
         case .remoteFolderNotConfirmed:
             return "Image Relay did not report the folder change in the folder listing before the sync timeout."
-        case .remoteMoveNotConfirmed:
-            return "Image Relay did not report the file move in the folder listing before the sync timeout."
         case .remoteVersionNotConfirmed:
             return "Image Relay did not report the uploaded version in the folder listing before the sync timeout."
         }

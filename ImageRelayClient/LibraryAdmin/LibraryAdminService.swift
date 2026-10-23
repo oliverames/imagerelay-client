@@ -345,25 +345,6 @@ final class LibraryAdminService {
         enum CodingKeys: String, CodingKey { case folderLink = "folder_link" }
     }
 
-    /// Accepts either `{"permission_groups": [...]}` or a bare `[...]`.
-    /// Permission groups are small enough we don't bother with pagination here.
-    /// The bare-array decode in the fallback branch throws on failure so a
-    /// schema mismatch surfaces as an error instead of an empty list.
-    private struct PermissionGroupListResponse: Decodable, Sendable {
-        let values: [PermissionGroup]
-
-        init(from decoder: any Decoder) throws {
-            if let c = try? decoder.container(keyedBy: CodingKeys.self),
-               let array = try c.decodeIfPresent([PermissionGroup].self, forKey: .permissionGroups) {
-                values = array
-                return
-            }
-            values = try [PermissionGroup](from: decoder)
-        }
-
-        enum CodingKeys: String, CodingKey { case permissionGroups = "permission_groups" }
-    }
-
     /// Accepts either `{"users": [...]}` or a bare `[...]` so `searchUsers`
     /// matches whichever envelope the server emits. Fallback decode throws on
     /// failure so the caller gets a real error rather than empty results.

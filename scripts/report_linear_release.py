@@ -5,7 +5,6 @@ Safe to rerun after a reporting failure. This command never publishes app files.
 --dry-run performs receiving checks but reads no Linear credential and writes no release.
 """
 import argparse
-import os
 from pathlib import Path
 import subprocess
 import sys
