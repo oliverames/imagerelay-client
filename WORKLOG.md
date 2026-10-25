@@ -42,6 +42,16 @@ Add dated outcomes here with source, verification and remaining limits. Keep his
 - Flagged, not changed: Finder's scripting definition has no `com.apple.finder.idle` access group, and the signed 1.4.4 app lacks `com.apple.security.automation.apple-events` and `NSAppleEventsUsageDescription`. Reading the Finder selection therefore probably never succeeds, and Edit Metadata falls back to the file picker. A fix needs an entitlement decision and a signed runtime test.
 - Verification: unsigned macOS `xcodebuild build` succeeded; `swift test` in ImageRelayKit passed 243 tests in 25 suites; the release-script unit tests passed. The update path, OAuth sign-in and Finder selection were not exercised at runtime.
 
+### 2026-10-25 - 1.4.5 release (build 48)
+
+- Published https://github.com/oliverames/imagerelay-client/releases/tag/v1.4.5 from tag `v1.4.5` at `316f3ee`. It is the first public build under `com.amesconsulting.imagerelay` (team 84M4ZF255G) and ships Sparkle 2.9.6 (closes #41). Settings from 1.4.4 do not carry over; users enter their API key again. DMG SHA-256 `82c1e8287d0438242a9d9128fed0b47965f3b8d475ffe669601ef45fa3adf56b`, 11,728,514 bytes. Oliver approved publishing to the stable feed on October 25.
+- Tests before the build: `scripts/run-release-candidate-checks.sh 1.4.5` passed with 243 ImageRelayKit tests (25 suites), 86 scheme tests (11 suites), and the unsigned macOS and iOS Simulator builds.
+- Notarization (1Password App Store Connect key) accepted the app (`56c93a02-81d7-40b4-a83f-202fa2bf20df`) and the DMG (`3a0cd4a9-13a6-4c27-a19b-1e5f950ee055`). The shipped feed is the first fully signed Image Relay appcast, so builds with `SURequireSignedFeed` can read it.
+- Verified from the published assets: the downloaded DMG and `releases/latest/download/appcast.xml` are byte-identical to the built files; `scripts/verify_sparkle.swift` confirmed the feed and DMG signatures against the shipped `SUPublicEDKey`. Installing the DMG payload to a scratch folder (not `/Applications`) showed 1.4.5 (48), `com.amesconsulting.imagerelay`, Sparkle 2.9.6, `codesign --verify --deep --strict` valid, `spctl` "Notarized Developer ID", `stapler validate` worked. The app was not launched. The runbook's `audit_sparkle_feeds.py` reports failure because it verifies against the default Keychain Sparkle key, while Image Relay's key lives in 1Password; this is a helper limitation, not a feed defect.
+- The DMG step needed repeated retries. `hdiutil create` failed with "Resource busy" on every attempt of three earlier runs, even with few simulators booted; a failed attempt can leave the DMG attached at `/Volumes/Image Relay`, which blocks every retry until `hdiutil detach` releases it. The script now retries the create step for up to an hour.
+- Not verified: the Sparkle update path from an installed 1.4.4 (different bundle ID and team) to 1.4.5, OAuth sign-in, and File Provider runtime behavior of the new identity. Watch for update-failure reports from 1.4.4 users; Homebrew is the fallback route.
+- Cask updated to 1.4.5 with uninstall and zap entries for the new identity, keeping the 1.4.4 paths, then synced to `oliverames/homebrew-tap`.
+
 <details>
 <summary>Historical section links</summary>
 
