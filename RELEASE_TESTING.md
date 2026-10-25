@@ -167,6 +167,9 @@ Use this checklist with a signed release build from GitHub Releases, not a local
   inside `Test Library`, then clean it up manually.
 - For packaging coverage, run `RUN_PACKAGE=1 scripts/run-release-candidate-checks.sh`.
 - Confirm the release artifact folder includes the notarized DMG, SHA-256 file, and `appcast.xml`.
+- For a stable release, `scripts/build-developer-id-release.sh` also updates `Casks/image-relay.rb` with the new version and DMG SHA-256. After the GitHub release is published, commit the cask, then run `scripts/sync-cask-to-tap.sh` to push it to `oliverames/homebrew-tap` (the cask downloads the published DMG, so syncing earlier would point Homebrew at a missing asset). This sync runs every stable release; skip it for pre-releases.
+- Verify the tap copy with `brew update`, `brew audit --cask --online --strict oliverames/tap/image-relay`, and `brew style --cask oliverames/tap/image-relay`. Do not install over a working app to test.
+- The cask's `uninstall` and `zap` stanzas still name the 1.4.4 identity (`com.oliverames.imagerelay-client`, team `PV3W52NDZ3`). The first release on the `com.amesconsulting.imagerelay` identity (1.4.5) must update them to the new bundle IDs, file provider, and `group.com.amesconsulting.imagerelay` group container before the sync, and keep the old paths in `zap` so users who upgrade from 1.4.4 are cleaned up too.
 
 ## Linear release reporting
 

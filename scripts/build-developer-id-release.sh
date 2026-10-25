@@ -615,8 +615,9 @@ EOF
 if [[ "$CASK_UPDATED" -eq 1 ]]; then
   cat <<'EOF'
 
-Casks/image-relay.rb updated for this stable release. Commit it and run
-scripts/sync-cask-to-tap.sh to publish to the public Homebrew tap.
+Casks/image-relay.rb updated for this stable release. After the GitHub release
+is published, commit the cask and run scripts/sync-cask-to-tap.sh to publish it
+to the public Homebrew tap (every stable release; see RELEASE_TESTING.md).
 EOF
 fi
 

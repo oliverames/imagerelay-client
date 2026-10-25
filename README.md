@@ -45,6 +45,14 @@ The client uses Apple's File Provider API to expose the selected library as a Fi
 
 The macOS app and extension target macOS 26 or later. The iOS app and extension target iOS 18 or later.
 
+### Install with Homebrew
+
+```sh
+brew install --cask oliverames/tap/image-relay
+```
+
+The cask installs the same notarized DMG that GitHub Releases publishes. Image Relay updates itself through Sparkle, so you don't need `brew upgrade` to stay current.
+
 ### Install from the DMG
 
 1. Download the latest `ImageRelayClient-*.dmg` asset from the [latest release](https://github.com/oliverames/imagerelay-client/releases/latest)

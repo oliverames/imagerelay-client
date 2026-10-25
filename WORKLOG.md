@@ -14,7 +14,7 @@ Multi-folder appearances and explicit Add to Folders support are implemented. Re
 
 - [#36](https://github.com/oliverames/imagerelay-client/issues/36) retains the membership gap. Do not remove the global asset as a substitute for removing one membership.
 - [#35](https://github.com/oliverames/imagerelay-client/issues/35) retains active notarization-key rotation and verification.
-- [#33](https://github.com/oliverames/imagerelay-client/issues/33) retains the Homebrew publishing decision. The tap exists as of October 13, but its Image Relay cask was still absent when reviewed. The local cask and sync script remain in place pending that decision.
+- [#33](https://github.com/oliverames/imagerelay-client/issues/33) is resolved: Oliver decided on October 25 to publish the cask. `Casks/image-relay.rb` (1.4.4, SHA-256 matching the published DMG) is in `oliverames/homebrew-tap` and passes `brew audit --cask --online --strict` and `brew style`. Each stable release now runs `scripts/sync-cask-to-tap.sh` after publication; see [Release Testing](RELEASE_TESTING.md). The 1.4.5 release must also update the cask's uninstall and zap stanzas for the new bundle identity.
 
 The former bundled webhook relay was decommissioned in June. Optional relay support and the OAuth callback Worker still have current callers; neither is obsolete merely because that older relay was removed.
 
