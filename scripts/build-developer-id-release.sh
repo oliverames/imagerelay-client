@@ -407,16 +407,16 @@ fi
 codesign --verify --deep --strict --verbose=4 "$DMG_ROOT/$APP_BUNDLE_NAME" 2>&1 | tee "$ARTIFACT_DIR/codesign-dmgroot-app.log"
 # macOS 27.2 intermittently fails `hdiutil create` with "Resource busy" while
 # other sessions have simulators booted. The failure is transient, so retry.
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 240); do
   if hdiutil create -volname 'Image Relay' -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_PATH" 2>&1 | tee "$ARTIFACT_DIR/hdiutil.log" && [[ -s "$DMG_PATH" ]]; then
     break
   fi
-  if ((attempt == 20)); then
+  if ((attempt == 240)); then
     echo "hdiutil create kept failing after $attempt attempts." >&2
     exit 1
   fi
-  echo "hdiutil create failed (attempt $attempt); retrying in 30s..." >&2
-  sleep 30
+  echo "hdiutil create failed (attempt $attempt); retrying in 15s..." >&2
+  sleep 15
 done
 codesign --sign "$DEVELOPER_ID_APPLICATION_IDENTITY" \
   --timestamp \
