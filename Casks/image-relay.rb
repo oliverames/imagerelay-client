@@ -5,7 +5,7 @@ cask "image-relay" do
   url "https://github.com/oliverames/imagerelay-client/releases/download/v#{version}/ImageRelayClient-#{version}.dmg",
       verified: "github.com/oliverames/imagerelay-client/"
   name "Image Relay"
-  desc "Native macOS client for the Image Relay digital asset manager"
+  desc "Native client for the Image Relay digital asset manager"
   homepage "https://github.com/oliverames/imagerelay-client"
 
   livecheck do
@@ -14,12 +14,12 @@ cask "image-relay" do
   end
 
   auto_updates true
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
 
   app "Image Relay.app"
 
-  uninstall quit:      "com.oliverames.imagerelay-client",
-            launchctl: "com.oliverames.imagerelay-client.fileprovider"
+  uninstall launchctl: "com.oliverames.imagerelay-client.fileprovider",
+            quit:      "com.oliverames.imagerelay-client"
 
   zap trash: [
     "~/Library/Application Support/Image Relay",
