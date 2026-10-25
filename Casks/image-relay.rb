@@ -2,8 +2,7 @@ cask "image-relay" do
   version "1.4.4"
   sha256 "0429fe09b4fb8205358746298694c87297d000a602f176a4607362d916ee0e2a"
 
-  url "https://github.com/oliverames/imagerelay-client/releases/download/v#{version}/ImageRelayClient-#{version}.dmg",
-      verified: "github.com/oliverames/imagerelay-client/"
+  url "https://github.com/oliverames/imagerelay-client/releases/download/v#{version}/ImageRelayClient-#{version}.dmg"
   name "Image Relay"
   desc "Native client for the Image Relay digital asset manager"
   homepage "https://github.com/oliverames/imagerelay-client"
