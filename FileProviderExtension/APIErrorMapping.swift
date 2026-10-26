@@ -14,6 +14,7 @@ extension Error {
         }
 
         guard let apiError = self as? APIError else {
+            CrashReporting.report(.fileprovider, "Unexpected sync error", error: self)
             return fileProviderCannotSynchronize(
                 localizedDescription,
                 recoverySuggestion: "Try again. If this keeps happening, open Image Relay settings and export diagnostics."
@@ -30,11 +31,15 @@ extension Error {
             if statusCode >= 500 {
                 return NSFileProviderError(.serverUnreachable)
             }
+            CrashReporting.report(.fileprovider, "Image Relay rejected a request", error: apiError, httpStatus: statusCode)
             return fileProviderCannotSynchronize(
                 localizedDescription,
                 recoverySuggestion: "Image Relay rejected the request. Try again after checking the item in Image Relay."
             )
         case .forbidden, .decodingError, .invalidResponse, .invalidURL, .paginationLimitExceeded:
+            if case .forbidden = apiError {} else {
+                CrashReporting.report(.fileprovider, "Unexpected Image Relay response", error: apiError)
+            }
             return fileProviderCannotSynchronize(
                 apiError.userMessage,
                 recoverySuggestion: "Check Image Relay permissions and app settings, then try again."

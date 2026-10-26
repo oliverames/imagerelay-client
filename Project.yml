@@ -13,6 +13,14 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.9.6"
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    exactVersion: "9.31.0"
+
+configFiles:
+  # Crash reporting DSN: empty in Git, filled by scripts/configure-diagnostics.py.
+  Debug: Config/Diagnostics.xcconfig
+  Release: Config/Diagnostics.xcconfig
 
 settings:
   base:
@@ -54,10 +62,14 @@ targets:
       - path: ImageRelayClient
       - path: FileProviderExtension/ActionFormatting.swift
       - path: FileProviderExtension/FileProviderSignalCoordinator.swift
+      - path: FileProviderExtension/CrashReporting.swift
+      - path: FileProviderExtension/DiagnosticsPrivacy.swift
     dependencies:
       - package: ImageRelayKit
       - package: Sparkle
         product: Sparkle
+      - package: Sentry
+        product: Sentry
       - target: FileProviderExtension
         embed: true
         codeSign: false
@@ -98,6 +110,8 @@ targets:
       - path: FileProviderExtension
     dependencies:
       - package: ImageRelayKit
+      - package: Sentry
+        product: Sentry
     entitlements:
       path: FileProviderExtension/FileProviderExtension.entitlements
       properties:
@@ -174,6 +188,7 @@ targets:
             CFBundleSymbolName: ImageRelayMark
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ImageRelaySentryDSN: $(IMAGERELAY_SENTRY_DSN)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.fileprovider
@@ -201,6 +216,8 @@ targets:
       - path: FileProviderExtension
     dependencies:
       - package: ImageRelayKit
+      - package: Sentry
+        product: Sentry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.amesconsulting.imagerelay.fileprovider.tests

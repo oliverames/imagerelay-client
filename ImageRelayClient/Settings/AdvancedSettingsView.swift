@@ -15,6 +15,7 @@ struct AdvancedSettingsView: View {
     @State private var isResettingDomain = false
     @State private var isExportingDiagnostics = false
     @State private var diagnosticsMessage: String?
+    @State private var shareCrashReports = CrashReporting.isPreferenceOn
 
     private var container: URL? { AppConfiguration.containerURL() }
 
@@ -64,6 +65,18 @@ struct AdvancedSettingsView: View {
                 Text("Webhook Relay")
             } footer: {
                 Text("When configured, the host app checks the relay for change events and refreshes Finder immediately. The File Provider extension keeps a slower safety poll.")
+                    .font(.caption)
+            }
+
+            Section {
+                Toggle("Share Crash Reports", isOn: $shareCrashReports)
+                    .onChange(of: shareCrashReports) { _, enabled in
+                        CrashReporting.setEnabled(enabled)
+                    }
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Sends crash reports and unexpected sync error codes to the developer through Sentry. Reports never include your API key, account, asset, file, or folder names, or file paths.")
                     .font(.caption)
             }
 

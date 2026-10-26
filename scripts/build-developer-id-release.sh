@@ -89,6 +89,26 @@ for tool in op python3 xcodegen xcodebuild xcrun hdiutil codesign spctl ditto sh
   require_command "$tool"
 done
 
+# Crash reporting pre-flight. Every release carries the Sentry DSN from
+# 1Password (scripts/configure-diagnostics.py), so a Mac without `op` access
+# cannot ship a build that silently has reporting off. Symbol upload also needs
+# sentry-cli and the organization token; SKIP_SENTRY=1 skips only the upload.
+SENTRY_DSN_REFERENCE="op://Development/Image Relay Sentry DSN/credential"
+SENTRY_TOKEN_REFERENCE="op://Development/PingWarden Sentry API Token/credential"
+SENTRY_RELEASE="$APP_BUNDLE_ID@$VERSION+$PROJECT_BUILD_VERSION"
+export PATH="$HOME/.local/bin:$PATH"
+if ! op read "$SENTRY_DSN_REFERENCE" >/dev/null 2>&1; then
+  echo "Cannot read the Sentry DSN from 1Password ($SENTRY_DSN_REFERENCE)." >&2
+  exit 69
+fi
+if [[ "${SKIP_SENTRY:-0}" != "1" ]]; then
+  require_command sentry-cli
+  if ! op read "$SENTRY_TOKEN_REFERENCE" >/dev/null 2>&1; then
+    echo "Cannot read the Sentry token from 1Password. Set SKIP_SENTRY=1 to skip dSYM upload." >&2
+    exit 69
+  fi
+fi
+
 sanitize_name() {
   printf '%s' "$1" | tr -c '[:alnum:]._-/' '_'
 }
@@ -366,6 +386,9 @@ cat >"$EXPORT_OPTIONS_PLIST" <<PLIST
 </plist>
 PLIST
 
+echo "Writing the Sentry DSN build configuration..."
+python3 "$ROOT_DIR/scripts/configure-diagnostics.py" --dsn-reference "$SENTRY_DSN_REFERENCE"
+
 echo "Archiving release build..."
 run_xcodebuild archive \
   -project "$PROJECT_PATH" \
@@ -383,6 +406,19 @@ xcodebuild -exportArchive \
 
 echo "Validating exported app before notarization..."
 codesign --verify --deep --strict --verbose=4 "$APP_PATH" 2>&1 | tee "$ARTIFACT_DIR/codesign-exported-app.log"
+python3 "$ROOT_DIR/scripts/configure-diagnostics.py" --dsn-reference "$SENTRY_DSN_REFERENCE" --verify-app "$APP_PATH"
+
+# Keep the archive's debug symbols with the artifacts; the stage directory is
+# deleted on exit, and Sentry needs them to symbolicate crash reports.
+DSYM_DIR="$ARTIFACT_DIR/dSYMs"
+rm -rf "$DSYM_DIR"
+ditto "$ARCHIVE_PATH/dSYMs" "$DSYM_DIR"
+for bundle in "Image Relay.app" "FileProviderExtension.appex"; do
+  if [[ ! -d "$DSYM_DIR/$bundle.dSYM" ]]; then
+    echo "Archive is missing $bundle.dSYM" >&2
+    exit 1
+  fi
+done
 
 echo "Notarizing app zip..."
 ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP_PATH"
@@ -453,6 +489,15 @@ publisher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(publisher)
 publisher.validate_artifacts(sys.argv[2], Path(sys.argv[3]))
 PYVERIFY
+
+# Sentry is enrichment, not a release gate: the notarized artifacts above are
+# complete, so a failed upload warns instead of discarding them. Rerun
+# scripts/upload-dsyms.sh with the same arguments to retry.
+if [[ "${SKIP_SENTRY:-0}" == "1" ]]; then
+  echo "SKIP_SENTRY=1 set; dSYMs were not uploaded to Sentry." >&2
+elif ! "$ROOT_DIR/scripts/upload-dsyms.sh" "$SENTRY_RELEASE" "$DSYM_DIR"/*.dSYM | tee "$ARTIFACT_DIR/sentry-upload.log"; then
+  echo "Warning: Sentry dSYM upload failed. Retry: scripts/upload-dsyms.sh '$SENTRY_RELEASE' '$DSYM_DIR'/*.dSYM" >&2
+fi
 
 if [[ "$SMOKE_INSTALL" -eq 1 ]]; then
   echo "Running smoke install from notarized DMG..."

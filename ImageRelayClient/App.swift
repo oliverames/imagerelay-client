@@ -15,6 +15,13 @@ struct ImageRelayClientApp: App {
     @State private var libraryAdmin: LibraryAdminState
 
     init() {
+        // First, so a crash anywhere in startup is caught, and before the
+        // domain manager starts, so a debug delivery check never touches the
+        // File Provider domain or the library.
+        CrashReporting.start()
+        #if DEBUG
+        if CrashReporting.runDebugTestIfRequested() { Darwin.exit(0) }
+        #endif
         let arguments = CommandLine.arguments
         let isUtilityInvocation = arguments.contains("--export-diagnostics")
             || arguments.contains("--reset-file-provider-domain")

@@ -81,6 +81,7 @@ The cask installs the same notarized DMG that GitHub Releases publishes. Image R
 - **OAuth Security**: connect via classic API key or an Image Relay Developer-app OAuth flow using the Cloudflare-hosted `https://imagerelay-oauth.amesvt.com/callback` bridge, process-safe coordinated refresh, and anti-prompt Keychain caching
 - **Scratch-file protection**: Finder, macOS metadata, editor swap, Office lock, partial-download files, and legacy AI release-matrix fixture names are ignored before upload so temporary local artifacts are not synchronized to Image Relay
 - **Update checks**: Sparkle-backed Check for Updates action from the menu bar
+- **Crash reports**: release builds send crash reports and unexpected sync error codes to the developer through Sentry, with no API key, account, asset, file, or folder names, or file paths; turn it off in Settings > Advanced > Privacy (see [Privacy](PRIVACY.md))
 - **Diagnostics export**: export a sanitized bundle (config, app/system info, activity log, domain status, crash-report summary, recent logs) from Settings > Advanced for support or debugging
 - **Domain reset**: Settings > Advanced > Reset Finder Sync removes and re-registers the File Provider domain without losing configuration
 - **Metadata editing**: edit descriptions, keywords, and custom text fields for the selected Finder item without opening the web app

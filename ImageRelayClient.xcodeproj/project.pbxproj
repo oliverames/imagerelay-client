@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		090F0656A4EFECB28C2A7024 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = B42EBD277D87AE9ACA81B398 /* Sentry */; };
 		0950333D2FBD0A0B7ACFD780 /* WebhooksAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D53A68B665657946F223C4D /* WebhooksAdminView.swift */; };
 		0B6D6305DC1868B1AE40508B /* ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */; };
 		0BDDD9F7D8AB65C3888522D5 /* UploadFileTypeResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE247637D809AACFBF0C0FD3 /* UploadFileTypeResolverTests.swift */; };
 		11AA123A6805705B76D4D482 /* FolderMembershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED205DCD6CD5F128E4CF5D8 /* FolderMembershipView.swift */; };
 		127F1DB94C7A817B7A0D3EBA /* CollectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687CAEA68F037CCA3B5BBD7C /* CollectionsService.swift */; };
+		130B30CF18DE593E772D1A64 /* CrashReporting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B96F56FB0D20D146F0AC181 /* CrashReporting.swift */; };
 		1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */; };
 		138FE9F4035E06E942725316 /* FileProviderSignalCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D9CA591F5FDBC9C8E34343E /* FileProviderSignalCoordinator.swift */; };
 		13B4D654346DD22E357C1C11 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8474CE4312626B6DF40DEB47 /* MenuBarView.swift */; };
@@ -54,6 +56,9 @@
 		786E4DE40EE3029A55D5E660 /* UploadLinksSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BF626C1C1259927BA1F8AE8 /* UploadLinksSettingsView.swift */; };
 		787E887F51E8D73C62824E81 /* ProductsListiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */; };
 		7A7EA3E4B08D42807AF4FD3A /* APIDirectoryiOSView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF8214A8915F547C3475A0FD /* APIDirectoryiOSView.swift */; };
+		7A9694D70050158E8621A727 /* DiagnosticsPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51787514AA1E4E4B69F7A6E /* DiagnosticsPrivacy.swift */; };
+		7B7084EB30F9EC5AD2CE056D /* DiagnosticsPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51787514AA1E4E4B69F7A6E /* DiagnosticsPrivacy.swift */; };
+		7CEE2DA0691AB9314CB7D349 /* DiagnosticsPrivacyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DC52CD44BF3DE7B0405B1A7 /* DiagnosticsPrivacyTests.swift */; };
 		7F145372D694E4765CBC2120 /* SearchEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C2D5387F93605F3CB6B424 /* SearchEnumerator.swift */; };
 		83FCA1A5E566EE87F8AF27BD /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1F29EDBF47C83AC5414A490E /* ImageRelayKit */; };
 		8471271030D5C80138BBDE8A /* FileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7457CF8F4D2A7AB894729 /* FileProviderItem.swift */; };
@@ -82,16 +87,20 @@
 		ABA4106160B19B23434B5491 /* PartialContentFetching.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD835267C9E6B9423321FB4 /* PartialContentFetching.swift */; };
 		B03C1E5D92BE52B11738AF7A /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 9EC291125448216A6C5FE8C2 /* ImageRelayKit */; };
+		B730311CD020DA050CA2628C /* CrashReporting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B96F56FB0D20D146F0AC181 /* CrashReporting.swift */; };
 		BD30D281DD6325FF6DF3B36F /* QuickLinkCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531A609D164448847E6FDD66 /* QuickLinkCleanup.swift */; };
 		BE0F2FF21949D0E2DA83F925 /* FileProviderItemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE92E3AF49009DE57F012E1 /* FileProviderItemTests.swift */; };
+		BF0BF3D68DCC1AC14EA707FD /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 1611CE36FA9C9698E12D1FED /* Sentry */; };
 		BF28848A0635B5E2AAD2656B /* ProductsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF0767B27EA3C8CA0F118C /* ProductsService.swift */; };
 		C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8233106D2398739D5A27A3EF /* CollectionsBrowserView.swift */; };
 		C31A658171BDF0414EE6A18D /* APIErrorMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */; };
+		C5FCF713ED86C04AC132AA8A /* CrashReporting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B96F56FB0D20D146F0AC181 /* CrashReporting.swift */; };
 		CD243F9C5CFEC6CCBA093FAC /* Thumbnailing.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC2224D56C23E028B6761BD4 /* Thumbnailing.swift */; };
 		CEF0F421CAC7EA6ACFA63C25 /* RemoteChangePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E35897A1FA8DBEF1E40B3A3 /* RemoteChangePoller.swift */; };
 		CF4E7F86324A2837C118326F /* ActivitySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE94854D48F7AEDCC969FDD0 /* ActivitySettingsView.swift */; };
 		D39BABEE6FA73544F07647C6 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71DF140CD2400270EE53C4AD /* AdvancedSettingsView.swift */; };
 		D9C9F0316A42E9720EF939C9 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD75B910F8DB2DD99BACD98 /* GeneralSettingsView.swift */; };
+		DA1EAD514537AA8B60A7D0BD /* DiagnosticsPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51787514AA1E4E4B69F7A6E /* DiagnosticsPrivacy.swift */; };
 		DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5214AA13DEAEE7F7687D4000 /* Enumerator.swift */; };
 		DE4D78A483B3275786907ADA /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46B76A4D571BB9BA19CDE4B /* App.swift */; };
 		E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6B484F18C4C86D49798D03D6 /* ImageRelayKit */; };
@@ -101,6 +110,7 @@
 		E490E1FBEEDD9CF4D06756BC /* ImageRelayKit in Frameworks */ = {isa = PBXBuildFile; productRef = 605A842907034C3D0729CACD /* ImageRelayKit */; };
 		F24A531DEE6758FB57272F30 /* WebhookRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D26F70F4D8B1EDD04D2FA65 /* WebhookRelayClient.swift */; };
 		F34CE24C2BF45E5B4D2BDBEF /* IOSFileProviderItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7960CBBF07E6F69DB46014B7 /* IOSFileProviderItem.swift */; };
+		F4F43103560AF9074F658745 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 9A510C662F406F4345F8C2EF /* Sentry */; };
 		F7E97E14C2C6166EDA091B50 /* UploadLinksState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */; };
 		F98998F648EBAA4B46031455 /* Enumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43BFF79E08904BFEC78A777 /* Enumerator.swift */; };
 		F9CFB81BA52112532D583FE9 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0CA6FB5CB8A04A06B32540E /* RootView.swift */; };
@@ -160,8 +170,10 @@
 		1A02240E2F27A5F0FB5D35C7 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		1A9B99F76A7CEBB047DE9752 /* APIErrorMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIErrorMapping.swift; sourceTree = "<group>"; };
 		1C111DCAC573027CA09A51F4 /* UploadLinksState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksState.swift; sourceTree = "<group>"; };
+		1DC52CD44BF3DE7B0405B1A7 /* DiagnosticsPrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsPrivacyTests.swift; sourceTree = "<group>"; };
 		24C2F299036FE7B116F11230 /* CollectionsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsListiOSView.swift; sourceTree = "<group>"; };
 		24D84F22B250C2A2E35B7CA8 /* FoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoldersSettingsView.swift; sourceTree = "<group>"; };
+		2B96F56FB0D20D146F0AC181 /* CrashReporting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporting.swift; sourceTree = "<group>"; };
 		2C9726E505DD02F3DAF29912 /* UploadLinksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadLinksService.swift; sourceTree = "<group>"; };
 		2D26F70F4D8B1EDD04D2FA65 /* WebhookRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhookRelayClient.swift; sourceTree = "<group>"; };
 		336DBC3887926D6E12C41EB1 /* WebhooksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebhooksService.swift; sourceTree = "<group>"; };
@@ -169,6 +181,7 @@
 		395C5774C2A7EB2F00839EFA /* Thumbnailing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thumbnailing.swift; sourceTree = "<group>"; };
 		413441CD471A316A1D63A161 /* FileProviderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FileProviderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnumeratorDataLossTests.swift; sourceTree = "<group>"; };
+		482DBAE5098B800186848971 /* Diagnostics.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Diagnostics.xcconfig; sourceTree = "<group>"; };
 		4A0652D330352E2602E7A99E /* FileProviderExtensioniOS.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FileProviderExtensioniOS.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4ACFCF895BE3EF6017459B2B /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		4CDE7FEDF892912D9CBCEE3E /* ProductsListiOSView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsListiOSView.swift; sourceTree = "<group>"; };
@@ -228,6 +241,7 @@
 		F0B0E925D750E0EA1B6F685F /* ConfigRefreshThrottle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigRefreshThrottle.swift; sourceTree = "<group>"; };
 		F43D66C196BA9E0171106E32 /* PartialContentFetcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialContentFetcherTests.swift; sourceTree = "<group>"; };
 		F46B76A4D571BB9BA19CDE4B /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		F51787514AA1E4E4B69F7A6E /* DiagnosticsPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsPrivacy.swift; sourceTree = "<group>"; };
 		F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FileProviderExtensionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAC0BEE8BC80FC1A5C797F4B /* ImageRelayAPIPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageRelayAPIPath.swift; sourceTree = "<group>"; };
 		FE9BB37AB51EE212EC538E97 /* ConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStore.swift; sourceTree = "<group>"; };
@@ -241,6 +255,7 @@
 			files = (
 				B1F22A7BC59DE16B7B091F07 /* ImageRelayKit in Frameworks */,
 				5E176CE222C64F1164385243 /* Sparkle in Frameworks */,
+				BF0BF3D68DCC1AC14EA707FD /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E490E1FBEEDD9CF4D06756BC /* ImageRelayKit in Frameworks */,
+				F4F43103560AF9074F658745 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -273,6 +289,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E289A627B7368E3628AE8E3C /* ImageRelayKit in Frameworks */,
+				090F0656A4EFECB28C2A7024 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +320,7 @@
 			isa = PBXGroup;
 			children = (
 				80D87A866FF03E2BAD943E1C /* ActionFormattingTests.swift */,
+				1DC52CD44BF3DE7B0405B1A7 /* DiagnosticsPrivacyTests.swift */,
 				41F2AB627B058A88F7F49B64 /* EnumeratorDataLossTests.swift */,
 				1571B39D4D69A523AB9F63B6 /* EnumeratorMockURLProtocol.swift */,
 				EAE92E3AF49009DE57F012E1 /* FileProviderItemTests.swift */,
@@ -320,6 +338,8 @@
 				70839E86A67E6491DD18FAAB /* ActionFormatting.swift */,
 				C1B1133410C098F1C172BB32 /* APIErrorMapping.swift */,
 				6B768EB375011997B202B6FF /* Assets.xcassets */,
+				2B96F56FB0D20D146F0AC181 /* CrashReporting.swift */,
+				F51787514AA1E4E4B69F7A6E /* DiagnosticsPrivacy.swift */,
 				5214AA13DEAEE7F7687D4000 /* Enumerator.swift */,
 				1907D94A32A3AE0968238BFE /* Extension.swift */,
 				B1D7280D1DB8A0DD6D266D76 /* FileProviderExtension.entitlements */,
@@ -385,6 +405,14 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
+		71FCCB6AA7F455C09AF6C429 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				482DBAE5098B800186848971 /* Diagnostics.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 		761CB1C54BAAEBBEB0945304 /* FileProvider */ = {
 			isa = PBXGroup;
 			children = (
@@ -442,6 +470,7 @@
 		AA5C8E04043665C3E3F0251C = {
 			isa = PBXGroup;
 			children = (
+				71FCCB6AA7F455C09AF6C429 /* Config */,
 				1337FB025DB622C6D770D76F /* FileProviderExtension */,
 				B2E7E1FC294B17D53B2849F7 /* FileProviderExtensioniOS */,
 				0F0AA21D952360693AB8C27C /* FileProviderExtensionTests */,
@@ -549,6 +578,7 @@
 			name = FileProviderExtension;
 			packageProductDependencies = (
 				6B484F18C4C86D49798D03D6 /* ImageRelayKit */,
+				B42EBD277D87AE9ACA81B398 /* Sentry */,
 			);
 			productName = FileProviderExtension;
 			productReference = 413441CD471A316A1D63A161 /* FileProviderExtension.appex */;
@@ -572,6 +602,7 @@
 			packageProductDependencies = (
 				9EC291125448216A6C5FE8C2 /* ImageRelayKit */,
 				70F34D5A8C76987F13E836E2 /* Sparkle */,
+				1611CE36FA9C9698E12D1FED /* Sentry */,
 			);
 			productName = ImageRelayClient;
 			productReference = 10E8B32366DC8A4264C5216C /* ImageRelayClient.app */;
@@ -613,6 +644,7 @@
 			name = FileProviderExtensionTests;
 			packageProductDependencies = (
 				605A842907034C3D0729CACD /* ImageRelayKit */,
+				9A510C662F406F4345F8C2EF /* Sentry */,
 			);
 			productName = FileProviderExtensionTests;
 			productReference = F8CBF1B20C164895EC9ADE92 /* FileProviderExtensionTests.xctest */;
@@ -657,6 +689,7 @@
 			mainGroup = AA5C8E04043665C3E3F0251C;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				4848219B2C921171EF017CBC /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				AA55A8F4871F53667E7C8EB9 /* XCLocalSwiftPackageReference "ImageRelayKit" */,
 			);
@@ -709,6 +742,8 @@
 			files = (
 				1332D2C84CAF6E056F5F6BAE /* APIErrorMapping.swift in Sources */,
 				89AE15BD1F5A37F28715F554 /* ActionFormatting.swift in Sources */,
+				B730311CD020DA050CA2628C /* CrashReporting.swift in Sources */,
+				DA1EAD514537AA8B60A7D0BD /* DiagnosticsPrivacy.swift in Sources */,
 				DAF1FE72097EA2960A3332D8 /* Enumerator.swift in Sources */,
 				960B40F8B168A16893E05254 /* Extension.swift in Sources */,
 				2A24DEC4DA2CC498B59BE186 /* FileProviderItem.swift in Sources */,
@@ -733,7 +768,9 @@
 				DE4D78A483B3275786907ADA /* App.swift in Sources */,
 				C0E11E5D98CC82B36AE3AAB4 /* CollectionsBrowserView.swift in Sources */,
 				127F1DB94C7A817B7A0D3EBA /* CollectionsService.swift in Sources */,
+				130B30CF18DE593E772D1A64 /* CrashReporting.swift in Sources */,
 				38408F6DD2EFE27C384909D4 /* DiagnosticsExporter.swift in Sources */,
+				7A9694D70050158E8621A727 /* DiagnosticsPrivacy.swift in Sources */,
 				2920893565BB9C279BA5E9AF /* DomainManager.swift in Sources */,
 				138FE9F4035E06E942725316 /* FileProviderSignalCoordinator.swift in Sources */,
 				596AF611CF0D654188390AED /* FinderSelectionReader.swift in Sources */,
@@ -780,6 +817,9 @@
 				9AA24C58E66241965C7637BF /* APIErrorMapping.swift in Sources */,
 				E44C1C0E30FB29D0E5AE30D0 /* ActionFormatting.swift in Sources */,
 				4C31D68446CCD026870B36ED /* ActionFormattingTests.swift in Sources */,
+				C5FCF713ED86C04AC132AA8A /* CrashReporting.swift in Sources */,
+				7B7084EB30F9EC5AD2CE056D /* DiagnosticsPrivacy.swift in Sources */,
+				7CEE2DA0691AB9314CB7D349 /* DiagnosticsPrivacyTests.swift in Sources */,
 				304E4872CBAF1A530C31812B /* Enumerator.swift in Sources */,
 				24BEB7C0CB875FE2BDC28583 /* EnumeratorDataLossTests.swift in Sources */,
 				9BC429DCAF85E390B3EC318C /* EnumeratorMockURLProtocol.swift in Sources */,
@@ -841,6 +881,7 @@
 /* Begin XCBuildConfiguration section */
 		13726E5A498AC4FD5F888635 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 482DBAE5098B800186848971 /* Diagnostics.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -944,6 +985,7 @@
 		};
 		5B73251BED380150A82E5D7F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 482DBAE5098B800186848971 /* Diagnostics.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -1235,6 +1277,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4848219B2C921171EF017CBC /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
+			requirement = {
+				kind = exactVersion;
+				version = 9.31.0;
+			};
+		};
 		EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1246,6 +1296,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1611CE36FA9C9698E12D1FED /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4848219B2C921171EF017CBC /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
 		1F29EDBF47C83AC5414A490E /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
@@ -1263,9 +1318,19 @@
 			package = EE53646747C0B7F2CD79C568 /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
+		9A510C662F406F4345F8C2EF /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4848219B2C921171EF017CBC /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
 		9EC291125448216A6C5FE8C2 /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ImageRelayKit;
+		};
+		B42EBD277D87AE9ACA81B398 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4848219B2C921171EF017CBC /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 		EA55A5F80292B27EC2A4FAFB /* ImageRelayKit */ = {
 			isa = XCSwiftPackageProductDependency;

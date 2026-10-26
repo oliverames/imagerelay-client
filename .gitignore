@@ -13,3 +13,6 @@ DerivedData/
 
 # Wrangler local cache
 Cloudflare/**/.wrangler/
+
+# Sentry DSN for local and release builds (scripts/configure-diagnostics.py)
+Config/Diagnostics.local.xcconfig

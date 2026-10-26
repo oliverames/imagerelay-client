@@ -43,6 +43,8 @@ final class Extension: NSObject, NSFileProviderReplicatedExtension, NSFileProvid
     }
 
     required init(domain: NSFileProviderDomain) {
+        // First, so a crash anywhere in the extension is caught.
+        CrashReporting.start()
         self.domain = domain
 
         guard let container = FileManager.default.containerURL(

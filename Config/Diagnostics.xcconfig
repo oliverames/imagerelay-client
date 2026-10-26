@@ -1,0 +1,5 @@
+// Crash and error reporting. The checked-in value is empty, so a build without the local file
+// runs with reporting off. scripts/configure-diagnostics.py writes the ignored
+// Diagnostics.local.xcconfig from 1Password without printing the DSN.
+IMAGERELAY_SENTRY_DSN =
+#include? "Diagnostics.local.xcconfig"
