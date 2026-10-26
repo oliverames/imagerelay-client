@@ -24,6 +24,22 @@ struct DiagnosticsPrivacyTests {
         }
     }
 
+    @Test func scrubRemovesFileNamesAfterPathsWithSpaces() {
+        let text = DiagnosticsPrivacy.scrub(
+            "Could not open /Users/jane/Pictures/Beach Day.HEIC or Smith Family Budget.xlsx or notes.md",
+            knownIdentifiers: []
+        )
+        for secret in ["Day", "HEIC", "Budget", "xlsx", "notes"] {
+            #expect(!text.contains(secret), "\(secret) leaked: \(text)")
+        }
+    }
+
+    @Test func scrubRemovesBearerTokensInHeaders() {
+        for text in ["Authorization: Bearer xyz123", "authorization=Bearer xyz123", "Bearer xyz123"] {
+            #expect(!DiagnosticsPrivacy.scrub(text, knownIdentifiers: []).contains("xyz123"))
+        }
+    }
+
     @Test func scrubKeepsTypeNamesAndCodes() {
         #expect(DiagnosticsPrivacy.scrub("ImageRelayKit.APIError code 3") == "ImageRelayKit.APIError code 3")
         #expect(DiagnosticsPrivacy.scrub("EXC_BAD_ACCESS") == "EXC_BAD_ACCESS")
@@ -138,10 +154,12 @@ struct DiagnosticsPrivacyTests {
     @Test func ownReportsKeepTheirFixedMessageAndAllowedTags() {
         let event = Event(level: .error)
         event.message = SentryMessage(formatted: "Unexpected sync error")
-        event.fingerprint = [CrashReporting.ownEventFingerprintHead, "fileprovider"]
+        event.fingerprint = [CrashReporting.ownEventFingerprintHead, "fileprovider", "jane@example.com"]
         event.tags = ["area": "fileprovider", "error_code": "3", "http_status": "422", "folder": "Marketing"]
         let scrubbed = CrashReporting.scrub(event)
         #expect(scrubbed.message?.formatted == "Unexpected sync error")
         #expect(scrubbed.tags == ["area": "fileprovider", "error_code": "3", "http_status": "422"])
+        let fingerprint = scrubbed.fingerprint ?? []
+        #expect(!fingerprint.joined().contains("jane@example.com"))
     }
 }
